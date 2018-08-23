@@ -1,0 +1,61 @@
+log.level: "DEBUG"
+
+backup.time.s: 600
+backup.on.shutdown: false
+commit.time.s: 60
+create.records.trigger: 1
+index.lru.cache.size: 1
+index.write.batch.size: 3
+topic.lag.trigger: 1000000
+
+rocks.db.backup.uri: "file:///tmp/RocksDB/testBackup"
+rocks.db.backups.to.keep: 5
+rocks.db.compaction.read.ahead.size: 1048675
+rocks.db.max.background.compactions: 4
+rocks.db.max.background.flushes: 4
+rocks.db.max.subcompactions: 2
+rocks.db.max.write.buffer.number: 4
+rocks.db.memtable.size: 1048675
+rocks.db.parallelism: 4
+rocks.db.uri: "file:///tmp/RocksDB/test"
+rocks.db.put.batch.size: 5
+
+topics:
+  default:
+    acks: "all"
+    auto.offset.reset: "earliest"
+    bootstrap.servers: "kafka:29092"
+    client.id: "southpaw"
+    group.id: "southpaw"
+    key.serde.class: "com.jwplayer.southpaw.serde.JsonSerde"
+    poll.timeout: 100
+    schema.registry.url: "http://schema-registry:8081"
+    topic.class: "com.jwplayer.southpaw.topic.InMemoryTopic"
+    value.serde.class: "com.jwplayer.southpaw.serde.JsonSerde"
+  DenormalizedPlaylist:
+    topic.name: "denormalized.playlist"
+  DenormalizedMedia:
+      topic.name: "denormalized.media"
+  DenormalizedPlayer:
+    topic.name: "denormalized.player"
+  media:
+    topic.name: "media"
+  player:
+    topic.name: "presentation"
+  playlist:
+    topic.name: "playlist"
+  playlist_custom_params:
+    topic.name: "playlist_custom_params"
+  playlist_media:
+    topic.name: "playlist_media"
+  playlist_tag:
+    topic.name: "playlist_tag"
+  user:
+    topic.name: "user"
+  user_tag:
+    topic.name: "user_tag"
+  Overrides:
+    client.id: "overrides"
+    key.serde.class: "com.jwplayer.southpaw.serde.AvroSerde"
+    value.serde.class: "com.jwplayer.southpaw.serde.AvroSerde"
+    topic.name: "overrides"

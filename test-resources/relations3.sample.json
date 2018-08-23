@@ -1,0 +1,25 @@
+[
+  {
+    "DenormalizedName": "DenormalizedMedia",
+    "Entity": "media",
+    "Children": [
+      {
+        "Entity": "user",
+        "JoinKey": "user_id",
+        "ParentKey": "user_id"
+      },
+      {
+        "Entity": "playlist_media",
+        "JoinKey": "media_id",
+        "ParentKey": "id",
+        "Children": [
+          {
+            "Entity": "playlist",
+            "JoinKey": "id",
+            "ParentKey": "playlist_id"
+          }
+        ]
+      }
+    ]
+  }
+]

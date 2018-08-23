@@ -1,0 +1,42 @@
+[
+  {
+    "DenormalizedName": "DenormalizedPlaylist",
+    "Entity": "playlist",
+    "Children": [
+      {
+        "Entity": "user",
+        "JoinKey": "user_id",
+        "ParentKey": "user_id"
+      },
+      {
+        "Entity": "playlist_tag",
+        "JoinKey": "playlist_id",
+        "ParentKey": "id",
+        "Children": [
+          {
+            "Entity": "user_tag",
+            "JoinKey": "id",
+            "ParentKey": "user_tag_id"
+          }
+        ]
+      },
+      {
+        "Entity": "playlist_custom_params",
+        "JoinKey": "playlist_id",
+        "ParentKey": "id"
+      },
+      {
+        "Entity": "playlist_media",
+        "JoinKey": "playlist_id",
+        "ParentKey": "id",
+        "Children": [
+          {
+            "Entity": "media",
+            "JoinKey": "id",
+            "ParentKey": "media_id"
+          }
+        ]
+      }
+    ]
+  }
+]

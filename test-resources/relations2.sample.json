@@ -1,0 +1,13 @@
+[
+  {
+    "DenormalizedName": "DenormalizedPlayer",
+    "Entity": "player",
+    "Children": [
+      {
+        "Entity": "user",
+        "JoinKey": "user_id",
+        "ParentKey": "user_id"
+      }
+    ]
+  }
+]

@@ -1,0 +1,40 @@
+{
+  "$schema": "http://json-schema.org/draft-06/schema#",
+  "id": "relations.json",
+  "title": "Southpaw relation definitions",
+  "description": "A JSON doc that describes the relationship tree for the entities that make up each denormalized entity",
+  "definitions": {
+    "Relation": {
+      "javaType": "com.jwplayer.southpaw.json.Relation",
+      "type": "object",
+      "required": ["Entity"],
+      "properties": {
+        "DenormalizedName": {
+          "description": "The name of the denormalized object created (e.g. feed), should be null if this is a child relation",
+          "type": "string"
+        },
+        "Entity": {
+          "description": "The (short) name of the entity (e.g. media)",
+          "type": "string"
+        },
+        "JoinKey": {
+          "description": "The name of the key field used to join to the parent of this entity (ON JoinKey = ParentKey), should be null if this is the root relation",
+          "type": "string"
+        },
+        "ParentKey": {
+          "description": "The name of the key field of the parent used to join to this entity (ON JoinKey = ParentKey), should be null if this is the root relation",
+          "type": "string"
+        },
+        "Children": {
+          "description": "The child entities of this entity",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Relation"
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "$ref": "#/definitions/Relation"
+}

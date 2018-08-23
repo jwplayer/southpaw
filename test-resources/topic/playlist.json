@@ -1,0 +1,18 @@
+{"id":4234}
+{"id":4234,"active":0,"user_id":1234,"type":"manual","title":"Empty Manual Playlist"}
+{"id":4235}
+{"id":4235,"active":1,"user_id":1234,"type":"feed","title":"Untitled Similar Playlist"}
+{"id":4236}
+{"id":4236,"active":1,"user_id":1235,"type":"trending","title":"Test Trending Playlist"}
+{"id":4237}
+{"id":4237,"active":1,"user_id":1235,"type":"dynamic","title":"Pinned Dynamic"}
+{"id":4238}
+{"id":4238,"active":1,"user_id":1235,"type":"feed","title":"Pinning Dynamic Target"}
+{"id":4238}
+{"id":4238,"active":1,"user_id":1234,"type":"feed","title":"look mom, I'm a title"}
+{"id":4234}
+
+{"id":4235}
+
+{"id":4235}
+{"id":4235,"active":1,"user_id":1234,"type":"feed","title":"Titled Similar Playlist"}

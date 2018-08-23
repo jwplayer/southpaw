@@ -1,0 +1,43 @@
+{
+  "$schema": "http://json-schema.org/draft-06/schema#",
+  "id": "denormalized_record.json",
+  "title": "Denormalized Record",
+  "description": "A JSON doc that represents a denormalized record based on relation configuration",
+  "definitions": {
+    "Record": {
+      "description": "The actual normalized input record added to this denormalized object.",
+      "javaType": "com.jwplayer.southpaw.json.Record",
+      "type": "object",
+      "additionalProperties": true
+    },
+    "DenormalizedRecord": {
+      "javaType": "com.jwplayer.southpaw.json.DenormalizedRecord",
+      "type": "object",
+      "required": [
+        "Record",
+        "Children"
+      ],
+      "properties": {
+        "Record": {
+          "$ref": "#/definitions/Record"
+        },
+        "Children": {
+          "$ref": "#/definitions/ChildRecords"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ChildRecords": {
+      "description": "A map of child record collections keyed by entity",
+      "javaType": "com.jwplayer.southpaw.json.ChildRecords",
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "$ref": "#/definitions/DenormalizedRecord"
+        }
+      }
+    }
+  },
+  "$ref": "#/definitions/DenormalizedRecord"
+}

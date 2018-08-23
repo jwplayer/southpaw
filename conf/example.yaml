@@ -1,0 +1,62 @@
+log.level: "INFO"
+
+backup.time.s: 1800
+backup.on.shutdown: true
+commit.time.s: 120
+create.records.trigger: 1000000
+index.lru.cache.size: 1500
+index.write.batch.size: 1500
+topic.lag.trigger: 100
+
+rocks.db.backup.uri: "file:///tmp/RocksDB/southpaw/backups"
+rocks.db.backups.to.keep: 2
+rocks.db.compaction.read.ahead.size: 2097152
+rocks.db.max.background.compactions: 2
+rocks.db.max.background.flushes: 4
+rocks.db.max.subcompactions: 2
+rocks.db.max.write.buffer.number: 6
+rocks.db.memtable.size: 2000000000
+rocks.db.parallelism: 10
+rocks.db.uri: "file:///tmp/RocksDB/southpaw"
+rocks.db.put.batch.size: 1500
+
+aws.s3.access.key.id: ABCDEFG
+aws.s3.secret.key: 1234567
+aws.s3.region: us-east-1
+
+topics:
+  default:
+    acks: "all"
+    auto.offset.reset: "earliest"
+    bootstrap.servers: "kafka:9092"
+    client.id: "southpaw"
+    group.id: "southpaw"
+    enable.auto.commit: false
+    key.serde.class: "com.jwplayer.southpaw.serde.AvroSerde"
+    poll.timeout: 100
+    schema.registry.url: "http://schema_registry_url:80"
+    topic.class: "com.jwplayer.southpaw.topic.KafkaTopic"
+    value.serde.class: "com.jwplayer.southpaw.serde.AvroSerde"
+  DenormalizedPlaylist:
+    compression.type: "snappy"
+    jackson.serde.class: "com.jwplayer.southpaw.json.DenormalizedRecord"
+    key.serde.class: "org.apache.kafka.common.serialization.Serdes$ByteArraySerde"
+    topic.class: "com.jwplayer.southpaw.topic.KafkaTopic"
+    topic.name: "denormalizer.playlist"
+    value.serde.class: "com.jwplayer.southpaw.serde.JacksonSerde"
+  media:
+    topic.name: "media"
+  playlist:
+    topic.name: "playlist"
+  playlist_custom_params:
+    topic.name: "playlist_custom_params"
+  playlist_media:
+    topic.name: "playlist_media"
+  playlist_tag:
+    topic.name: "playlist_tag"
+  player:
+    topic.name: "player"
+  user:
+    topic.name: "user"
+  user_tag:
+    topic.name: "user_tag"

@@ -1,0 +1,26 @@
+# Compiled class file
+*.class
+
+# Package Files #
+*.jar
+*.war
+*.ear
+*.zip
+*.tar.gz
+*.rar
+
+# Maven
+.classpath
+.project
+.settings/
+dependency-reduced-pom.xml
+src/main/java/com/jwplayer/southpaw/json/
+target/
+
+# Local config
+conf/local.yaml
+relations/
+
+# IntelliJ
+.idea/
+*.iml
