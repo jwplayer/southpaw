@@ -58,6 +58,12 @@ public class JacksonSerdeTest {
     }
 
     @Test
+    public void testDeserializerNull() {
+        Relation[] actual = serde.deserializer().deserialize(null, null);
+        assertNull(actual);
+    }
+
+    @Test
     public void testSerializer() throws Exception {
         Relation[] relations = mapper.readValue(FileHelper.loadFileAsString(new URI(RELATIONS_PATH)), Relation[].class);
         byte[] bytes = serde.serializer().serialize(null, relations);
@@ -65,5 +71,11 @@ public class JacksonSerdeTest {
                 RELATIONS,
                 new String(bytes)
         );
+    }
+
+    @Test
+    public void testSerializerNull() {
+        byte[] bytes = serde.serializer().serialize(null, null);
+        assertNull(bytes);
     }
 }

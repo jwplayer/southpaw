@@ -53,6 +53,7 @@ public class JacksonSerde<T> implements Serde<T> {
         @SuppressWarnings("unchecked")
         public T deserialize(String topic, byte[] bytes) {
             try {
+                if(bytes == null) return null;
                 return mapper.readValue(new String(bytes), clazz);
             } catch(IOException ex) {
                 throw new RuntimeException(ex);
@@ -74,6 +75,7 @@ public class JacksonSerde<T> implements Serde<T> {
         @Override
         public byte[] serialize(String topic, T record) {
             try {
+                if(record == null) return null;
                 return mapper.writeValueAsBytes(record);
             } catch(JsonProcessingException ex) {
                 throw new RuntimeException(ex);
