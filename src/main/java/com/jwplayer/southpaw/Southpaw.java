@@ -408,7 +408,7 @@ public class Southpaw {
             dePKsByType.put(root, ByteArraySet.deserialize(bytes));
         }
 
-        /* Make sure we commit, backup, and close before exiting. Also, prevents a scenario where Southpaw:
+        /* Make sure we backup, and close before exiting. Also, prevents a scenario where Southpaw:
         * - Starts up
         * - Attempts to restore from backups
         * - Restore fails, potentially due to a transient S3 error
@@ -417,8 +417,7 @@ public class Southpaw {
         * */
         if(backupOnShutdown && startedSuccessfully) {
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-                logger.info("Committing and backing up before shutting down");
-                this.commit();
+                logger.info("Backing up before shutting down");
                 this.state.backup();
                 this.close();
                 logger.info("Shutting down");
