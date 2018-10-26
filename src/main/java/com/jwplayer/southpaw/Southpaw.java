@@ -483,8 +483,6 @@ public class Southpaw {
                                             fkIndices.get(createJoinIndexName(child.getValue()));
                                     oldParentKeys = ((Reversible) joinIndex).getForeignKeys(primaryKey);
 
-                                    // Update the join index
-                                    updateJoinIndex(child.getValue(), primaryKey, newRecord);
                                     // Create the denormalized records
                                     if (oldParentKeys != null) {
                                         for (ByteArray oldParentKey : oldParentKeys) {
@@ -502,6 +500,8 @@ public class Southpaw {
                                             dePrimaryKeys.addAll(primaryKeys);
                                         }
                                     }
+                                    // Update the join index
+                                    updateJoinIndex(child.getValue(), primaryKey, newRecord);
                                 }
                             }
                             int size = dePrimaryKeys.size();
@@ -636,7 +636,6 @@ public class Southpaw {
      * Recursively create a new denormalized record based on its relation definition, its parent's input record,
      * and its primary key.
      * @param root - The root relation of the denormalized record
-     * @param parent - The parent of the current relation
      * @param relation - The current relation of the denormalized record to build
      * @param rootPrimaryKey - The PK of the root / denormalized record
      * @param relationPrimaryKey - The PK of the record
@@ -644,7 +643,6 @@ public class Southpaw {
      */
     protected DenormalizedRecord createDenormalizedRecord(
             Relation root,
-            Relation parent,
             Relation relation,
             ByteArray rootPrimaryKey,
             ByteArray relationPrimaryKey) {
@@ -652,15 +650,7 @@ public class Southpaw {
         BaseTopic<BaseRecord, BaseRecord> relationTopic = inputTopics.get(relation.getEntity());
         BaseRecord relationRecord = relationTopic.readByPK(relationPrimaryKey);
 
-        if(relationRecord == null || relationRecord.isEmpty()) {
-            if(root == relation) {
-                // This is a tombstone record of the root relation
-                scrubParentIndices(root, relation, rootPrimaryKey);
-            } else {
-                // This is a tombstone record of a child relation
-                scrubParentIndices(root, parent, relation, rootPrimaryKey, relationPrimaryKey);
-            }
-        } else {
+        if(!(relationRecord == null || relationRecord.isEmpty())) {
             denormalizedRecord = new DenormalizedRecord();
             denormalizedRecord.setRecord(createInternalRecord(relationRecord));
             ChildRecords childRecords = new ChildRecords();
@@ -674,7 +664,7 @@ public class Southpaw {
                     Set<ByteArray> childPKs = joinIndex.getIndexEntry(newParentKey);
                     if (childPKs != null) {
                         for (ByteArray childPK : childPKs) {
-                            DenormalizedRecord deChildRecord = createDenormalizedRecord(root, relation, child, rootPrimaryKey, childPK);
+                            DenormalizedRecord deChildRecord = createDenormalizedRecord(root, child, rootPrimaryKey, childPK);
                             if (deChildRecord != null) records.put(childPK, deChildRecord);
                         }
                     }
@@ -697,7 +687,8 @@ public class Southpaw {
         for(ByteArray dePrimaryKey: rootRecordPKs) {
             if(dePrimaryKey != null) {
                 BaseTopic<byte[], DenormalizedRecord> outputTopic = outputTopics.get(root.getDenormalizedName());
-                DenormalizedRecord newDeRecord = createDenormalizedRecord(root, root, root, dePrimaryKey, dePrimaryKey);
+                scrubParentIndices(root, root, dePrimaryKey);
+                DenormalizedRecord newDeRecord = createDenormalizedRecord(root, root, dePrimaryKey, dePrimaryKey);
                 if(logger.getLevel().equals(Level.DEBUG)) {
                     try {
                         logger.debug(
@@ -1083,31 +1074,6 @@ public class Southpaw {
                 }
                 scrubParentIndices(root, child, rootPrimaryKey);
             }
-        }
-    }
-
-    /**
-     * Scrubs the parent index of the given root primary key and child primary key for the given relations. This is
-     * needed when a tombstone record is seen for a child so that we remove that index entry so we no longer create
-     * denormalized records previously associated with that child primary key.
-     * @param root - The root relation of the parent relation
-     * @param parent - The parent relation of the parent index to scrub
-     * @param rootPrimaryKey - The PK of the root entity
-     * @param relationPrimaryKey - The PK of the tombstoned record
-     */
-    protected void scrubParentIndices(
-            Relation root,
-            Relation parent,
-            Relation child,
-            ByteArray rootPrimaryKey,
-            ByteArray relationPrimaryKey) {
-        Preconditions.checkNotNull(root);
-        Preconditions.checkNotNull(parent);
-        Preconditions.checkNotNull(child);
-        if(rootPrimaryKey != null && relationPrimaryKey != null) {
-            BaseIndex<BaseRecord, BaseRecord, Set<ByteArray>> parentIndex =
-                    fkIndices.get(createParentIndexName(root, parent, child));
-            parentIndex.remove(relationPrimaryKey, rootPrimaryKey);
         }
     }
 
