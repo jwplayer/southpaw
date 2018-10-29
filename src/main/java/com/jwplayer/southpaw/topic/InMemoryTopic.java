@@ -108,7 +108,12 @@ public final class InMemoryTopic<K, V> extends BaseTopic<K, V> {
 
     @Override
     public void write(K key, V value) {
-        ConsumerRecord<K, V> record = new ConsumerRecord<>(topicName, 0, records.size() + firstOffset, key, value);
+        ConsumerRecord<K, V> record;
+        if(value instanceof BaseRecord && filter.isFiltered(shortName, (BaseRecord) value)) {
+            record = new ConsumerRecord<>(topicName, 0, records.size() + firstOffset, key, null);
+        } else {
+            record = new ConsumerRecord<>(topicName, 0, records.size() + firstOffset, key, value);
+        }
         records.add(record);
         if(key instanceof BaseRecord) {
             recordsByPK.put(((BaseRecord) key).toByteArray(), record);

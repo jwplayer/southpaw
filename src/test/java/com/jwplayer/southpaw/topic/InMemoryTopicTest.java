@@ -15,6 +15,7 @@
  */
 package com.jwplayer.southpaw.topic;
 
+import com.jwplayer.southpaw.filter.DefaultFilter;
 import com.jwplayer.southpaw.state.RocksDBState;
 import com.jwplayer.southpaw.state.RocksDBStateTest;
 import com.jwplayer.southpaw.util.ByteArray;
@@ -51,7 +52,7 @@ public class InMemoryTopicTest {
     public InMemoryTopic<String, String> createTopic() {
         InMemoryTopic<String, String> topic = new InMemoryTopic<>();
         Map<String, Object> config = new HashMap<>();
-        topic.configure("TestTopic", config, state, Serdes.String(), Serdes.String());
+        topic.configure("TestTopic", config, state, Serdes.String(), Serdes.String(), new DefaultFilter());
         for(int i = 0; i < keys.length; i++) {
             topic.write(keys[i], values[i]);
         }

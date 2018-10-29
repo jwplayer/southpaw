@@ -15,6 +15,7 @@
  */
 package com.jwplayer.southpaw.topic;
 
+import com.jwplayer.southpaw.filter.DefaultFilter;
 import com.jwplayer.southpaw.state.RocksDBState;
 import com.jwplayer.southpaw.state.RocksDBStateTest;
 import com.jwplayer.southpaw.util.ByteArray;
@@ -48,7 +49,7 @@ public class KafkaTopicTest {
         config.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
         config.put(ConsumerConfig.GROUP_ID_CONFIG, "test-group");
         config.put(KafkaTopic.TOPIC_NAME_CONFIG, topicName);
-        topic.configure("test", config, state, Serdes.String(), Serdes.String());
+        topic.configure("test", config, state, Serdes.String(), Serdes.String(), new DefaultFilter());
         topic.write("A", "1");
         topic.write("B", "2");
         topic.write("C", "3");

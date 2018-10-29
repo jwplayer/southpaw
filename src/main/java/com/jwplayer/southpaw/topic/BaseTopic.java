@@ -16,6 +16,7 @@
 package com.jwplayer.southpaw.topic;
 
 import com.google.common.base.Preconditions;
+import com.jwplayer.southpaw.filter.BaseFilter;
 import com.jwplayer.southpaw.state.BaseState;
 import com.jwplayer.southpaw.util.ByteArray;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -40,15 +41,32 @@ public abstract class BaseTopic<K, V> {
      * Used as the suffix of the group name where offsets are stored.
      */
     public static final String OFFSETS = "offsets";
+    public static final String FILTER_CLASS_CONFIG = "filter.class";
+    public static final String FILTER_CLASS_DEFAULT = "com.jwplayer.southpaw.filter.DefaultFilter";
+    public static final String FILTER_CLASS_DOC = "Filter class used to filter input records, treating them " +
+            "like tombstones and not recording them in the local state.";
+    public static final String KEY_SERDE_CLASS_CONFIG = "key.serde.class";
+    public static final String KEY_SERDE_CLASS_DOC =
+            "Config option for specifying the key serde class for an input record";
+    public static final String TOPIC_CLASS_CONFIG = "topic.class";
+    public static final String TOPIC_CLASS_DOC =
+            "The topic class to use for Southpaw. The different topics can use different topic implementations.";
     /**
      * Config option for specifying the name of the topic
      */
     public static final String TOPIC_NAME_CONFIG = "topic.name";
+    public static final String VALUE_SERDE_CLASS_CONFIG = "value.serde.class";
+    public static final String VALUE_SERDE_CLASS_DOC =
+            "Config option for specifying the value serde class for an input record";
 
     /**
      * Configuration for this topic
      */
     protected Map<String, Object> config;
+    /**
+     * Filter used to filter out consumed records, treating them like a tombstone
+     */
+    protected BaseFilter filter;
     /**
      * The serde for (de)serializing Kafka record keys
      */
@@ -83,13 +101,15 @@ public abstract class BaseTopic<K, V> {
      * @param state - The state where we store the offsets for this topic
      * @param keySerde - The serde for (de)serializing Kafka record keys
      * @param valueSerde - The serde for (de)serializing Kafka record values
+     * @param filter - The filter used to filter out consumed records, treating them like a tombstone
      */
     public void configure(
             String shortName,
             Map<String, Object> config,
             BaseState state,
             Serde<K> keySerde,
-            Serde<V> valueSerde
+            Serde<V> valueSerde,
+            BaseFilter filter
     ) {
         this.shortName = shortName;
         this.config = Preconditions.checkNotNull(config);
@@ -99,6 +119,7 @@ public abstract class BaseTopic<K, V> {
         this.state.createKeySpace(shortName + "-" + OFFSETS);
         this.keySerde = keySerde;
         this.valueSerde = valueSerde;
+        this.filter = filter;
     }
 
     /**

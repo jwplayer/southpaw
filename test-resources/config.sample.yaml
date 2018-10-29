@@ -26,6 +26,7 @@ topics:
     auto.offset.reset: "earliest"
     bootstrap.servers: "kafka:29092"
     client.id: "southpaw"
+    filter.class: "com.jwplayer.southpaw.filter.TestFilter"
     group.id: "southpaw"
     key.serde.class: "com.jwplayer.southpaw.serde.JsonSerde"
     poll.timeout: 100

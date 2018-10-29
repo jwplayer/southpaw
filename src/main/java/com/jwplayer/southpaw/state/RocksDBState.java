@@ -227,7 +227,9 @@ public class RocksDBState extends BaseState {
                     .setCreateMissingColumnFamilies(true)
                     .setIncreaseParallelism(parallelism)
                     .setMaxBackgroundCompactions(maxBackgroundCompactions)
-                    .setMaxBackgroundFlushes(maxBackgroundFlushes);
+                    .setMaxBackgroundFlushes(maxBackgroundFlushes)
+                    .setWalSizeLimitMB(0L)
+                    .setMaxTotalWalSize(0L);
             dbOptions.setMaxSubcompactions(maxSubcompactions);
             ColumnFamilyOptions cfOptions = new ColumnFamilyOptions()
                     .setCompactionStyle(CompactionStyle.LEVEL)
@@ -243,7 +245,9 @@ public class RocksDBState extends BaseState {
                     .setCompactionReadaheadSize(compactionReadAheadSize)
                     .setMaxBackgroundCompactions(maxBackgroundCompactions)
                     .setMaxBackgroundFlushes(maxBackgroundFlushes)
-                    .setMaxWriteBufferNumber(maxWriteBufferNumber);
+                    .setMaxWriteBufferNumber(maxWriteBufferNumber)
+                    .setWalSizeLimitMB(0L)
+                    .setWalTtlSeconds(0L);
             rocksDBOptions.setMaxSubcompactions(maxSubcompactions);
 
 
@@ -307,7 +311,8 @@ public class RocksDBState extends BaseState {
         Preconditions.checkNotNull(cfHandles.get(handleName));
         try {
             dataBatches.get(handleName).remove(new ByteArray(key));
-            rocksDB.delete(cfHandles.get(handleName), key);
+            WriteOptions writeOptions = new WriteOptions().setDisableWAL(true);
+            rocksDB.delete(cfHandles.get(handleName), writeOptions, key);
         } catch(RocksDBException ex) {
             throw new RuntimeException(ex);
         }

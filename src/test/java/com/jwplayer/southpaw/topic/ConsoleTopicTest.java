@@ -15,6 +15,7 @@
  */
 package com.jwplayer.southpaw.topic;
 
+import com.jwplayer.southpaw.filter.DefaultFilter;
 import com.jwplayer.southpaw.state.BaseState;
 import com.jwplayer.southpaw.state.RocksDBState;
 import com.jwplayer.southpaw.state.RocksDBStateTest;
@@ -38,7 +39,7 @@ public class ConsoleTopicTest {
         Map<String, Object> config = RocksDBStateTest.createConfig("file:///tmp/RocksDB/ConsoleTopicTest");
         state = new RocksDBState();
         state.configure(config);
-        topic.configure("TestTopic", config, state, Serdes.String(), Serdes.String());
+        topic.configure("TestTopic", config, state, Serdes.String(), Serdes.String(), new DefaultFilter());
     }
 
     @After

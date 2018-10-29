@@ -15,6 +15,7 @@
  */
 package com.jwplayer.southpaw.index;
 
+import com.jwplayer.southpaw.filter.DefaultFilter;
 import com.jwplayer.southpaw.record.BaseRecord;
 import com.jwplayer.southpaw.serde.JsonSerde;
 import com.jwplayer.southpaw.state.RocksDBState;
@@ -59,7 +60,7 @@ public class MultiIndexTest {
         valueSerde.configure(config, true);
         state.configure(config);
         BaseTopic<BaseRecord, BaseRecord> indexedTopic = new InMemoryTopic<>(0);
-        indexedTopic.configure("IndexedTopic", config, state, keySerde, valueSerde);
+        indexedTopic.configure("IndexedTopic", config, state, keySerde, valueSerde, new DefaultFilter());
         MultiIndex<BaseRecord, BaseRecord> index = new MultiIndex<>();
         index.configure("TestIndex", config, state, indexedTopic);
         return index;

@@ -18,6 +18,7 @@ package com.jwplayer.southpaw.topic;
 import com.google.common.collect.ImmutableList;
 import com.google.common.primitives.Ints;
 import com.google.common.primitives.Longs;
+import com.jwplayer.southpaw.filter.BaseFilter;
 import com.jwplayer.southpaw.record.BaseRecord;
 import com.jwplayer.southpaw.state.BaseState;
 import com.jwplayer.southpaw.util.ByteArray;
@@ -78,7 +79,26 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
         @Override
         public ConsumerRecord<K, V> next() {
             ConsumerRecord<byte[], byte[]> record = iter.next();
-            ConsumerRecord<K, V> retVal =
+            K key = topic.getKeySerde().deserializer().deserialize(record.topic(), record.key());
+            V value = topic.getValueSerde().deserializer().deserialize(record.topic(), record.value());
+            ByteArray primaryKey;
+            if(key instanceof BaseRecord) {
+                primaryKey = ((BaseRecord) key).toByteArray();
+            } else {
+                primaryKey = new ByteArray(record.key());
+            }
+            if(record.value() == null || (value instanceof BaseRecord && topic.filter.isFiltered(topic.getShortName(), (BaseRecord) value))) {
+                value = null;
+            }
+            if(value == null) {
+                topic.state.delete(topic.shortName + "-" + DATA, primaryKey.getBytes());
+            } else {
+                topic.state.put(topic.shortName + "-" + DATA, primaryKey.getBytes(), record.value());
+            }
+            // The current offset is one ahead of the last read one. This copies what Kafka would return as the
+            // current offset.
+            topic.setCurrentOffset(record.offset() + 1L);
+            return
                     new ConsumerRecord<>(
                             record.topic(),
                             record.partition(),
@@ -88,25 +108,10 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
                             0L,
                             record.serializedKeySize(),
                             record.serializedValueSize(),
-                            topic.getKeySerde().deserializer().deserialize(record.topic(), record.key()),
-                            topic.getValueSerde().deserializer().deserialize(record.topic(), record.value()),
+                            key,
+                            value,
                             record.headers()
                     );
-            ByteArray primaryKey;
-            if(retVal.key() instanceof BaseRecord) {
-                primaryKey = ((BaseRecord) retVal.key()).toByteArray();
-            } else {
-                primaryKey = new ByteArray(record.key());
-            }
-            if(record.value() == null) {
-                topic.state.delete(topic.shortName + "-" + DATA, primaryKey.getBytes());
-            } else {
-                topic.state.put(topic.shortName + "-" + DATA, primaryKey.getBytes(), record.value());
-            }
-            // The current offset is one ahead of the last read one. This copies what Kafka would return as the
-            // current offset.
-            topic.setCurrentOffset(record.offset() + 1L);
-            return retVal;
         }
     }
 
@@ -159,9 +164,10 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
             Map<String, Object> config,
             BaseState state,
             Serde<K> keySerde,
-            Serde<V> valueSerde
+            Serde<V> valueSerde,
+            BaseFilter filter
     ) {
-        super.configure(shortName, config, state, keySerde, valueSerde);
+        super.configure(shortName, config, state, keySerde, valueSerde, filter);
         // Make a consumer
         if(!ObjectUtils.equals(config.get(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG), false)) {
             logger.warn("Southpaw does not use Kafka's offset management. Enabling auto commit does nothing, except maybe incur some overhead.");
