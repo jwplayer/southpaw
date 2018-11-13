@@ -25,6 +25,17 @@ import java.util.Map;
  * in any denormalized records. They are effectively treated as a tombstone.
  */
 public abstract class BaseFilter {
+
+    /*
+     * Used to inform how a record should be handled:
+     * 
+     * UPDATE: Do not filter (no op) by advancing offset and updating state, output record produced.
+     * SKIP: Skip record and advance offset, don't update state, output record not produced.
+     * DELETE: Delete record by advancing offset and updating state, output record produced.
+     * 
+     */
+    public enum FilterMode { UPDATE, SKIP, DELETE }
+
     /**
      * Configure this filter using the global configuration
      * @param config - The global config
@@ -34,10 +45,12 @@ public abstract class BaseFilter {
     }
 
     /**
-     * Determines if the given record should be filtered based on its entity
+     * Determines if the given record should be filtered based on its entity.
+     * 
      * @param entity - The entity of the given record
      * @param record - The record to filter
-     * @return True if the record should be filtered, else false
+     * @param oldRecord - The previously seen record state (may be null)
+     * @return FilterMode - Describes how to handle the input record
      */
-    public abstract boolean isFiltered(String entity, BaseRecord record);
+    public abstract FilterMode filter(String entity, BaseRecord record, BaseRecord oldRecord);
 }

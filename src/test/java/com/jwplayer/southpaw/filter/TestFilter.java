@@ -24,14 +24,20 @@ public class TestFilter extends BaseFilter {
     public TestFilter() {}
 
     @Override
-    public boolean isFiltered(String entity, BaseRecord record) {
+    public FilterMode filter(String entity, BaseRecord record, BaseRecord oldRecord) {
+        FilterMode mode;
         switch(entity) {
             case "media":
-                return DELETED.equals(record.get("status"));
+                if (DELETED.equals(record.get("status"))) {
+                    mode = FilterMode.DELETE;
+                }
             case "playlist_custom_params":
-                return INVALID.equals(record.get("value"));
+                if (INVALID.equals(record.get("value"))) {
+                    mode = FilterMode.DELETE;
+                }
             default:
-                return false;
+                mode = FilterMode.UPDATE;
         }
+        return mode;
     }
 }

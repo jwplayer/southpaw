@@ -19,6 +19,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.primitives.Ints;
 import com.google.common.primitives.Longs;
 import com.jwplayer.southpaw.filter.BaseFilter;
+import com.jwplayer.southpaw.filter.BaseFilter.FilterMode;
 import com.jwplayer.southpaw.record.BaseRecord;
 import com.jwplayer.southpaw.state.BaseState;
 import com.jwplayer.southpaw.util.ByteArray;
@@ -76,42 +77,79 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
             return iter.hasNext();
         }
 
+        /*
+         * Get the next record, or NULL if remaining records are skipped.
+         */
         @Override
         public ConsumerRecord<K, V> next() {
-            ConsumerRecord<byte[], byte[]> record = iter.next();
-            K key = topic.getKeySerde().deserializer().deserialize(record.topic(), record.key());
-            V value = topic.getValueSerde().deserializer().deserialize(record.topic(), record.value());
+
+            ConsumerRecord<byte[], byte[]> record = null;
+            FilterMode filterMode = FilterMode.UPDATE;
             ByteArray primaryKey;
-            if(key instanceof BaseRecord) {
-                primaryKey = ((BaseRecord) key).toByteArray();
-            } else {
-                primaryKey = new ByteArray(record.key());
+            BaseRecord newRec, oldRec = null;
+            K key;
+            V value, currState;
+
+            do {
+                record = iter.next();
+
+                key = topic.getKeySerde().deserializer().deserialize(record.topic(), record.key());
+                value = topic.getValueSerde().deserializer().deserialize(record.topic(), record.value());
+
+                if(key instanceof BaseRecord) {
+                    primaryKey = ((BaseRecord) key).toByteArray();
+                } else {
+                    primaryKey = new ByteArray(record.key());
+                }
+
+                currState = topic.readByPK(primaryKey);
+                if (currState instanceof BaseRecord) {
+                    oldRec = (BaseRecord) currState;
+                }
+
+                // Non-BaseRecord value types will not be filtered
+                if (value instanceof BaseRecord) {
+                    newRec = (BaseRecord) value;
+                    filterMode = topic.filter.filter(topic.getShortName(), newRec, oldRec);
+                }
+
+                switch (filterMode) {
+                    case SKIP:
+                        // do nothing  
+                        break;
+                    case DELETE:    
+                        topic.state.delete(topic.shortName + "-" + DATA, primaryKey.getBytes());
+                        break;
+                    case UPDATE:
+                    default:
+                        topic.state.put(topic.shortName + "-" + DATA, primaryKey.getBytes(), record.value());
+                        break;
+                }
+
+                // The current offset is one ahead of the last read one. 
+                // This copies what Kafka would return as the current offset.
+                topic.setCurrentOffset(record.offset() + 1L);
+            } while (iter.hasNext() && filterMode == FilterMode.SKIP);
+
+            // Condition if the last element in the topic was filtered as SKIP 
+            // and there are no more records to process (hasNext() was false)
+            if (filterMode == FilterMode.SKIP) {
+                return null;
             }
-            if(record.value() == null || (value instanceof BaseRecord && topic.filter.isFiltered(topic.getShortName(), (BaseRecord) value))) {
-                value = null;
-            }
-            if(value == null) {
-                topic.state.delete(topic.shortName + "-" + DATA, primaryKey.getBytes());
-            } else {
-                topic.state.put(topic.shortName + "-" + DATA, primaryKey.getBytes(), record.value());
-            }
-            // The current offset is one ahead of the last read one. This copies what Kafka would return as the
-            // current offset.
-            topic.setCurrentOffset(record.offset() + 1L);
-            return
-                    new ConsumerRecord<>(
-                            record.topic(),
-                            record.partition(),
-                            record.offset(),
-                            record.timestamp(),
-                            record.timestampType(),
-                            0L,
-                            record.serializedKeySize(),
-                            record.serializedValueSize(),
-                            key,
-                            value,
-                            record.headers()
-                    );
+
+            return new ConsumerRecord<>(
+                record.topic(),
+                record.partition(),
+                record.offset(),
+                record.timestamp(),
+                record.timestampType(),
+                0L,
+                record.serializedKeySize(),
+                record.serializedValueSize(),
+                key,
+                value,
+                record.headers()
+            );
         }
     }
 

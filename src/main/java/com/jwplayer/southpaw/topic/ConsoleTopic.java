@@ -17,6 +17,7 @@ package com.jwplayer.southpaw.topic;
 
 import com.jwplayer.southpaw.record.BaseRecord;
 import com.jwplayer.southpaw.util.ByteArray;
+import com.jwplayer.southpaw.filter.BaseFilter.FilterMode;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.commons.lang.NotImplementedException;
 
@@ -63,7 +64,10 @@ public class ConsoleTopic<K, V> extends BaseTopic<K, V> {
     public void write(K key, V value) {
         String k = new String(keySerde.serializer().serialize(topicName, key));
         String v = new String(valueSerde.serializer().serialize(topicName, value));
-        boolean isFiltered = value instanceof BaseRecord && filter.isFiltered(shortName, (BaseRecord) value);
-        System.out.println(String.format("key: %s / value: %s / is filtered: %s", k, v, isFiltered));
+        FilterMode filterMode = FilterMode.UPDATE;
+        if (value instanceof BaseRecord) {
+            filterMode = filter.filter(shortName, (BaseRecord) value, null);
+        }
+        System.out.println(String.format("key: %s / value: %s / filter mode: %s", k, v, filterMode));
     }
 }

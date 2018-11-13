@@ -447,10 +447,12 @@ public class Southpaw {
                     Iterator<ConsumerRecord<BaseRecord, BaseRecord>> records = inputTopic.readNext();
                     // Loop through each record and process it
                     while (records.hasNext()) {
+                        // next() call may return null even if hasNext() returns true due to filtering in next()
                         ConsumerRecord<BaseRecord, BaseRecord> newRecord = records.next();
-                        // Grab the old record, if it exists
+                        if (newRecord == null) {
+                            continue;
+                        }
                         ByteArray primaryKey = newRecord.key().toByteArray();
-
                         for (Relation root : relations) {
                             Set<ByteArray> dePrimaryKeys = dePKsByType.get(root);
                             if (root.getEntity().equals(entity)) {

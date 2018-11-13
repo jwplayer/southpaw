@@ -23,9 +23,14 @@ import com.jwplayer.southpaw.record.BaseRecord;
  */
 public class DefaultFilter extends BaseFilter {
     public DefaultFilter() {}
-
+    /*
+     * By default, null or empty records will be tombstoned (deleted).
+     */
     @Override
-    public boolean isFiltered(String entity, BaseRecord record) {
-        return false;
+    public FilterMode filter(String entity, BaseRecord record, BaseRecord oldRecord) {
+        if (record == null || record.isEmpty()) {
+            return FilterMode.DELETE;
+        }
+        return FilterMode.UPDATE;
     }
 }
