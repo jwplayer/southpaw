@@ -25,16 +25,18 @@ public class TestFilter extends BaseFilter {
 
     @Override
     public FilterMode filter(String entity, BaseRecord record, BaseRecord oldRecord) {
-        FilterMode mode;
+        FilterMode mode = FilterMode.UPDATE;
         switch(entity) {
             case "media":
                 if (DELETED.equals(record.get("status"))) {
                     mode = FilterMode.DELETE;
                 }
+                break;
             case "playlist_custom_params":
                 if (INVALID.equals(record.get("value"))) {
                     mode = FilterMode.DELETE;
                 }
+                break;
             default:
                 mode = FilterMode.UPDATE;
         }
