@@ -59,8 +59,14 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
      * This allows us to capture the record and update our state when next() is called.
      */
     private static class KafkaTopicIterator<K, V> implements Iterator<ConsumerRecord<K, V>> {
+        
         protected Iterator<ConsumerRecord<byte[], byte[]>> iter;
         protected KafkaTopic<K, V> topic;
+
+        // Information about the next valid record
+        private ConsumerRecord<byte[], byte[]> nextRecord;
+        private FilterMode nextRecordFilterMode;
+        private ByteArray nextRecordPrimaryKey;
 
         /**
          * Constructor
@@ -70,33 +76,39 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
         private KafkaTopicIterator(Iterator<ConsumerRecord<byte[], byte[]>> iter, KafkaTopic<K, V> topic) {
             this.iter = iter;
             this.topic = topic;
-        }
-
-        @Override
-        public boolean hasNext() {
-            return iter.hasNext();
+            this.nextRecord = null;
+            this.nextRecordFilterMode = null;
+            this.nextRecordPrimaryKey = null;
         }
 
         /*
-         * Get the next record, or NULL if remaining records are skipped.
+         * Internal helper to obtain and stage the next non-skipped record
          */
-        @Override
-        public ConsumerRecord<K, V> next() {
+        private ConsumerRecord<byte[], byte[]> getAndStageNextRecord() {
+
+            // If there exists a pre-staged record, our work is done
+            if (this.nextRecord != null) {
+                return this.nextRecord;
+            }
 
             ConsumerRecord<byte[], byte[]> record = null;
-            FilterMode filterMode = FilterMode.UPDATE;
-            ByteArray primaryKey;
-            BaseRecord newRec, oldRec = null;
+            BaseRecord oldRec = null;
+            FilterMode filterMode = FilterMode.SKIP;
+            ByteArray primaryKey = null;
             K key;
             V value, currState;
 
-            do {
+            // Obtain a record and stage it
+            while(iter.hasNext() && filterMode == FilterMode.SKIP) {
                 record = iter.next();
+                // The current offset is one ahead of the last read one. 
+                // This copies what Kafka would return as the current offset.
+                topic.setCurrentOffset(record.offset() + 1L);
 
                 key = topic.getKeySerde().deserializer().deserialize(record.topic(), record.key());
                 value = topic.getValueSerde().deserializer().deserialize(record.topic(), record.value());
 
-                if(key instanceof BaseRecord) {
+                if (key instanceof BaseRecord) {
                     primaryKey = ((BaseRecord) key).toByteArray();
                 } else {
                     primaryKey = new ByteArray(record.key());
@@ -109,34 +121,67 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
 
                 // Non-BaseRecord value types will not be filtered
                 if (value instanceof BaseRecord) {
-                    newRec = (BaseRecord) value;
-                    filterMode = topic.filter.filter(topic.getShortName(), newRec, oldRec);
+                    filterMode = topic.filter.filter(topic.getShortName(), (BaseRecord) value, oldRec);
+                } else {
+                    filterMode = FilterMode.UPDATE;
                 }
-
-                switch (filterMode) {
-                    case SKIP:
-                        // do nothing  
-                        break;
-                    case DELETE:    
-                        topic.state.delete(topic.shortName + "-" + DATA, primaryKey.getBytes());
-                        break;
-                    case UPDATE:
-                    default:
-                        topic.state.put(topic.shortName + "-" + DATA, primaryKey.getBytes(), record.value());
-                        break;
-                }
-
-                // The current offset is one ahead of the last read one. 
-                // This copies what Kafka would return as the current offset.
-                topic.setCurrentOffset(record.offset() + 1L);
-            } while (iter.hasNext() && filterMode == FilterMode.SKIP);
-
-            // Condition if the last element in the topic was filtered as SKIP 
-            // and there are no more records to process (hasNext() was false)
-            if (filterMode == FilterMode.SKIP) {
-                return null;
             }
 
+            // by this point, we've either reached the end of the topic with no message found
+            // or, we have a valid record available
+            if (record != null && filterMode != FilterMode.SKIP) {
+                // if the last record's filter mode was not skip, we have a valid record
+                // update internal state to reflect
+                this.nextRecord = record;
+                this.nextRecordFilterMode = filterMode;
+                this.nextRecordPrimaryKey = primaryKey;
+            }
+            
+            return this.nextRecord;
+        }
+
+        private void resetStagedRecord() {
+            this.nextRecord = null;
+            this.nextRecordFilterMode = null;
+            this.nextRecordPrimaryKey = null;
+        }
+
+        @Override
+        public boolean hasNext() {
+            return (getAndStageNextRecord() != null);
+        }
+
+        /*
+         * Get the next record, or NULL if remaining records are skipped.
+         */
+        @Override
+        public ConsumerRecord<K, V> next() {
+
+            // obtain the next valid (non-skipped) record
+            ConsumerRecord<byte[], byte[]> record = getAndStageNextRecord();
+            if (record == null) {
+                throw new NoSuchElementException();
+            }
+
+            K key = topic.getKeySerde().deserializer().deserialize(record.topic(), record.key());
+            V value = topic.getValueSerde().deserializer().deserialize(record.topic(), record.value());
+
+            // update state
+            switch (this.nextRecordFilterMode) {
+                case SKIP:
+                    // By design, this should never be the case
+                    throw new IllegalStateException("Staged record has unexpected filter mode of SKIP");
+                case DELETE:
+                    topic.state.delete(topic.shortName + "-" + DATA, this.nextRecordPrimaryKey.getBytes());
+                    break;
+                case UPDATE:
+                default:
+                    topic.state.put(topic.shortName + "-" + DATA, this.nextRecordPrimaryKey.getBytes(), record.value());
+                    break;
+            }
+
+            // mark the record as consumed from the staging area and return
+            this.resetStagedRecord();
             return new ConsumerRecord<>(
                 record.topic(),
                 record.partition(),
