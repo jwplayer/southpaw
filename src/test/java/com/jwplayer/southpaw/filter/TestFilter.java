@@ -19,6 +19,7 @@ import com.jwplayer.southpaw.record.BaseRecord;
 
 public class TestFilter extends BaseFilter {
     String DELETED = "deleted";
+    String SKIP = "skip";
     String INVALID = "INVALID";
 
     public TestFilter() {}
@@ -35,6 +36,11 @@ public class TestFilter extends BaseFilter {
             case "playlist_custom_params":
                 if (INVALID.equals(record.get("value"))) {
                     mode = FilterMode.DELETE;
+                }
+                break;
+            case "user":
+                if (SKIP.equals(record.get("name"))) {
+                    mode = FilterMode.SKIP;
                 }
                 break;
             default:
