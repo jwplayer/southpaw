@@ -23,7 +23,7 @@ import com.jwplayer.southpaw.record.BaseRecord;
  */
 public class DefaultFilter extends BaseFilter {
     public DefaultFilter() {}
-    /*
+    /**
      * By default, null or empty records will be tombstoned (deleted).
      */
     @Override

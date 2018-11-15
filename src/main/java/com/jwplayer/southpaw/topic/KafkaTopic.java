@@ -63,7 +63,17 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
         protected Iterator<ConsumerRecord<byte[], byte[]>> iter;
         protected KafkaTopic<K, V> topic;
 
-        // Information about the next valid record
+        /*
+         * Information about the next valid record:
+         * 
+         * The next record needs to be staged as we'll have consumed it in hasNext() by calling next()
+         * nextRecord can be either (1) NULL or (2) not NULL:
+         * 
+         *  (1) When NULL this indicates we don't have a staged record available, 
+         *     there might be another record available in the Kafka topic.
+         *  (2) When not NULL, we have a staged record that has passed filtering already
+         *      nextRecord is the what should be returned from next()
+        */
         private ConsumerRecord<byte[], byte[]> nextRecord;
         private FilterMode nextRecordFilterMode;
         private ByteArray nextRecordPrimaryKey;
@@ -76,13 +86,13 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
         private KafkaTopicIterator(Iterator<ConsumerRecord<byte[], byte[]>> iter, KafkaTopic<K, V> topic) {
             this.iter = iter;
             this.topic = topic;
-            this.nextRecord = null;
-            this.nextRecordFilterMode = null;
-            this.nextRecordPrimaryKey = null;
+            this.resetStagedRecord();
         }
 
-        /*
+        /**
          * Internal helper to obtain and stage the next non-skipped record
+         * 
+         * @return ConsumerRecord - The next non-skipped record
          */
         private ConsumerRecord<byte[], byte[]> getAndStageNextRecord() {
 
@@ -140,6 +150,11 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
             return this.nextRecord;
         }
 
+        /**
+         * Reset the staging variables referring to the next available record
+         * This function is intended to be called once the staged next 
+         * record is consumed (returned by the next function).
+         */
         private void resetStagedRecord() {
             this.nextRecord = null;
             this.nextRecordFilterMode = null;
@@ -148,10 +163,10 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
 
         @Override
         public boolean hasNext() {
-            return (getAndStageNextRecord() != null);
+            return getAndStageNextRecord() != null;
         }
 
-        /*
+        /**
          * Get the next record, or NULL if remaining records are skipped.
          */
         @Override
