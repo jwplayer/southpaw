@@ -23,6 +23,7 @@ import com.jwplayer.southpaw.filter.BaseFilter.FilterMode;
 import com.jwplayer.southpaw.record.BaseRecord;
 import com.jwplayer.southpaw.state.BaseState;
 import com.jwplayer.southpaw.util.ByteArray;
+import com.jwplayer.southpaw.metric.Metrics;
 import org.apache.commons.lang.ObjectUtils;
 import org.apache.commons.lang.time.StopWatch;
 import org.apache.kafka.clients.consumer.*;
@@ -134,6 +135,16 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
                     filterMode = topic.filter.filter(topic.getShortName(), (BaseRecord) value, oldRec);
                 } else {
                     filterMode = FilterMode.UPDATE;
+                }
+
+                // If the record is classified as to be skipped
+                // increment the appropriate metrics to indicate we have finished consuming
+                // an input topic record.
+                // In the case that the record is not flagged as skip, we'll rely on the caller
+                // to increment appropriate metrics when it has finished consuming the record.
+                if (filterMode == FilterMode.SKIP && this.topic.metrics != null) {
+                    this.topic.metrics.recordsConsumed.mark(1);
+                    this.topic.metrics.recordsConsumedByTopic.get(this.topic.shortName).mark(1);
                 }
             }
 
@@ -263,9 +274,10 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
             BaseState state,
             Serde<K> keySerde,
             Serde<V> valueSerde,
-            BaseFilter filter
+            BaseFilter filter,
+            Metrics metrics
     ) {
-        super.configure(shortName, config, state, keySerde, valueSerde, filter);
+        super.configure(shortName, config, state, keySerde, valueSerde, filter, metrics);
         // Make a consumer
         if(!ObjectUtils.equals(config.get(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG), false)) {
             logger.warn("Southpaw does not use Kafka's offset management. Enabling auto commit does nothing, except maybe incur some overhead.");
@@ -363,10 +375,22 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
 
     /**
      * Method so the iterator returned by readNext() can set the current offset of this topic.
+     * Additionally, responsible for updating topic metrics.
      * @param offset - The new current offset
      */
     private void setCurrentOffset(long offset) {
         currentOffset = offset;
+    }
+
+    /**
+     * Method to increment records consumed and records consumed by entity
+     * Used when a record is skipped as it counts as consumed
+     */
+    private void incrementTopicConsumedMetrics() {
+        if (this.metrics != null) {
+            metrics.recordsConsumed.mark(1);
+            metrics.recordsConsumedByTopic.get(this.shortName).mark(1);
+        }
     }
 
     @Override

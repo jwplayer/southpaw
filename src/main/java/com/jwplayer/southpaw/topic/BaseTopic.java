@@ -19,6 +19,7 @@ import com.google.common.base.Preconditions;
 import com.jwplayer.southpaw.filter.BaseFilter;
 import com.jwplayer.southpaw.state.BaseState;
 import com.jwplayer.southpaw.util.ByteArray;
+import com.jwplayer.southpaw.metric.Metrics;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.serialization.Serde;
 
@@ -87,6 +88,10 @@ public abstract class BaseTopic<K, V> {
      * The serde for (de)serializing Kafka record values
      */
     protected Serde<V> valueSerde;
+    /**
+     * Reference to metrics class for metric reporting
+     */
+    protected Metrics metrics;
 
     /**
      * Commits the current offsets and data to the state. Use after reading messages using the readNext method,
@@ -104,12 +109,42 @@ public abstract class BaseTopic<K, V> {
      * @param filter - The filter used to filter out consumed records, treating them like a tombstone
      */
     public void configure(
+        String shortName,
+        Map<String, Object> config,
+        BaseState state,
+        Serde<K> keySerde,
+        Serde<V> valueSerde,
+        BaseFilter filter
+    ) {
+        this.configure(
+            shortName,
+            config,
+            state,
+            keySerde,
+            valueSerde,
+            filter,
+            null
+        );
+    }
+
+    /**
+     * Configures the topic object. Should be called after instantiation.
+     * @param shortName - The short name for this topic, could be the entity stored in this topic and used in indices (e.g. user)
+     * @param config - This topic configuration
+     * @param state - The state where we store the offsets for this topic
+     * @param keySerde - The serde for (de)serializing Kafka record keys
+     * @param valueSerde - The serde for (de)serializing Kafka record values
+     * @param filter - The filter used to filter out consumed records, treating them like a tombstone
+     * @param metrics - The Southpaw Metrics object
+     */
+    public void configure(
             String shortName,
             Map<String, Object> config,
             BaseState state,
             Serde<K> keySerde,
             Serde<V> valueSerde,
-            BaseFilter filter
+            BaseFilter filter,
+            Metrics metrics
     ) {
         this.shortName = shortName;
         this.config = Preconditions.checkNotNull(config);
@@ -120,6 +155,7 @@ public abstract class BaseTopic<K, V> {
         this.keySerde = keySerde;
         this.valueSerde = valueSerde;
         this.filter = filter;
+        this.metrics = metrics;
     }
 
     /**
