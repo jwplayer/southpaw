@@ -375,7 +375,6 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
 
     /**
      * Method so the iterator returned by readNext() can set the current offset of this topic.
-     * Additionally, responsible for updating topic metrics.
      * @param offset - The new current offset
      */
     private void setCurrentOffset(long offset) {

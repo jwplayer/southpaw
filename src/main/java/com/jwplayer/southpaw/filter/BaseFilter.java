@@ -26,7 +26,7 @@ import java.util.Map;
  */
 public abstract class BaseFilter {
 
-    /*
+    /**
      * Used to inform how a record should be handled:
      * 
      * UPDATE: Do not filter (no op) by advancing offset and updating state, output record produced.
@@ -52,7 +52,6 @@ public abstract class BaseFilter {
      * @return FilterMode - Describes how to handle the input record
      */
     public FilterMode filter(String entity, BaseRecord record) {
-        // Default, don't filter
         return FilterMode.UPDATE;
     }
 
