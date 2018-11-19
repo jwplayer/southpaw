@@ -20,6 +20,7 @@ import com.jwplayer.southpaw.state.BaseState;
 import com.jwplayer.southpaw.state.RocksDBState;
 import com.jwplayer.southpaw.state.RocksDBStateTest;
 import com.jwplayer.southpaw.util.ByteArray;
+import com.jwplayer.southpaw.topic.TopicConfig;
 import org.apache.commons.lang.NotImplementedException;
 import org.apache.kafka.common.serialization.Serdes;
 import org.junit.*;
@@ -58,7 +59,13 @@ public class ConsoleTopicTest {
         Map<String, Object> config = RocksDBStateTest.createConfig(ROCKSDB_BASE_URI + testName);
         state = new RocksDBState();
         state.configure(config);
-        topic.configure("TestTopic", config, state, Serdes.String(), Serdes.String(), new DefaultFilter());
+        topic.configure(new TopicConfig<String, String>()
+            .setShortName("TestTopic")
+            .setSouthpawConfig(config)
+            .setState(state)
+            .setKeySerde(Serdes.String())
+            .setValueSerde(Serdes.String())
+            .setFilter(new DefaultFilter()));
     }
 
     @After

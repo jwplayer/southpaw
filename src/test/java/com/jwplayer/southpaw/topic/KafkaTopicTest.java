@@ -52,7 +52,14 @@ public class KafkaTopicTest {
         config.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
         config.put(ConsumerConfig.GROUP_ID_CONFIG, "test-group");
         config.put(KafkaTopic.TOPIC_NAME_CONFIG, topicName);
-        topic.configure("test", config, state, Serdes.String(), Serdes.String(), new DefaultFilter());
+        topic.configure(new TopicConfig<String, String>()
+            .setShortName("test")
+            .setSouthpawConfig(config)
+            .setState(state)
+            .setKeySerde(Serdes.String())
+            .setValueSerde(Serdes.String())
+            .setFilter(new DefaultFilter()));
+
         topic.write("A", "1");
         topic.write("B", "2");
         topic.write("C", "3");

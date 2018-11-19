@@ -35,6 +35,7 @@ import com.jwplayer.southpaw.util.ByteArraySet;
 import com.jwplayer.southpaw.util.FileHelper;
 import com.jwplayer.southpaw.metric.Metrics;
 import com.jwplayer.southpaw.metric.StaticGauge;
+import com.jwplayer.southpaw.topic.TopicConfig;
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
 import org.apache.commons.lang.ObjectUtils;
@@ -698,17 +699,26 @@ public class Southpaw {
     @SuppressWarnings("unchecked")
     protected <K, V> BaseTopic<K, V> createTopic(
             String shortName,
-            Map<String, Object> topicConfig,
+            Map<String, Object> southpawConfig,
             Serde<K> keySerde,
             Serde<V> valueSerde,
             BaseFilter filter,
             Metrics metrics) throws ClassNotFoundException, IllegalAccessException, InstantiationException {
-        Class topicClass = Class.forName(Preconditions.checkNotNull(topicConfig.get(BaseTopic.TOPIC_CLASS_CONFIG).toString()));
+        Class topicClass = Class.forName(Preconditions.checkNotNull(southpawConfig.get(BaseTopic.TOPIC_CLASS_CONFIG).toString()));
         BaseTopic<K, V> topic = (BaseTopic<K, V>) topicClass.newInstance();
-        keySerde.configure(topicConfig, true);
-        valueSerde.configure(topicConfig, false);
-        filter.configure(topicConfig);
-        topic.configure(shortName, topicConfig, state, keySerde, valueSerde, filter, metrics);
+        keySerde.configure(southpawConfig, true);
+        valueSerde.configure(southpawConfig, false);
+        filter.configure(southpawConfig);
+
+        topic.configure(new TopicConfig<K, V>()
+            .setShortName(shortName)
+            .setSouthpawConfig(southpawConfig)
+            .setState(state)
+            .setKeySerde(keySerde)
+            .setValueSerde(valueSerde)
+            .setFilter(filter)
+            .setMetrics(metrics));
+        
         return topic;
     }
 

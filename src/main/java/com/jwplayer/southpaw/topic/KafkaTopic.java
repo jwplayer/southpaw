@@ -132,7 +132,7 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
 
                 // Non-BaseRecord value types will not be filtered
                 if (value instanceof BaseRecord) {
-                    filterMode = topic.filter.filter(topic.getShortName(), (BaseRecord) value, oldRec);
+                    filterMode = topic.getFilter().filter(topic.topicConfig.shortName, (BaseRecord) value, oldRec);
                 } else {
                     filterMode = FilterMode.UPDATE;
                 }
@@ -142,9 +142,9 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
                 // an input topic record.
                 // In the case that the record is not flagged as skip, we'll rely on the caller
                 // to increment appropriate metrics when it has finished consuming the record.
-                if (filterMode == FilterMode.SKIP && this.topic.metrics != null) {
-                    this.topic.metrics.recordsConsumed.mark(1);
-                    this.topic.metrics.recordsConsumedByTopic.get(this.topic.shortName).mark(1);
+                if (filterMode == FilterMode.SKIP && this.topic.getMetrics() != null) {
+                    this.topic.getMetrics().recordsConsumed.mark(1);
+                    this.topic.getMetrics().recordsConsumedByTopic.get(this.topic.getShortName()).mark(1);
                 }
             }
 
@@ -198,11 +198,11 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
                     // By design, this should never be the case
                     throw new IllegalStateException("Staged record has unexpected filter mode of SKIP");
                 case DELETE:
-                    topic.state.delete(topic.shortName + "-" + DATA, this.nextRecordPrimaryKey.getBytes());
+                    topic.getState().delete(topic.getShortName() + "-" + DATA, this.nextRecordPrimaryKey.getBytes());
                     break;
                 case UPDATE:
                 default:
-                    topic.state.put(topic.shortName + "-" + DATA, this.nextRecordPrimaryKey.getBytes(), record.value());
+                    topic.getState().put(topic.getShortName() + "-" + DATA, this.nextRecordPrimaryKey.getBytes(), record.value());
                     break;
             }
 
@@ -258,54 +258,49 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
     public void commit() {
         commitData();
         if(currentOffset != null) {
-            state.put(shortName + "-" + OFFSETS, Ints.toByteArray(0), Longs.toByteArray(currentOffset));
+            this.getState().put(this.getShortName() + "-" + OFFSETS, Ints.toByteArray(0), Longs.toByteArray(currentOffset));
         }
-        state.flush(shortName + "-" + OFFSETS);
+        this.getState().flush(this.getShortName() + "-" + OFFSETS);
     }
 
     protected void commitData() {
-        state.flush(shortName + "-" + DATA);
+        this.getState().flush(this.getShortName() + "-" + DATA);
     }
 
     @Override
-    public void configure(
-            String shortName,
-            Map<String, Object> config,
-            BaseState state,
-            Serde<K> keySerde,
-            Serde<V> valueSerde,
-            BaseFilter filter,
-            Metrics metrics
-    ) {
-        super.configure(shortName, config, state, keySerde, valueSerde, filter, metrics);
+    public void configure(TopicConfig<K, V> topicConfig) {
+        super.configure(topicConfig);
+
+        Map<String, Object> spConfig = topicConfig.southpawConfig;
+
         // Make a consumer
-        if(!ObjectUtils.equals(config.get(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG), false)) {
+        if(!ObjectUtils.equals(spConfig.get(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG), false)) {
             logger.warn("Southpaw does not use Kafka's offset management. Enabling auto commit does nothing, except maybe incur some overhead.");
         }
-        if(!ObjectUtils.equals(config.get(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG), "earliest")) {
+        if(!ObjectUtils.equals(spConfig.get(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG), "earliest")) {
             logger.warn("Since Southpaw handles its own offsets, the auto offset reset config is ignored. If there are no existing offsets, we will always start at the beginning.");
         }
-        consumer = new KafkaConsumer<>(config, Serdes.ByteArray().deserializer(), Serdes.ByteArray().deserializer());
+        consumer = new KafkaConsumer<>(spConfig, Serdes.ByteArray().deserializer(), Serdes.ByteArray().deserializer());
         if(consumer.partitionsFor(topicName).size() > 1) {
             throw new RuntimeException(String.format("Topic '%s' has more than one partition. Southpaw currently only supports topics with a single partition.", topicName));
         }
         // Subscribe is lazy and requires a poll() call, which we don't want to require, so we do this instead
         consumer.assign(Collections.singleton(new TopicPartition(topicName, 0)));
-        byte[] bytes = state.get(shortName + "-" + OFFSETS, Ints.toByteArray(0));
+        byte[] bytes = this.getState().get(this.getShortName() + "-" + OFFSETS, Ints.toByteArray(0));
         if(bytes == null) {
             consumer.seekToBeginning(Collections.singleton(new TopicPartition(topicName, 0)));
-            logger.info(String.format("No offsets found for topic %s, seeking to beginning.", shortName));
+            logger.info(String.format("No offsets found for topic %s, seeking to beginning.", this.getShortName()));
         } else {
             currentOffset = Longs.fromByteArray(bytes);
             consumer.seek(new TopicPartition(topicName, 0), currentOffset);
-            logger.info(String.format("Topic %s starting with offset %s.", shortName, currentOffset));
+            logger.info(String.format("Topic %s starting with offset %s.", this.getShortName(), currentOffset));
         }
         endOffsetWatch = new StopWatch();
         endOffsetWatch.start();
-        pollTimeout = ((Number) config.getOrDefault(POLL_TIMEOUT_CONFIG, POLL_TIMEOUT_DEFAULT)).longValue();
+        pollTimeout = ((Number) spConfig.getOrDefault(POLL_TIMEOUT_CONFIG, POLL_TIMEOUT_DEFAULT)).longValue();
 
         // Check producer config
-        if(!ObjectUtils.equals(config.get(ProducerConfig.ACKS_CONFIG), "all")) {
+        if(!ObjectUtils.equals(spConfig.get(ProducerConfig.ACKS_CONFIG), "all")) {
             logger.warn("It is recommended to set ACKS to 'all' otherwise data loss can occur");
         }
     }
@@ -355,9 +350,9 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
         if(primaryKey == null) {
             return null;
         } else {
-            bytes = state.get(shortName + "-" + DATA, primaryKey.getBytes());
+            bytes = this.getState().get(this.getShortName() + "-" + DATA, primaryKey.getBytes());
         }
-        return valueSerde.deserializer().deserialize(topicName, bytes);
+        return this.getValueSerde().deserializer().deserialize(topicName, bytes);
     }
 
     @Override
@@ -367,8 +362,8 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
 
     @Override
     public void resetCurrentOffset() {
-        logger.info(String.format("Resetting offsets for topic %s, seeking to beginning.", shortName));
-        state.delete(shortName + "-" + OFFSETS, Ints.toByteArray(0));
+        logger.info(String.format("Resetting offsets for topic %s, seeking to beginning.", this.getShortName()));
+        this.getState().delete(this.getShortName() + "-" + OFFSETS, Ints.toByteArray(0));
         consumer.seekToBeginning(ImmutableList.of(new TopicPartition(topicName, 0)));
         currentOffset = null;
     }
@@ -381,20 +376,10 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
         currentOffset = offset;
     }
 
-    /**
-     * Method to increment records consumed and records consumed by entity
-     * Used when a record is skipped as it counts as consumed
-     */
-    private void incrementTopicConsumedMetrics() {
-        if (this.metrics != null) {
-            metrics.recordsConsumed.mark(1);
-            metrics.recordsConsumedByTopic.get(this.shortName).mark(1);
-        }
-    }
-
     @Override
     public void write(K key, V value) {
-        if(producer == null) producer = new KafkaProducer<>(config, keySerde.serializer(), valueSerde.serializer());
+        if(producer == null) producer = new KafkaProducer<>(topicConfig.southpawConfig, 
+            this.getKeySerde().serializer(), this.getValueSerde().serializer());
         producerFutures.add(producer.send(new ProducerRecord<>(topicName, 0, key, value)));
     }
 }

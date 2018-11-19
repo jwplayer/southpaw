@@ -62,11 +62,11 @@ public class ConsoleTopic<K, V> extends BaseTopic<K, V> {
 
     @Override
     public void write(K key, V value) {
-        String k = new String(keySerde.serializer().serialize(topicName, key));
-        String v = new String(valueSerde.serializer().serialize(topicName, value));
+        String k = new String(this.getKeySerde().serializer().serialize(topicName, key));
+        String v = new String(this.getValueSerde().serializer().serialize(topicName, value));
         FilterMode filterMode = FilterMode.UPDATE;
         if (value instanceof BaseRecord) {
-            filterMode = filter.filter(shortName, (BaseRecord) value, null);
+            filterMode = this.getFilter().filter(this.getShortName(), (BaseRecord) value, null);
         }
         System.out.println(String.format("key: %s / value: %s / filter mode: %s", k, v, filterMode));
     }

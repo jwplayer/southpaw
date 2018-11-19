@@ -113,7 +113,7 @@ public final class InMemoryTopic<K, V> extends BaseTopic<K, V> {
         FilterMode filterMode = FilterMode.UPDATE;
 
         if (value instanceof BaseRecord) {
-            filterMode = filter.filter(shortName, (BaseRecord) value, null);
+            filterMode = this.getFilter().filter(this.getShortName(), (BaseRecord) value, null);
         }
 
         switch (filterMode) {

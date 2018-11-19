@@ -22,6 +22,7 @@ import com.jwplayer.southpaw.state.RocksDBState;
 import com.jwplayer.southpaw.state.RocksDBStateTest;
 import com.jwplayer.southpaw.topic.BaseTopic;
 import com.jwplayer.southpaw.topic.InMemoryTopic;
+import com.jwplayer.southpaw.topic.TopicConfig;
 import com.jwplayer.southpaw.util.ByteArray;
 import com.jwplayer.southpaw.util.FileHelper;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -79,7 +80,13 @@ public class MultiIndexTest {
         valueSerde.configure(config, true);
         state.configure(config);
         BaseTopic<BaseRecord, BaseRecord> indexedTopic = new InMemoryTopic<>(0);
-        indexedTopic.configure("IndexedTopic", config, state, keySerde, valueSerde, new DefaultFilter());
+        indexedTopic.configure(new TopicConfig<BaseRecord, BaseRecord>()
+            .setShortName("IndexedTopic")
+            .setSouthpawConfig(config)
+            .setState(state)
+            .setKeySerde(keySerde)
+            .setValueSerde(valueSerde)
+            .setFilter(new DefaultFilter()));
         MultiIndex<BaseRecord, BaseRecord> index = new MultiIndex<>();
         index.configure("TestIndex", config, state, indexedTopic);
         return index;
