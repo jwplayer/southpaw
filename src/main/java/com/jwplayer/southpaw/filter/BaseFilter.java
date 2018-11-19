@@ -45,6 +45,7 @@ public abstract class BaseFilter {
     }
 
     /**
+     * DEPRECATED
      * Determines if the given record should be filtered based on its entity.
      * 
      * @param entity - The entity of the given record
