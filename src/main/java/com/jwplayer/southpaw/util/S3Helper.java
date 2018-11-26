@@ -33,7 +33,6 @@ import java.io.File;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.*;
-import java.util.regex.Pattern;
 
 
 /**
