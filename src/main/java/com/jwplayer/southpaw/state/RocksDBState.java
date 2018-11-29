@@ -20,6 +20,7 @@ import com.jwplayer.southpaw.util.ByteArray;
 import com.jwplayer.southpaw.util.FileHelper;
 import com.jwplayer.southpaw.util.S3Helper;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.codec.binary.Hex;
 import org.apache.log4j.Logger;
 import org.rocksdb.*;
 
@@ -314,6 +315,7 @@ public class RocksDBState extends BaseState {
             WriteOptions writeOptions = new WriteOptions().setDisableWAL(true);
             rocksDB.delete(cfHandles.get(handleName), writeOptions, key);
         } catch(RocksDBException ex) {
+            logger.error("Problem deleting RocksDB record, keySpace: " + keySpace + ", key: " + Hex.encodeHexString(key));
             throw new RuntimeException(ex);
         }
     }
