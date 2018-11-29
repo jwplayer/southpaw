@@ -195,6 +195,7 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
                     throw new IllegalStateException("Staged record has unexpected filter mode of SKIP");
                 case DELETE:
                     topic.getState().delete(topic.getShortName() + "-" + DATA, this.nextRecordPrimaryKey.getBytes());
+                    value = null;
                     break;
                 case UPDATE:
                 default:
