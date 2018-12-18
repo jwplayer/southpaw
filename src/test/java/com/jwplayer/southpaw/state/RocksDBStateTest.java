@@ -83,14 +83,18 @@ public class RocksDBStateTest {
         state.backup();
         state.restore();
         BaseState.Iterator iter = state.iterate(KEY_SPACE);
-        Integer count = 0;
-        while (iter.hasNext()) {
-            AbstractMap.SimpleEntry<byte[], byte[]> pair = iter.next();
-            assertEquals(new ByteArray(count), new ByteArray(pair.getKey()));
-            assertEquals(count.toString(), new String(pair.getValue()));
-            count++;
+        try {
+            Integer count = 0;
+            while (iter.hasNext()) {
+                AbstractMap.SimpleEntry<byte[], byte[]> pair = iter.next();
+                assertEquals(new ByteArray(count), new ByteArray(pair.getKey()));
+                assertEquals(count.toString(), new String(pair.getValue()));
+                count++;
+            }
+            assertEquals(100, (int) count);
+        } finally {
+          iter.close();
         }
-        assertEquals(100, (int) count);
         state.deleteBackups();
     }
 
