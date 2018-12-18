@@ -121,11 +121,15 @@ public class RocksDBState extends BaseState {
     protected int backupsToKeep;
     /**
      * RocksDB column family handles.
+     * NOTE: This list contains pointers that get mutated by RocksDB. It is necessary to ensure all handle pointers
+     * are closed prior to closing the DB.
      */
     protected List<ColumnFamilyHandle> cfHandles = new ArrayList<>();
 
     /**
-     * Rocksdb column family handles name to index mappings
+     * Rocksdb column family handles name to index mappings. This hashmap contains a mapping between the index of a
+     * ColumnFamilyHandler in cfHandles to a ByteArray name of the ColumnFamilyHandler. It is important to keep in sync
+     * with cfHandles inserts/deletes.
      */
     protected Map<ByteArray, Integer> cfHandleMapping = new HashMap<>();
     /**
