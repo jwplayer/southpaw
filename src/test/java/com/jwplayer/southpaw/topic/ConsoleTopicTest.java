@@ -22,21 +22,40 @@ import com.jwplayer.southpaw.state.RocksDBStateTest;
 import com.jwplayer.southpaw.util.ByteArray;
 import org.apache.commons.lang.NotImplementedException;
 import org.apache.kafka.common.serialization.Serdes;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.*;
+import org.junit.rules.TestName;
 
+import java.io.File;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.Map;
 
 
 public class ConsoleTopicTest {
+    private static final String ROCKSDB_BASE_URI = "file:///tmp/RocksDB/";
+
     BaseState state;
     public ConsoleTopic<String, String> topic;
+
+    @Rule
+    public TestName testName = new TestName();
+
+    @BeforeClass
+    public static void classSetup() throws URISyntaxException {
+        File folder = new File(new URI(ROCKSDB_BASE_URI));
+        folder.mkdirs();
+    }
+
+    @AfterClass
+    public static void classCleanup() throws URISyntaxException {
+        File folder = new File(new URI(ROCKSDB_BASE_URI));
+        folder.delete();
+    }
 
     @Before
     public void setUp() {
         topic = new ConsoleTopic<>();
-        Map<String, Object> config = RocksDBStateTest.createConfig("file:///tmp/RocksDB/ConsoleTopicTest");
+        Map<String, Object> config = RocksDBStateTest.createConfig(ROCKSDB_BASE_URI + testName);
         state = new RocksDBState();
         state.configure(config);
         topic.configure("TestTopic", config, state, Serdes.String(), Serdes.String(), new DefaultFilter());

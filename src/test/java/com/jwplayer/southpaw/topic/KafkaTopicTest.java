@@ -23,10 +23,12 @@ import com.jwplayer.southpaw.util.KafkaTestServer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.serialization.Serdes;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.*;
+import org.junit.rules.TestName;
 
+import java.io.File;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -35,6 +37,7 @@ import static org.junit.Assert.*;
 
 
 public class KafkaTopicTest {
+    private static final String ROCKSDB_BASE_URI = "file:///tmp/RocksDB/";
     private static final String TEST_TOPIC = "test-topic";
 
     private KafkaTestServer kafkaServer;
@@ -57,19 +60,34 @@ public class KafkaTopicTest {
         return topic;
     }
 
-    @After
-    public void cleanup() {
-        kafkaServer.shutdown();
-        state.delete();
+    @Rule public TestName testName = new TestName();
+
+    @BeforeClass
+    public static void classSetup() throws URISyntaxException {
+        File folder = new File(new URI(ROCKSDB_BASE_URI));
+        folder.mkdirs();
+    }
+
+    @AfterClass
+    public static void classCleanup() throws URISyntaxException {
+        File folder = new File(new URI(ROCKSDB_BASE_URI));
+        folder.delete();
     }
 
     @Before
     public void setup() {
         state = new RocksDBState();
-        Map<String, Object> config = RocksDBStateTest.createConfig("file:///tmp/RocksDB/KafkaTopicTest");
+
+        Map<String, Object> config = RocksDBStateTest.createConfig(ROCKSDB_BASE_URI + testName);
         state.configure(config);
         kafkaServer = new KafkaTestServer();
         topic = createTopic(TEST_TOPIC);
+    }
+
+    @After
+    public void cleanup() {
+        kafkaServer.shutdown();
+        state.delete();
     }
 
     @Test

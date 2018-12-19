@@ -23,18 +23,19 @@ import com.jwplayer.southpaw.record.MapRecord;
 import com.jwplayer.southpaw.topic.BaseTopic;
 import com.jwplayer.southpaw.util.ByteArray;
 import com.jwplayer.southpaw.util.FileHelper;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.*;
 import org.yaml.snakeyaml.Yaml;
 
+import java.io.File;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.*;
 
 import static org.junit.Assert.*;
 
 
 public class SouthpawTest {
+    private static final String ROCKSDB_BASE_URI = "file:///tmp/RocksDB/";
     private static final String BROKEN_RELATIONS_PATH = "test-resources/broken_relations.sample.json";
     private static final String CONFIG_PATH = "test-resources/config.sample.yaml";
     private static final String RELATIONS_PATH = "test-resources/relations.sample.json";
@@ -43,6 +44,18 @@ public class SouthpawTest {
     private Map<String, Object> config;
     private MockSouthpaw southpaw;
     private URI relationsUri;
+
+    @BeforeClass
+    public static void classSetup() throws URISyntaxException {
+        File folder = new File(new URI(ROCKSDB_BASE_URI));
+        folder.mkdirs();
+    }
+
+    @AfterClass
+    public static void classCleanup() throws URISyntaxException {
+        File folder = new File(new URI(ROCKSDB_BASE_URI));
+        folder.delete();
+    }
 
     @Before
     public void setup() throws Exception {
