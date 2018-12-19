@@ -1,6 +1,8 @@
+[![Build Status](https://travis-ci.org/jwplayer/southpaw.svg?branch=master)](https://travis-ci.org/jwplayer/southpaw)
+
 # Southpaw
 
-# Overview
+## Overview
 
 Southpaw is a tool that creates denormalized records from input records based on hierarchical relationships. These relationships are similar to a LEFT OUTER JOIN defined by the following SQL statement:
 
