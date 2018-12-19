@@ -25,19 +25,38 @@ import com.jwplayer.southpaw.topic.InMemoryTopic;
 import com.jwplayer.southpaw.util.ByteArray;
 import com.jwplayer.southpaw.util.FileHelper;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.*;
+import org.junit.rules.TestName;
 
+import java.io.File;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.*;
 
 import static org.junit.Assert.*;
 
 
 public class MultiIndexTest {
+    private static final String ROCKSDB_BASE_URI = "file:///tmp/RocksDB/";
+
     protected MultiIndex<BaseRecord, BaseRecord> index;
     protected RocksDBState state;
+
+
+    @Rule
+    public TestName testName = new TestName();
+
+    @BeforeClass
+    public static void classSetup() throws URISyntaxException {
+        File folder = new File(new URI(ROCKSDB_BASE_URI));
+        folder.mkdirs();
+    }
+
+    @AfterClass
+    public static void classCleanup() throws URISyntaxException {
+        File folder = new File(new URI(ROCKSDB_BASE_URI));
+        folder.delete();
+    }
 
     @Before
     public void setup() {
@@ -51,7 +70,7 @@ public class MultiIndexTest {
     }
 
     private MultiIndex<BaseRecord, BaseRecord> createEmptyIndex(RocksDBState state) {
-        Map<String, Object> config = RocksDBStateTest.createConfig("file:///tmp/RocksDB/MultiSimpleIndexTest");
+        Map<String, Object> config = RocksDBStateTest.createConfig(ROCKSDB_BASE_URI + testName);
         config.put(MultiIndex.INDEX_LRU_CACHE_SIZE, 2);
         config.put(MultiIndex.INDEX_WRITE_BATCH_SIZE, 5);
         JsonSerde keySerde = new JsonSerde();

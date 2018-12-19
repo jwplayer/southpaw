@@ -23,12 +23,15 @@ import com.jwplayer.southpaw.util.ByteArray;
 import com.jwplayer.southpaw.util.FileHelper;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.junit.After;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.yaml.snakeyaml.Yaml;
 
+import java.io.File;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.*;
 
 import static org.junit.Assert.*;
@@ -36,6 +39,7 @@ import static org.junit.Assert.*;
 
 @RunWith(Parameterized.class)
 public class SouthpawEndToEndTest {
+    private static final String ROCKSDB_BASE_URI = "file:///tmp/RocksDB/";
     private static final String CONFIG_PATH = "test-resources/config.sample.yaml";
     private static final String RELATIONS_PATH = "test-resources/relations.sample.json";
     private static final String RELATIONS_PATH2 = "test-resources/relations2.sample.json";
@@ -58,6 +62,9 @@ public class SouthpawEndToEndTest {
 
     @Parameterized.Parameters(name = "{0}")
     public static Collection<Object[]> getTestCases() throws Exception {
+        // call setup function since parameter cases are setup prior to @Before being called
+        setup();
+
         // Build the expected results
         ObjectMapper mapper = new ObjectMapper();
         Map<ByteArray, DenormalizedRecord> expectedResults = new HashMap<>(12);
@@ -133,6 +140,18 @@ public class SouthpawEndToEndTest {
 
         assertEquals(12, retVal.size());
         return retVal;
+    }
+
+    public static void setup() throws URISyntaxException {
+        // This setup function is called manually within the parameterized test cases
+        File folder = new File(new URI(ROCKSDB_BASE_URI));
+        folder.mkdirs();
+    }
+
+    @After
+    public void cleanup() throws URISyntaxException {
+        File folder = new File(new URI(ROCKSDB_BASE_URI));
+        folder.delete();
     }
 
     @Test

@@ -16,10 +16,11 @@
 package com.jwplayer.southpaw.state;
 
 import com.jwplayer.southpaw.util.ByteArray;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.*;
 
+import java.io.File;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.AbstractMap;
 import java.util.HashMap;
 import java.util.Map;
@@ -28,6 +29,8 @@ import static org.junit.Assert.*;
 
 
 public class RocksDBStateTest {
+    private static final String ROCKSDB_BASE_URI = "file:///tmp/RocksDB/";
+
     protected static final String BACKUP_URI = "file:///tmp/RocksDB/RocksDBStateTestBackup";
     protected static final String KEY_SPACE = "Default";
     protected static final String URI = "file:///tmp/RocksDB/RocksDBStateTest";
@@ -44,6 +47,18 @@ public class RocksDBStateTest {
         config.put(RocksDBState.PUT_BATCH_SIZE, 5);
         config.put(RocksDBState.URI_CONFIG, uri);
         return config;
+    }
+
+    @BeforeClass
+    public static void classSetup() throws URISyntaxException {
+        File folder = new File(new URI(ROCKSDB_BASE_URI));
+        folder.mkdirs();
+    }
+
+    @AfterClass
+    public static void classCleanup() throws URISyntaxException {
+        File folder = new File(new URI(ROCKSDB_BASE_URI));
+        folder.delete();
     }
 
     @Before

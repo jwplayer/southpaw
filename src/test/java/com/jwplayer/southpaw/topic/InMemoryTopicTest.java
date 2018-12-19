@@ -21,10 +21,12 @@ import com.jwplayer.southpaw.state.RocksDBStateTest;
 import com.jwplayer.southpaw.util.ByteArray;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.serialization.Serdes;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.*;
+import org.junit.rules.TestName;
 
+import java.io.File;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -33,13 +35,31 @@ import static org.junit.Assert.*;
 
 
 public class InMemoryTopicTest {
+    private static final String ROCKSDB_BASE_URI = "file:///tmp/RocksDB/";
+
     private final String[] keys = {"A", "B", "C"};
     private final String[] values = {"Badger", "Mushroom", "Snake"};
     private RocksDBState state;
 
+
+    @Rule
+    public TestName testName = new TestName();
+
+    @BeforeClass
+    public static void classSetup() throws URISyntaxException {
+        File folder = new File(new URI(ROCKSDB_BASE_URI));
+        folder.mkdirs();
+    }
+
+    @AfterClass
+    public static void classCleanup() throws URISyntaxException {
+        File folder = new File(new URI(ROCKSDB_BASE_URI));
+        folder.delete();
+    }
+
     @Before
     public void setup() {
-        Map<String, Object> config = RocksDBStateTest.createConfig("file:///tmp/RocksDB/InMemoryTopicTest");
+        Map<String, Object> config = RocksDBStateTest.createConfig(ROCKSDB_BASE_URI + testName);
         state = new RocksDBState();
         state.configure(config);
     }
