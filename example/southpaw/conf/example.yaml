@@ -20,8 +20,8 @@ rocks.db.parallelism: 10
 rocks.db.uri: "file:///tmp/RocksDB/southpaw"
 rocks.db.put.batch.size: 1500
 
-aws.s3.access.key.id: ABCDEFG
-aws.s3.secret.key: 1234567
+aws.s3.access.key.id: not_using_s3_in_example
+aws.s3.secret.key: not_using_s3_in_example
 aws.s3.region: us-east-1
 
 topics:
@@ -34,29 +34,21 @@ topics:
     enable.auto.commit: false
     key.serde.class: "com.jwplayer.southpaw.serde.AvroSerde"
     poll.timeout: 100
-    schema.registry.url: "http://schema_registry_url:80"
+    schema.registry.url: "http://schema-registry:8081"
     topic.class: "com.jwplayer.southpaw.topic.KafkaTopic"
     value.serde.class: "com.jwplayer.southpaw.serde.AvroSerde"
-  DenormalizedPlaylist:
+  DenormalizedCustomer:
     compression.type: "snappy"
     jackson.serde.class: "com.jwplayer.southpaw.json.DenormalizedRecord"
     key.serde.class: "org.apache.kafka.common.serialization.Serdes$ByteArraySerde"
     topic.class: "com.jwplayer.southpaw.topic.KafkaTopic"
-    topic.name: "denormalizer.playlist"
+    topic.name: "southpaw.denormalized_customers"
     value.serde.class: "com.jwplayer.southpaw.serde.JacksonSerde"
-  media:
-    topic.name: "media"
-  playlist:
-    topic.name: "playlist"
-  playlist_custom_params:
-    topic.name: "playlist_custom_params"
-  playlist_media:
-    topic.name: "playlist_media"
-  playlist_tag:
-    topic.name: "playlist_tag"
-  player:
-    topic.name: "player"
-  user:
-    topic.name: "user"
-  user_tag:
-    topic.name: "user_tag"
+  customers:
+    topic.name: "mysql.northwind.customers"
+  orders:
+    topic.name: "mysql.northwind.orders"
+  order_details:
+    topic.name: "mysql.northwind.order_details"
+  products:
+    topic.name: "mysql.northwind.products"

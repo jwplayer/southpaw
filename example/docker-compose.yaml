@@ -1,0 +1,90 @@
+version: '3'
+services:
+  zookeeper:
+    image: debezium/zookeeper:${DEBEZIUM_VERSION}
+  kafka:
+    image: debezium/kafka:${DEBEZIUM_VERSION}
+    depends_on:
+      - zookeeper
+    ports:
+      # mapped to read output
+      - 9092:9092
+    environment:
+      ZOOKEEPER_CONNECT: zookeeper:2181
+  schema-registry:
+    image: confluentinc/cp-schema-registry:4.0.0
+    environment:
+      SCHEMA_REGISTRY_LOG4J_ROOT_LOGLEVEL: ERROR
+      SCHEMA_REGISTRY_KAFKASTORE_CONNECTION_URL: zookeeper:2181
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+    depends_on:
+      - zookeeper
+      - kafka
+  mysql:
+    image: mysql:5.6
+    command: [
+      "mysqld",
+      "--skip-host-cache",
+      "--skip-name-resolve",
+      "--server-id=223344",
+      "--log-bin=mysql-bin",
+      "--expire-logs-days=10",
+      "--binlog-format=row",
+      "--binlog-row-image=full"
+    ]
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: debezium
+      MYSQL_USER: mysqluser
+      MYSQL_PASSWORD: mysqlpw
+    volumes:
+      - ./mysql/northwind.sql:/docker-entrypoint-initdb.d/northwind-setup.sql:ro
+  debezium:
+    image: southpaw/debezium
+    build:
+      context: ./debezium
+      args:
+        DEBEZIUM_VERSION: ${DEBEZIUM_VERSION}
+    depends_on:
+      - kafka
+      - mysql
+      - schema-registry
+    environment:
+      BOOTSTRAP_SERVERS: kafka:9092
+      GROUP_ID: debezium_northwind
+      CONFIG_STORAGE_TOPIC: connect_configs
+      OFFSET_STORAGE_TOPIC: connect_offsets
+      KEY_CONVERTER: io.confluent.connect.avro.AvroConverter
+      VALUE_CONVERTER: io.confluent.connect.avro.AvroConverter
+      INTERNAL_KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      INTERNAL_VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      CONNECT_KEY_CONVERTER_SCHEMA_REGISTRY_URL: http://schema-registry:8081
+      CONNECT_VALUE_CONVERTER_SCHEMA_REGISTRY_URL: http://schema-registry:8081
+  southpaw:
+    build:
+      context: ./southpaw
+      args:
+        BRANCH: v0.1.0
+    image: southpaw/southpaw
+    depends_on:
+      - kafka
+      - schema-registry
+  kafka-rest-proxy:
+    image: confluentinc/cp-kafka-rest:4.0.0
+    depends_on:
+      - zookeeper
+      - kafka
+    environment:
+      KAFKA_REST_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_REST_LISTENERS: http://0.0.0.0:8082/
+      KAFKA_REST_HOST_NAME: kafka-rest-proxy
+  kafka-topics-ui:
+    image: landoop/kafka-topics-ui:0.9.3
+    ports:
+      - 8000:8000
+    environment:
+      KAFKA_REST_PROXY_URL: 'http://kafka-rest-proxy:8082/'
+      PROXY: "true"
+    depends_on:
+      - kafka-rest-proxy

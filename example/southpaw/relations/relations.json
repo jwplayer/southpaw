@@ -1,0 +1,27 @@
+[
+  {
+    "DenormalizedName": "DenormalizedCustomer",
+    "Entity": "customers",
+    "Children": [
+      {
+        "Entity": "orders",
+        "JoinKey": "customer_id",
+        "ParentKey": "id",
+        "Children": [
+          {
+            "Entity": "order_details",
+            "JoinKey": "order_id",
+            "ParentKey": "id",
+            "Children": [
+              {
+                "Entity": "products",
+                "JoinKey": "id",
+                "ParentKey": "product_id"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+]

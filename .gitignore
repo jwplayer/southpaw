@@ -19,7 +19,6 @@ target/
 
 # Local config
 conf/local.yaml
-relations/
 
 # IntelliJ
 .idea/

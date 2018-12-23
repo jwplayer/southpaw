@@ -2,6 +2,8 @@
 
 # Southpaw
 
+_Streaming left joins in Kafka for data change capture_
+
 ## Overview
 
 Southpaw is a tool that creates denormalized records from input records based on hierarchical relationships. These relationships are similar to a LEFT OUTER JOIN defined by the following SQL statement:
@@ -15,9 +17,15 @@ In this case 'table_b' is a child relationship of 'table_a.' 'a_key' is equivale
 
 While robust tools like Flink or Kafka Streams support joins, they are extremely limited. The typical use case is to enrich a stream of records with another stream that is used as a small lookup table. For Southpaw, we wanted to be able to create denormalized records in a streaming fashion as the input topics receive new records or updates are made to existing records. The results should be similar to running large JOIN queries against a standard SQL DB, but the results should be processed in a streaming fashion.
 
+Read more about why we built Southpaw in our [blog post](https://medium.com/jw-player-engineering/southpaw-176aea5f4583).
+
+## Example
+
+To see Southpaw in action, check the [example](./example) directory for and end-to-end working example.
+
 ## How?
 
-Southpaw maintains a state of all records it sees, keeping the latest version of each record. In addition to this, it builds two types of indices. The first type is the parent index. This index tells Southpaw which denormalized records it should create whenever it sees a new or updated child record. The second type of index is the join index. This tells Southpaw which child records to include in an denormalized record when it is being created. WIth these two types of indices, Southpaw can create and recreate the denormalized records as input records are streamed from the input topics.
+Southpaw maintains a state of all records it sees, keeping the latest version of each record. In addition to this, it builds two types of indices. The first type is the parent index. This index tells Southpaw which denormalized records it should create whenever it sees a new or updated child record. The second type of index is the join index. This tells Southpaw which child records to include in an denormalized record when it is being created. With these two types of indices, Southpaw can create and recreate the denormalized records as input records are streamed from the input topics.
 
 ## Running Southpaw
 
@@ -146,8 +154,8 @@ The config is broken up into multiple sections:
 * backup.on.shutdown - Instruct Southpaw to backup on shutdown (or not)
 * backup.time.s - The amount of time in seconds between backups
 * commit.time.s - The amount of time in seconds between full state commits
-* create.records.trigger - Number of denormalized record create actions to queue before creating denormalized records. Only queues creation of records when lagging. 
-* index.lru.cache.size - The number of index entries to cache in memory 
+* create.records.trigger - Number of denormalized record create actions to queue before creating denormalized records. Only queues creation of records when lagging.
+* index.lru.cache.size - The number of index entries to cache in memory
 * index.write.batch.size - The number of entries each index holds in memory before flushing to the state
 * topic.lag.trigger - Southpaw will stick to a single topic until it falls below a certain lag threshold before switching to the next topic. This is for performance purposes. This option controls that threshold.
 
@@ -356,7 +364,7 @@ Southpaw exposes basic metrics about its operation and performance through JMX u
 * backups.restored (Timer) - The count and time taken for backup restoration
 * denormalized.records.created (Meter) - The count and rate for records created
 * denormalized.records.created.[RECORD_NAME] (Meter) - Similar to denormalized.records.created, but broken down by the specific type of denormalized record created
-* denormalized.records.to.create (Meter) - The count of denormalized records that are queued to be created 
+* denormalized.records.to.create (Meter) - The count of denormalized records that are queued to be created
 * denormalized.records.to.create.[RECORD_NAME] (Meter) - Similar to denormalized.records.to.create, but broken down by the specific type of denormalized record queued
 * records.consumed (Meter) - The count and rate of records consumed from all normalized entity topics
 * records.consumed.[ENTITY_NAME] (Meter) - Similar to records.consumer, but broken down by the specific normalized entity
