@@ -30,7 +30,6 @@ ENV SOUTHPAW_CLASS_PATH /etc/southpaw/jars
 WORKDIR $SOUTHPAW_HOME
 
 COPY --from=build $SRC_DIR/target/southpaw.jar $SOUTHPAW_CLASS_PATH/southpaw.jar
-COPY run-docker.sh $SOUTHPAW_HOME/bin/run-docker.sh
 
 # TODO: move to child Dockerfile that inherits from above
 COPY conf/ $SOUTHPAW_HOME/conf/
@@ -39,4 +38,10 @@ COPY relations/ $SOUTHPAW_HOME/relations/
 ENV SOUTHPAW_CONFIG=$SOUTHPAW_HOME/conf/example.yaml
 ENV SOUTHPAW_RELATIONS_FILE=$SOUTHPAW_HOME/relations/relations.json
 
-CMD "./bin/run-docker.sh"
+RUN mkdir -p /tmp/RocksDB
+
+CMD java -XX:+UnlockExperimentalVMOptions -XX:+UseCGroupMemoryLimitForHeap \
+  -cp "${SOUTHPAW_CLASS_PATH}/*" com.jwplayer.southpaw.Southpaw \
+  --config ${SOUTHPAW_CONFIG} \
+  --relations ${SOUTHPAW_RELATIONS_FILE} \
+  --build

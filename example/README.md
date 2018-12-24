@@ -12,7 +12,12 @@ https://github.com/dalers/mywind.
 ## Run
 
 ```bash
-make run
+export DEBEZIUM_VERSION=0.8
+docker-compose up --build -d
+curl -i -X POST -H "Accept:application/json" -H  "Content-Type:application/json" http://localhost:8083/connectors -d @register-debezium.json)
+# wait ~10s for services to start before re-running southpaw
+docker-compose up -d southpaw
+docker-compose logs -f -t
 ```
 
 You can view the records by looking at the kafka-topics UI: http://localhost:8000.

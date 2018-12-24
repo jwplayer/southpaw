@@ -40,27 +40,6 @@ services:
       MYSQL_PASSWORD: mysqlpw
     volumes:
       - ./mysql/northwind.sql:/docker-entrypoint-initdb.d/northwind-setup.sql:ro
-  debezium:
-    image: southpaw/debezium
-    build:
-      context: ./debezium
-      args:
-        DEBEZIUM_VERSION: ${DEBEZIUM_VERSION}
-    depends_on:
-      - kafka
-      - mysql
-      - schema-registry
-    environment:
-      BOOTSTRAP_SERVERS: kafka:9092
-      GROUP_ID: debezium_northwind
-      CONFIG_STORAGE_TOPIC: connect_configs
-      OFFSET_STORAGE_TOPIC: connect_offsets
-      KEY_CONVERTER: io.confluent.connect.avro.AvroConverter
-      VALUE_CONVERTER: io.confluent.connect.avro.AvroConverter
-      INTERNAL_KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
-      INTERNAL_VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
-      CONNECT_KEY_CONVERTER_SCHEMA_REGISTRY_URL: http://schema-registry:8081
-      CONNECT_VALUE_CONVERTER_SCHEMA_REGISTRY_URL: http://schema-registry:8081
   southpaw:
     build:
       context: ./southpaw
