@@ -13,24 +13,25 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.jwplayer.southpaw.filter;
+package com.jwplayer.southpaw.metric;
 
-import com.jwplayer.southpaw.record.BaseRecord;
-
+import com.codahale.metrics.Gauge;
 
 /**
- * Default filter used by Southpaw if no filter is specified. Does not filter any records.
+ * Simple gauge that we can update manually.
+ * @param <T> - Type stored / reported by the Gauge
  */
-public class DefaultFilter extends BaseFilter {
-    public DefaultFilter() {}
-    /**
-     * By default, null or empty records will be tombstoned (deleted).
-     */
+public class StaticGauge<T> implements Gauge<T> {
+    protected T value;
+
+    public StaticGauge() { }
+
     @Override
-    public FilterMode filter(String entity, BaseRecord record, BaseRecord oldRecord) {
-        if (record == null || record.isEmpty()) {
-            return FilterMode.DELETE;
-        }
-        return FilterMode.UPDATE;
+    public T getValue() {
+        return value;
+    }
+
+    public void update(T value) {
+        this.value = value;
     }
 }

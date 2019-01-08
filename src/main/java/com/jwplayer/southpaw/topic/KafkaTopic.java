@@ -18,9 +18,8 @@ package com.jwplayer.southpaw.topic;
 import com.google.common.collect.ImmutableList;
 import com.google.common.primitives.Ints;
 import com.google.common.primitives.Longs;
-import com.jwplayer.southpaw.filter.BaseFilter;
+import com.jwplayer.southpaw.filter.BaseFilter.FilterMode;
 import com.jwplayer.southpaw.record.BaseRecord;
-import com.jwplayer.southpaw.state.BaseState;
 import com.jwplayer.southpaw.util.ByteArray;
 import org.apache.commons.lang.ObjectUtils;
 import org.apache.commons.lang.time.StopWatch;
@@ -30,7 +29,6 @@ import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.clients.producer.RecordMetadata;
 import org.apache.kafka.common.TopicPartition;
-import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.log4j.Logger;
 
@@ -58,8 +56,24 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
      * This allows us to capture the record and update our state when next() is called.
      */
     private static class KafkaTopicIterator<K, V> implements Iterator<ConsumerRecord<K, V>> {
+        
         protected Iterator<ConsumerRecord<byte[], byte[]>> iter;
         protected KafkaTopic<K, V> topic;
+
+        /*
+         * Information about the next valid record:
+         * 
+         * The next record needs to be staged as we'll have consumed it in hasNext() by calling next()
+         * nextRecord can be either (1) NULL or (2) not NULL:
+         * 
+         *  (1) When NULL this indicates we don't have a staged record available, 
+         *     there might be another record available in the Kafka topic.
+         *  (2) When not NULL, we have a staged record that has passed filtering already
+         *      nextRecord is the what should be returned from next()
+        */
+        private ConsumerRecord<byte[], byte[]> nextRecord;
+        private FilterMode nextRecordFilterMode;
+        private ByteArray nextRecordPrimaryKey;
 
         /**
          * Constructor
@@ -69,49 +83,141 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
         private KafkaTopicIterator(Iterator<ConsumerRecord<byte[], byte[]>> iter, KafkaTopic<K, V> topic) {
             this.iter = iter;
             this.topic = topic;
+            this.resetStagedRecord();
+        }
+
+        /**
+         * Internal helper to obtain and stage the next non-skipped record
+         * 
+         * @return ConsumerRecord - The next non-skipped record
+         */
+        private ConsumerRecord<byte[], byte[]> getAndStageNextRecord() {
+
+            // If there exists a pre-staged record, our work is done
+            if (this.nextRecord != null) {
+                return this.nextRecord;
+            }
+
+            ConsumerRecord<byte[], byte[]> record = null;
+            BaseRecord oldRec = null;
+            FilterMode filterMode = FilterMode.SKIP;
+            ByteArray primaryKey = null;
+            K key;
+            V value, currState;
+
+            // Obtain a record and stage it
+            while(iter.hasNext() && filterMode == FilterMode.SKIP) {
+                record = iter.next();
+                // The current offset is one ahead of the last read one. 
+                // This copies what Kafka would return as the current offset.
+                topic.setCurrentOffset(record.offset() + 1L);
+
+                key = topic.getKeySerde().deserializer().deserialize(record.topic(), record.key());
+                value = topic.getValueSerde().deserializer().deserialize(record.topic(), record.value());
+
+                if (key instanceof BaseRecord) {
+                    primaryKey = ((BaseRecord) key).toByteArray();
+                } else {
+                    primaryKey = new ByteArray(record.key());
+                }
+
+                currState = topic.readByPK(primaryKey);
+                if (currState instanceof BaseRecord) {
+                    oldRec = (BaseRecord) currState;
+                }
+
+                // Non-BaseRecord value types will not be filtered
+                if (value instanceof BaseRecord) {
+                    filterMode = topic.getFilter().filter(topic.topicConfig.shortName, (BaseRecord) value, oldRec);
+                } else {
+                    filterMode = FilterMode.UPDATE;
+                }
+
+                // If the record is classified as to be skipped
+                // increment the appropriate metrics to indicate we have finished consuming
+                // an input topic record.
+                // In the case that the record is not flagged as skip, we'll rely on the caller
+                // to increment appropriate metrics when it has finished consuming the record.
+                if (filterMode == FilterMode.SKIP && this.topic.getMetrics() != null) {
+                    this.topic.getMetrics().recordsConsumed.mark(1);
+                    this.topic.getMetrics().recordsConsumedByTopic.get(this.topic.getShortName()).mark(1);
+                }
+            }
+
+            // by this point, we've either reached the end of the topic with no message found
+            // or, we have a valid record available
+            if (record != null && filterMode != FilterMode.SKIP) {
+                // if the last record's filter mode was not skip, we have a valid record
+                // update internal state to reflect
+                this.nextRecord = record;
+                this.nextRecordFilterMode = filterMode;
+                this.nextRecordPrimaryKey = primaryKey;
+            }
+            
+            return this.nextRecord;
+        }
+
+        /**
+         * Reset the staging variables referring to the next available record
+         * This function is intended to be called once the staged next 
+         * record is consumed (returned by the next function).
+         */
+        private void resetStagedRecord() {
+            this.nextRecord = null;
+            this.nextRecordFilterMode = null;
+            this.nextRecordPrimaryKey = null;
         }
 
         @Override
         public boolean hasNext() {
-            return iter.hasNext();
+            return getAndStageNextRecord() != null;
         }
 
+        /**
+         * Get the next record, or NULL if remaining records are skipped.
+         */
         @Override
         public ConsumerRecord<K, V> next() {
-            ConsumerRecord<byte[], byte[]> record = iter.next();
+
+            // obtain the next valid (non-skipped) record
+            ConsumerRecord<byte[], byte[]> record = getAndStageNextRecord();
+            if (record == null) {
+                throw new NoSuchElementException();
+            }
+
             K key = topic.getKeySerde().deserializer().deserialize(record.topic(), record.key());
             V value = topic.getValueSerde().deserializer().deserialize(record.topic(), record.value());
-            ByteArray primaryKey;
-            if(key instanceof BaseRecord) {
-                primaryKey = ((BaseRecord) key).toByteArray();
-            } else {
-                primaryKey = new ByteArray(record.key());
+
+            // update state
+            switch (this.nextRecordFilterMode) {
+                case SKIP:
+                    // By design, this should never be the case
+                    throw new IllegalStateException("Staged record has unexpected filter mode of SKIP");
+                case DELETE:
+                    topic.getState().delete(topic.getShortName() + "-" + DATA, this.nextRecordPrimaryKey.getBytes());
+                    value = null;
+                    break;
+                case UPDATE:
+                default:
+                    topic.getState().put(topic.getShortName() + "-" + DATA, this.nextRecordPrimaryKey.getBytes(), record.value());
+                    break;
             }
-            if(record.value() == null || (value instanceof BaseRecord && topic.filter.isFiltered(topic.getShortName(), (BaseRecord) value))) {
-                value = null;
-            }
-            if(value == null) {
-                topic.state.delete(topic.shortName + "-" + DATA, primaryKey.getBytes());
-            } else {
-                topic.state.put(topic.shortName + "-" + DATA, primaryKey.getBytes(), record.value());
-            }
-            // The current offset is one ahead of the last read one. This copies what Kafka would return as the
-            // current offset.
-            topic.setCurrentOffset(record.offset() + 1L);
-            return
-                    new ConsumerRecord<>(
-                            record.topic(),
-                            record.partition(),
-                            record.offset(),
-                            record.timestamp(),
-                            record.timestampType(),
-                            0L,
-                            record.serializedKeySize(),
-                            record.serializedValueSize(),
-                            key,
-                            value,
-                            record.headers()
-                    );
+
+            // mark the record as consumed from the staging area and return
+            this.resetStagedRecord();
+            return new ConsumerRecord<>(
+                record.topic(),
+                record.partition(),
+                record.offset(),
+                record.timestamp(),
+                record.timestampType(),
+                0L,
+                record.serializedKeySize(),
+                record.serializedValueSize(),
+                key,
+                value,
+                record.headers()
+            );
         }
     }
 
@@ -149,53 +255,49 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
     public void commit() {
         commitData();
         if(currentOffset != null) {
-            state.put(shortName + "-" + OFFSETS, Ints.toByteArray(0), Longs.toByteArray(currentOffset));
+            this.getState().put(this.getShortName() + "-" + OFFSETS, Ints.toByteArray(0), Longs.toByteArray(currentOffset));
         }
-        state.flush(shortName + "-" + OFFSETS);
+        this.getState().flush(this.getShortName() + "-" + OFFSETS);
     }
 
     protected void commitData() {
-        state.flush(shortName + "-" + DATA);
+        this.getState().flush(this.getShortName() + "-" + DATA);
     }
 
     @Override
-    public void configure(
-            String shortName,
-            Map<String, Object> config,
-            BaseState state,
-            Serde<K> keySerde,
-            Serde<V> valueSerde,
-            BaseFilter filter
-    ) {
-        super.configure(shortName, config, state, keySerde, valueSerde, filter);
+    public void configure(TopicConfig<K, V> topicConfig) {
+        super.configure(topicConfig);
+
+        Map<String, Object> spConfig = topicConfig.southpawConfig;
+
         // Make a consumer
-        if(!ObjectUtils.equals(config.get(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG), false)) {
+        if(!ObjectUtils.equals(spConfig.get(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG), false)) {
             logger.warn("Southpaw does not use Kafka's offset management. Enabling auto commit does nothing, except maybe incur some overhead.");
         }
-        if(!ObjectUtils.equals(config.get(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG), "earliest")) {
+        if(!ObjectUtils.equals(spConfig.get(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG), "earliest")) {
             logger.warn("Since Southpaw handles its own offsets, the auto offset reset config is ignored. If there are no existing offsets, we will always start at the beginning.");
         }
-        consumer = new KafkaConsumer<>(config, Serdes.ByteArray().deserializer(), Serdes.ByteArray().deserializer());
+        consumer = new KafkaConsumer<>(spConfig, Serdes.ByteArray().deserializer(), Serdes.ByteArray().deserializer());
         if(consumer.partitionsFor(topicName).size() > 1) {
             throw new RuntimeException(String.format("Topic '%s' has more than one partition. Southpaw currently only supports topics with a single partition.", topicName));
         }
         // Subscribe is lazy and requires a poll() call, which we don't want to require, so we do this instead
         consumer.assign(Collections.singleton(new TopicPartition(topicName, 0)));
-        byte[] bytes = state.get(shortName + "-" + OFFSETS, Ints.toByteArray(0));
+        byte[] bytes = this.getState().get(this.getShortName() + "-" + OFFSETS, Ints.toByteArray(0));
         if(bytes == null) {
             consumer.seekToBeginning(Collections.singleton(new TopicPartition(topicName, 0)));
-            logger.info(String.format("No offsets found for topic %s, seeking to beginning.", shortName));
+            logger.info(String.format("No offsets found for topic %s, seeking to beginning.", this.getShortName()));
         } else {
             currentOffset = Longs.fromByteArray(bytes);
             consumer.seek(new TopicPartition(topicName, 0), currentOffset);
-            logger.info(String.format("Topic %s starting with offset %s.", shortName, currentOffset));
+            logger.info(String.format("Topic %s starting with offset %s.", this.getShortName(), currentOffset));
         }
         endOffsetWatch = new StopWatch();
         endOffsetWatch.start();
-        pollTimeout = ((Number) config.getOrDefault(POLL_TIMEOUT_CONFIG, POLL_TIMEOUT_DEFAULT)).longValue();
+        pollTimeout = ((Number) spConfig.getOrDefault(POLL_TIMEOUT_CONFIG, POLL_TIMEOUT_DEFAULT)).longValue();
 
         // Check producer config
-        if(!ObjectUtils.equals(config.get(ProducerConfig.ACKS_CONFIG), "all")) {
+        if(!ObjectUtils.equals(spConfig.get(ProducerConfig.ACKS_CONFIG), "all")) {
             logger.warn("It is recommended to set ACKS to 'all' otherwise data loss can occur");
         }
     }
@@ -245,9 +347,9 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
         if(primaryKey == null) {
             return null;
         } else {
-            bytes = state.get(shortName + "-" + DATA, primaryKey.getBytes());
+            bytes = this.getState().get(this.getShortName() + "-" + DATA, primaryKey.getBytes());
         }
-        return valueSerde.deserializer().deserialize(topicName, bytes);
+        return this.getValueSerde().deserializer().deserialize(topicName, bytes);
     }
 
     @Override
@@ -257,8 +359,8 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
 
     @Override
     public void resetCurrentOffset() {
-        logger.info(String.format("Resetting offsets for topic %s, seeking to beginning.", shortName));
-        state.delete(shortName + "-" + OFFSETS, Ints.toByteArray(0));
+        logger.info(String.format("Resetting offsets for topic %s, seeking to beginning.", this.getShortName()));
+        this.getState().delete(this.getShortName() + "-" + OFFSETS, Ints.toByteArray(0));
         consumer.seekToBeginning(ImmutableList.of(new TopicPartition(topicName, 0)));
         currentOffset = null;
     }
@@ -273,7 +375,8 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
 
     @Override
     public void write(K key, V value) {
-        if(producer == null) producer = new KafkaProducer<>(config, keySerde.serializer(), valueSerde.serializer());
+        if(producer == null) producer = new KafkaProducer<>(topicConfig.southpawConfig, 
+            this.getKeySerde().serializer(), this.getValueSerde().serializer());
         producerFutures.add(producer.send(new ProducerRecord<>(topicName, 0, key, value)));
     }
 }

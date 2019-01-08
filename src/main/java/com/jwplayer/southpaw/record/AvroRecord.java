@@ -15,7 +15,6 @@
  */
 package com.jwplayer.southpaw.record;
 
-import com.google.common.collect.ImmutableMap;
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.util.Utf8;
