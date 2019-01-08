@@ -25,7 +25,7 @@ public class TestFilter extends BaseFilter {
     public TestFilter() {}
 
     @Override
-    public FilterMode filter(String entity, BaseRecord record) {
+    public FilterMode filter(String entity, BaseRecord record, BaseRecord oldRecord) {
         FilterMode mode = FilterMode.UPDATE;
         switch(entity) {
             case "media":

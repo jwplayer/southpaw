@@ -45,18 +45,6 @@ public abstract class BaseFilter {
     }
 
     /**
-     * DEPRECATED
-     * Determines if the given record should be filtered based on its entity.
-     * 
-     * @param entity - The entity of the given record
-     * @param record - The record to filter
-     * @return FilterMode - Describes how to handle the input record
-     */
-    public FilterMode filter(String entity, BaseRecord record) {
-        return FilterMode.UPDATE;
-    }
-
-    /**
      * Determines if the given record should be filtered based on its entity and previous entity state.
      * 
      * @param entity - The entity of the given record
@@ -65,6 +53,6 @@ public abstract class BaseFilter {
      * @return FilterMode - Describes how to handle the input record
      */
     public FilterMode filter(String entity, BaseRecord record, BaseRecord oldRecord) {
-        return this.filter(entity, record);
+        return FilterMode.UPDATE;
     }
 }
