@@ -123,7 +123,7 @@ public class RocksDBState extends BaseState {
     /**
      * RocksDB column family handles.
      */
-    protected Map<ByteArray, ColumnFamilyHandle> cfHandles = new HashMap<>();
+    protected List<ColumnFamilyHandle> columnFamilyHandles = new ArrayList<>();
     /**
      * Configuration for this state
      */
@@ -197,10 +197,10 @@ public class RocksDBState extends BaseState {
 
     @Override
     public void close() {
-        for(Map.Entry<ByteArray, ColumnFamilyHandle> entry: cfHandles.entrySet()) {
-            entry.getValue().close();
+        for(ColumnFamilyHandle cfHandle: columnFamilyHandles) {
+            cfHandle.close();
         }
-        cfHandles.clear();
+        columnFamilyHandles.clear();
         dataBatches.clear();
         rocksDBOptions.close();
         rocksDB.close();
@@ -253,7 +253,6 @@ public class RocksDBState extends BaseState {
 
 
             List<byte[]> families = RocksDB.listColumnFamilies(rocksDBOptions, uri.getPath());
-            List<ColumnFamilyHandle> handles = new ArrayList<>(families.size() + 1);
             List<ColumnFamilyDescriptor> descriptors = new ArrayList<>(families.size() + 1);
             for (byte[] family : families) {
                 descriptors.add(new ColumnFamilyDescriptor(family, cfOptions));
@@ -261,11 +260,10 @@ public class RocksDBState extends BaseState {
             if (descriptors.size() == 0) {
                 descriptors.add(new ColumnFamilyDescriptor(RocksDB.DEFAULT_COLUMN_FAMILY, cfOptions));
             }
-            rocksDB = RocksDB.open(dbOptions, uri.getPath(), descriptors, handles);
+            rocksDB = RocksDB.open(dbOptions, uri.getPath(), descriptors, columnFamilyHandles);
             for (int i = 0; i < families.size(); i++) {
                 if (i > 0) {
                     ByteArray byteArray = new ByteArray(families.get(i));
-                    cfHandles.put(byteArray, handles.get(i));
                     dataBatches.put(byteArray, new HashMap<>());
                 }
             }
@@ -277,7 +275,7 @@ public class RocksDBState extends BaseState {
     @Override
     public void createKeySpace(String keySpace) {
         ByteArray handleName = new ByteArray(keySpace);
-        if(!cfHandles.containsKey(handleName)) {
+        if(getColumnFamilyHandle(handleName) == null) {
             createKeySpace(handleName);
         }
     }
@@ -290,7 +288,7 @@ public class RocksDBState extends BaseState {
         } catch (RocksDBException ex) {
             throw new RuntimeException(ex);
         }
-        cfHandles.put(handleName, cfHandle);
+        columnFamilyHandles.add(cfHandle);
         dataBatches.put(handleName, new HashMap<>());
     }
 
@@ -309,11 +307,11 @@ public class RocksDBState extends BaseState {
     @Override
     public void delete(String keySpace, byte[] key) {
         ByteArray handleName = new ByteArray(keySpace);
-        Preconditions.checkNotNull(cfHandles.get(handleName));
+        Preconditions.checkNotNull(getColumnFamilyHandle(handleName));
         try {
             dataBatches.get(handleName).remove(new ByteArray(key));
             WriteOptions writeOptions = new WriteOptions().setDisableWAL(true);
-            rocksDB.delete(cfHandles.get(handleName), writeOptions, key);
+            rocksDB.delete(getColumnFamilyHandle(handleName), writeOptions, key);
         } catch(RocksDBException ex) {
             logger.error("Problem deleting RocksDB record, keySpace: " + keySpace + ", key: " + Hex.encodeHexString(key));
             throw new RuntimeException(ex);
@@ -352,7 +350,7 @@ public class RocksDBState extends BaseState {
                 WriteOptions writeOptions = new WriteOptions().setDisableWAL(true);
                 for(Map.Entry<ByteArray, byte[]> batchEntry: entry.getValue().entrySet()) {
                     writeBatch.put(
-                            cfHandles.get(entry.getKey()),
+                            getColumnFamilyHandle(entry.getKey()),
                             batchEntry.getKey().getBytes(),
                             batchEntry.getValue()
                     );
@@ -379,7 +377,7 @@ public class RocksDBState extends BaseState {
             WriteOptions writeOptions = new WriteOptions().setDisableWAL(true);
             for(Map.Entry<ByteArray, byte[]> entry: dataBatches.get(byteArray).entrySet()) {
                 writeBatch.put(
-                        cfHandles.get(byteArray),
+                        getColumnFamilyHandle(byteArray),
                         entry.getKey().getBytes(),
                         entry.getValue()
                 );
@@ -389,7 +387,7 @@ public class RocksDBState extends BaseState {
             writeOptions.close();
             dataBatches.get(byteArray).clear();
             FlushOptions fOptions = new FlushOptions().setWaitForFlush(true);
-            rocksDB.flush(new FlushOptions(), cfHandles.get(byteArray));
+            rocksDB.flush(new FlushOptions(), getColumnFamilyHandle(byteArray));
             fOptions.close();
         } catch(RocksDBException ex) {
             throw new RuntimeException(ex);
@@ -399,11 +397,11 @@ public class RocksDBState extends BaseState {
     @Override
     public byte[] get(String keySpace, byte[] key) {
         ByteArray handleName = new ByteArray(keySpace);
-        Preconditions.checkNotNull(cfHandles.get(handleName));
+        Preconditions.checkNotNull(getColumnFamilyHandle(handleName));
         try {
             byte[] retVal = dataBatches.get(new ByteArray(keySpace)).get(new ByteArray(key));
             if(retVal == null) {
-                retVal = rocksDB.get(cfHandles.get(handleName), key);
+                retVal = rocksDB.get(getColumnFamilyHandle(handleName), key);
             }
             return retVal;
         } catch(RocksDBException ex) {
@@ -431,8 +429,8 @@ public class RocksDBState extends BaseState {
         // NOTE: This only iterates RocksDB, not the appropriate data batch. Call flush first if
         // you need to iterate everything.
         ByteArray handleName = new ByteArray(keySpace);
-        Preconditions.checkNotNull(cfHandles.get(handleName));
-        return new Iterator(rocksDB.newIterator(cfHandles.get(handleName)));
+        Preconditions.checkNotNull(getColumnFamilyHandle(handleName));
+        return new Iterator(rocksDB.newIterator(getColumnFamilyHandle(handleName)));
     }
 
     @Override
@@ -498,5 +496,20 @@ public class RocksDBState extends BaseState {
         } else {
             logger.warn("Skipping state restore, backup URI is empty");
         }
+    }
+
+    private ColumnFamilyHandle getColumnFamilyHandle(ByteArray name) {
+        return columnFamilyHandles
+                .stream()
+                .filter(
+                        handle -> {
+                            try {
+                                return Arrays.equals(handle.getName(), name.getBytes());
+                            } catch (Exception ex) {
+                                throw new RuntimeException(ex);
+                            }
+                        })
+                .findAny()
+                .orElse(null);
     }
 }
