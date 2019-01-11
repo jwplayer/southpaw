@@ -42,7 +42,7 @@ public abstract class BaseTopic<K, V> {
      */
     public static final String OFFSETS = "offsets";
     public static final String FILTER_CLASS_CONFIG = "filter.class";
-    public static final String FILTER_CLASS_DEFAULT = "com.jwplayer.southpaw.filter.DefaultFilter";
+    public static final String FILTER_CLASS_DEFAULT = "com.jwplayer.southpaw.filter.BaseFilter";
     public static final String FILTER_CLASS_DOC = "Filter class used to filter input records, treating them " +
             "like tombstones and not recording them in the local state.";
     public static final String KEY_SERDE_CLASS_CONFIG = "key.serde.class";

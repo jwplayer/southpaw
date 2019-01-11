@@ -20,7 +20,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
 import com.jwplayer.southpaw.filter.BaseFilter;
-import com.jwplayer.southpaw.filter.DefaultFilter;
 import com.jwplayer.southpaw.index.BaseIndex;
 import com.jwplayer.southpaw.index.MultiIndex;
 import com.jwplayer.southpaw.index.Reversible;
@@ -642,7 +641,7 @@ public class Southpaw {
                 topicConfig,
                 keySerde,
                 valueSerde,
-                new DefaultFilter(),
+                new BaseFilter(),
                 metrics
         );
     }
@@ -688,7 +687,7 @@ public class Southpaw {
     /**
      * Creates a new topic with the given parameters. Also useful for overriding for testing purposes.
      * @param shortName - The short name of the topic
-     * @param topicConfig - The topic configuration
+     * @param southpawConfig - The topic configuration
      * @param keySerde - The serde used to (de)serialize the key bytes
      * @param valueSerde - The serde used to (de)serialize the value bytes
      * @param filter - The filter used to filter out consumed records, treating them like a tombstone

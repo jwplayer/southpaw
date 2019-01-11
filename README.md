@@ -167,11 +167,12 @@ Currently, Southpaw uses RocksDB for its state, though this could be made plugga
 * rocks.db.uri - Location where RocksDB is stored. Only the local file system is supported.
 * rocks.db.put.batch.size - The number of puts that are batched by the state before automatically committing
 
-### S3 Config
+### S3 Config (For RocksDB backups to S3)
 
 * aws.s3.access.key.id - AWS access key
 * aws.s3.secret.key - AWS secret key
 * aws.s3.region - S3 region
+* aws.s3.exception.on.error (default: true) - Allows processing to continue even if a sync of RocksDB backups to S3 fails. All exceptions are logged no matter the value of this setting. Disabling this is useful in cases where continuing processing is more important than timely backups to S3.
 
 ### Topic Config
 
@@ -358,8 +359,17 @@ Southpaw exposes basic metrics about its operation and performance through JMX u
 * denormalized.records.created.[RECORD_NAME] (Meter) - Similar to denormalized.records.created, but broken down by the specific type of denormalized record created
 * denormalized.records.to.create (Meter) - The count of denormalized records that are queued to be created 
 * denormalized.records.to.create.[RECORD_NAME] (Meter) - Similar to denormalized.records.to.create, but broken down by the specific type of denormalized record queued
+* filter.deletes.[ENTITY_NAME] (Meter) - The count and rate of input records marked for deletion by the supplied or default filter
+* filter.skips.[ENTITY_NAME] (Meter) - The count and rate of input records marked for skipping by the supplied or default filter
+* filter.updates.[ENTITY_NAME] (Meter) - The count and rate of input records marked for updating by the supplied or default filter
 * records.consumed (Meter) - The count and rate of records consumed from all normalized entity topics
 * records.consumed.[ENTITY_NAME] (Meter) - Similar to records.consumer, but broken down by the specific normalized entity
+* s3.downloads (Timer) - The count and time taken for state downloads from S3
+* s3.files.deleted (Meter) - The count and rate of files deleted in S3
+* s3.files.downloaded (Meter) - The count and rate of files downloaded from S3
+* s3.files.uploaded (Meter) - The count and rate of files uploaded to S3
+* s3.upload.failures (Meter) - The count and rate of failures of backup syncs to S3. Useful if the "aws.s3.exception.on.error" setting is set to false.
+* s3.uploads (Timer) - The count and time taken for state uploads to S3
 * state.committed (Timer) - The count and time taken for committing the state
 * states.deleted (Meter) - The count and rate of state deletion
 * topic.lag (Gauge) - Snapshots of the overall lag (end offset - current offset) for the input topics

@@ -29,6 +29,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.*;
+import java.util.concurrent.ExecutionException;
 
 
 /**
@@ -123,7 +124,7 @@ public class RocksDBState extends BaseState {
     /**
      * RocksDB column family handles.
      */
-    protected List<ColumnFamilyHandle> columnFamilyHandles = new ArrayList<>();
+    protected Map<ByteArray, ColumnFamilyHandle> cfHandles = new HashMap<>();
     /**
      * Configuration for this state
      */
@@ -144,6 +145,10 @@ public class RocksDBState extends BaseState {
      * Rocks DB options
      */
     protected Options rocksDBOptions;
+    /**
+     * S3 helper class for backups in S3
+     */
+    protected S3Helper s3Helper;
     /**
      * The URI to the DB.
      */
@@ -167,13 +172,12 @@ public class RocksDBState extends BaseState {
                 case S3Helper.SCHEME:
                     String localBackupPath = getLocalBackupPath(uri);
                     backup(localBackupPath);
-                    S3Helper s3Helper = new S3Helper(config);
                     s3Helper.syncToS3(new URI(localBackupPath), backupURI);
                     break;
                 default:
                     throw new RuntimeException("Unsupported schema: " + backupURI.getScheme());
             }
-        } catch(InterruptedException | URISyntaxException | RocksDBException ex) {
+        } catch(InterruptedException | ExecutionException | URISyntaxException | RocksDBException ex) {
             throw new RuntimeException(ex);
         }
     }
@@ -197,10 +201,10 @@ public class RocksDBState extends BaseState {
 
     @Override
     public void close() {
-        for(ColumnFamilyHandle cfHandle: columnFamilyHandles) {
-            cfHandle.close();
+        for(Map.Entry<ByteArray, ColumnFamilyHandle> entry: cfHandles.entrySet()) {
+            entry.getValue().close();
         }
-        columnFamilyHandles.clear();
+        cfHandles.clear();
         dataBatches.clear();
         rocksDBOptions.close();
         rocksDB.close();
@@ -251,8 +255,8 @@ public class RocksDBState extends BaseState {
                     .setWalTtlSeconds(0L);
             rocksDBOptions.setMaxSubcompactions(maxSubcompactions);
 
-
             List<byte[]> families = RocksDB.listColumnFamilies(rocksDBOptions, uri.getPath());
+            List<ColumnFamilyHandle> handles = new ArrayList<>(families.size() + 1);
             List<ColumnFamilyDescriptor> descriptors = new ArrayList<>(families.size() + 1);
             for (byte[] family : families) {
                 descriptors.add(new ColumnFamilyDescriptor(family, cfOptions));
@@ -260,12 +264,18 @@ public class RocksDBState extends BaseState {
             if (descriptors.size() == 0) {
                 descriptors.add(new ColumnFamilyDescriptor(RocksDB.DEFAULT_COLUMN_FAMILY, cfOptions));
             }
-            rocksDB = RocksDB.open(dbOptions, uri.getPath(), descriptors, columnFamilyHandles);
+            rocksDB = RocksDB.open(dbOptions, uri.getPath(), descriptors, handles);
             for (int i = 0; i < families.size(); i++) {
                 if (i > 0) {
                     ByteArray byteArray = new ByteArray(families.get(i));
                     dataBatches.put(byteArray, new HashMap<>());
                 }
+            }
+            for(ColumnFamilyHandle handle: handles) {
+                cfHandles.put(new ByteArray(handle.getName()), handle);
+            }
+            if(backupURI.getScheme().toLowerCase().equals(S3Helper.SCHEME)) {
+                s3Helper = new S3Helper(config);
             }
         } catch(Exception ex) {
             throw new RuntimeException(ex);
@@ -275,7 +285,7 @@ public class RocksDBState extends BaseState {
     @Override
     public void createKeySpace(String keySpace) {
         ByteArray handleName = new ByteArray(keySpace);
-        if(getColumnFamilyHandle(handleName) == null) {
+        if(!cfHandles.containsKey(handleName)) {
             createKeySpace(handleName);
         }
     }
@@ -288,7 +298,7 @@ public class RocksDBState extends BaseState {
         } catch (RocksDBException ex) {
             throw new RuntimeException(ex);
         }
-        columnFamilyHandles.add(cfHandle);
+        cfHandles.put(handleName, cfHandle);
         dataBatches.put(handleName, new HashMap<>());
     }
 
@@ -307,11 +317,11 @@ public class RocksDBState extends BaseState {
     @Override
     public void delete(String keySpace, byte[] key) {
         ByteArray handleName = new ByteArray(keySpace);
-        Preconditions.checkNotNull(getColumnFamilyHandle(handleName));
+        Preconditions.checkNotNull(cfHandles.get(handleName));
         try {
             dataBatches.get(handleName).remove(new ByteArray(key));
             WriteOptions writeOptions = new WriteOptions().setDisableWAL(true);
-            rocksDB.delete(getColumnFamilyHandle(handleName), writeOptions, key);
+            rocksDB.delete(cfHandles.get(handleName), writeOptions, key);
         } catch(RocksDBException ex) {
             logger.error("Problem deleting RocksDB record, keySpace: " + keySpace + ", key: " + Hex.encodeHexString(key));
             throw new RuntimeException(ex);
@@ -331,13 +341,12 @@ public class RocksDBState extends BaseState {
                     String localBackupPath = getLocalBackupPath(uri);
                     file = new File(localBackupPath);
                     FileUtils.deleteDirectory(file);
-                    S3Helper s3Helper = new S3Helper(config);
                     s3Helper.deleteKeys(backupURI);
                     break;
                 default:
                     throw new RuntimeException("Unsupported schema: " + backupURI.getScheme());
             }
-        } catch(IOException ex) {
+        } catch(IOException | InterruptedException | ExecutionException ex) {
             throw new RuntimeException(ex);
         }
     }
@@ -350,7 +359,7 @@ public class RocksDBState extends BaseState {
                 WriteOptions writeOptions = new WriteOptions().setDisableWAL(true);
                 for(Map.Entry<ByteArray, byte[]> batchEntry: entry.getValue().entrySet()) {
                     writeBatch.put(
-                            getColumnFamilyHandle(entry.getKey()),
+                            cfHandles.get(entry.getKey()),
                             batchEntry.getKey().getBytes(),
                             batchEntry.getValue()
                     );
@@ -377,7 +386,7 @@ public class RocksDBState extends BaseState {
             WriteOptions writeOptions = new WriteOptions().setDisableWAL(true);
             for(Map.Entry<ByteArray, byte[]> entry: dataBatches.get(byteArray).entrySet()) {
                 writeBatch.put(
-                        getColumnFamilyHandle(byteArray),
+                        cfHandles.get(byteArray),
                         entry.getKey().getBytes(),
                         entry.getValue()
                 );
@@ -387,7 +396,7 @@ public class RocksDBState extends BaseState {
             writeOptions.close();
             dataBatches.get(byteArray).clear();
             FlushOptions fOptions = new FlushOptions().setWaitForFlush(true);
-            rocksDB.flush(new FlushOptions(), getColumnFamilyHandle(byteArray));
+            rocksDB.flush(new FlushOptions(), cfHandles.get(byteArray));
             fOptions.close();
         } catch(RocksDBException ex) {
             throw new RuntimeException(ex);
@@ -397,11 +406,11 @@ public class RocksDBState extends BaseState {
     @Override
     public byte[] get(String keySpace, byte[] key) {
         ByteArray handleName = new ByteArray(keySpace);
-        Preconditions.checkNotNull(getColumnFamilyHandle(handleName));
+        Preconditions.checkNotNull(cfHandles.get(handleName));
         try {
             byte[] retVal = dataBatches.get(new ByteArray(keySpace)).get(new ByteArray(key));
             if(retVal == null) {
-                retVal = rocksDB.get(getColumnFamilyHandle(handleName), key);
+                retVal = rocksDB.get(cfHandles.get(handleName), key);
             }
             return retVal;
         } catch(RocksDBException ex) {
@@ -429,8 +438,8 @@ public class RocksDBState extends BaseState {
         // NOTE: This only iterates RocksDB, not the appropriate data batch. Call flush first if
         // you need to iterate everything.
         ByteArray handleName = new ByteArray(keySpace);
-        Preconditions.checkNotNull(getColumnFamilyHandle(handleName));
-        return new Iterator(rocksDB.newIterator(getColumnFamilyHandle(handleName)));
+        Preconditions.checkNotNull(cfHandles.get(handleName));
+        return new Iterator(rocksDB.newIterator(cfHandles.get(handleName)));
     }
 
     @Override
@@ -455,14 +464,13 @@ public class RocksDBState extends BaseState {
                     String localBackupPath = getLocalBackupPath(uri);
                     File file = new File(localBackupPath);
                     if(!file.exists()) file.mkdir();
-                    S3Helper s3Helper = new S3Helper(config);
                     s3Helper.syncFromS3(new URI(localBackupPath), backupURI);
                     restore(uri, localBackupPath);
                     break;
                 default:
                     throw new RuntimeException("Unsupported schema: " + backupURI.getScheme());
             }
-        } catch(InterruptedException | RocksDBException | URISyntaxException ex) {
+        } catch(InterruptedException | ExecutionException | RocksDBException | URISyntaxException ex) {
             throw new RuntimeException(ex);
         }
     }
@@ -496,20 +504,5 @@ public class RocksDBState extends BaseState {
         } else {
             logger.warn("Skipping state restore, backup URI is empty");
         }
-    }
-
-    private ColumnFamilyHandle getColumnFamilyHandle(ByteArray name) {
-        return columnFamilyHandles
-                .stream()
-                .filter(
-                        handle -> {
-                            try {
-                                return Arrays.equals(handle.getName(), name.getBytes());
-                            } catch (Exception ex) {
-                                throw new RuntimeException(ex);
-                            }
-                        })
-                .findAny()
-                .orElse(null);
     }
 }

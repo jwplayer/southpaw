@@ -15,22 +15,11 @@
  */
 package com.jwplayer.southpaw.filter;
 
-import com.jwplayer.southpaw.record.BaseRecord;
-
 
 /**
- * Default filter used by Southpaw if no filter is specified. Does not filter any records.
+ * Default filter left for backwards compatibility.
  */
+@Deprecated
 public class DefaultFilter extends BaseFilter {
     public DefaultFilter() {}
-    /**
-     * By default, null or empty records will be tombstoned (deleted).
-     */
-    @Override
-    public FilterMode filter(String entity, BaseRecord record, BaseRecord oldRecord) {
-        if (record == null || record.isEmpty()) {
-            return FilterMode.DELETE;
-        }
-        return FilterMode.UPDATE;
-    }
 }
