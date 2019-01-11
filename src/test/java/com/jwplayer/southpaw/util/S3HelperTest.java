@@ -142,6 +142,7 @@ public class S3HelperTest {
         playerPath.toFile().deleteOnExit();
         Files.write(playerPath, "player".getBytes());
         s3.syncToS3(localUri, backupUri);
+        s3.waitForSyncToS3();
 
         List<S3ObjectSummary> summaries = s3.listKeys(backupUri);
         List<String> keys = new ArrayList<>(summaries.size());
