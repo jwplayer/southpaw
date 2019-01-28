@@ -72,7 +72,14 @@ public class InMemoryTopicTest {
     public InMemoryTopic<String, String> createTopic() {
         InMemoryTopic<String, String> topic = new InMemoryTopic<>();
         Map<String, Object> config = new HashMap<>();
-        topic.configure("TestTopic", config, state, Serdes.String(), Serdes.String(), new DefaultFilter());
+        topic.configure(new TopicConfig<String, String>()
+            .setShortName("TestTopic")
+            .setSouthpawConfig(config)
+            .setState(state)
+            .setKeySerde(Serdes.String())
+            .setValueSerde(Serdes.String())
+            .setFilter(new DefaultFilter()));
+
         for(int i = 0; i < keys.length; i++) {
             topic.write(keys[i], values[i]);
         }

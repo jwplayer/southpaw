@@ -15,15 +15,15 @@
  */
 package com.jwplayer.southpaw.topic;
 
-import com.google.common.base.Preconditions;
+import com.jwplayer.southpaw.util.ByteArray;
+import com.jwplayer.southpaw.topic.TopicConfig;
 import com.jwplayer.southpaw.filter.BaseFilter;
 import com.jwplayer.southpaw.state.BaseState;
-import com.jwplayer.southpaw.util.ByteArray;
+import com.jwplayer.southpaw.metric.Metrics;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.serialization.Serde;
 
 import java.util.Iterator;
-import java.util.Map;
 
 
 /**
@@ -42,7 +42,7 @@ public abstract class BaseTopic<K, V> {
      */
     public static final String OFFSETS = "offsets";
     public static final String FILTER_CLASS_CONFIG = "filter.class";
-    public static final String FILTER_CLASS_DEFAULT = "com.jwplayer.southpaw.filter.DefaultFilter";
+    public static final String FILTER_CLASS_DEFAULT = "com.jwplayer.southpaw.filter.BaseFilter";
     public static final String FILTER_CLASS_DOC = "Filter class used to filter input records, treating them " +
             "like tombstones and not recording them in the local state.";
     public static final String KEY_SERDE_CLASS_CONFIG = "key.serde.class";
@@ -60,33 +60,13 @@ public abstract class BaseTopic<K, V> {
             "Config option for specifying the value serde class for an input record";
 
     /**
-     * Configuration for this topic
+     * Configuration object
      */
-    protected Map<String, Object> config;
-    /**
-     * Filter used to filter out consumed records, treating them like a tombstone
-     */
-    protected BaseFilter filter;
-    /**
-     * The serde for (de)serializing Kafka record keys
-     */
-    protected Serde<K> keySerde;
-    /**
-     * The short name for this topic, could be the entity stored in this topic and used in indices (e.g. user)
-     */
-    protected String shortName;
-    /**
-     * We store offsets in the state instead of Kafka.
-     */
-    protected BaseState state;
+    protected TopicConfig<K, V> topicConfig;
     /**
      * The full topic name (e.g. my.topic.user)
      */
     protected String topicName;
-    /**
-     * The serde for (de)serializing Kafka record values
-     */
-    protected Serde<V> valueSerde;
 
     /**
      * Commits the current offsets and data to the state. Use after reading messages using the readNext method,
@@ -102,24 +82,16 @@ public abstract class BaseTopic<K, V> {
      * @param keySerde - The serde for (de)serializing Kafka record keys
      * @param valueSerde - The serde for (de)serializing Kafka record values
      * @param filter - The filter used to filter out consumed records, treating them like a tombstone
+     * @param metrics - The Southpaw Metrics object
      */
-    public void configure(
-            String shortName,
-            Map<String, Object> config,
-            BaseState state,
-            Serde<K> keySerde,
-            Serde<V> valueSerde,
-            BaseFilter filter
-    ) {
-        this.shortName = shortName;
-        this.config = Preconditions.checkNotNull(config);
-        this.topicName = config.getOrDefault(TOPIC_NAME_CONFIG, "").toString();
-        this.state = state;
-        this.state.createKeySpace(shortName + "-" + DATA);
-        this.state.createKeySpace(shortName + "-" + OFFSETS);
-        this.keySerde = keySerde;
-        this.valueSerde = valueSerde;
-        this.filter = filter;
+    public void configure(TopicConfig<K, V> config) {
+        // Store the configuration for this topic
+        this.topicConfig = config;
+
+        // Initialize topic
+        this.topicName = this.topicConfig.southpawConfig.getOrDefault(TOPIC_NAME_CONFIG, "").toString();
+        this.topicConfig.state.createKeySpace(this.getShortName() + "-" + DATA);
+        this.topicConfig.state.createKeySpace(this.getShortName() + "-" + OFFSETS);
     }
 
     /**
@@ -138,7 +110,15 @@ public abstract class BaseTopic<K, V> {
      * @return The key serde
      */
     public Serde<K> getKeySerde() {
-        return keySerde;
+        return this.topicConfig.keySerde;
+    }
+
+    /**
+     * Accessor for the value serde
+     * @return The value serde
+     */
+    public Serde<V> getValueSerde() {
+        return this.topicConfig.valueSerde;
     }
 
     /**
@@ -152,7 +132,7 @@ public abstract class BaseTopic<K, V> {
      * @return The short name for this topic.
      */
     public String getShortName() {
-        return shortName;
+        return this.topicConfig.shortName;
     }
 
     /**
@@ -164,11 +144,27 @@ public abstract class BaseTopic<K, V> {
     }
 
     /**
-     * Accessor for the value serde
-     * @return The value serde
+     * Accessor for the topic filter.
+     * @return The topic filter.
      */
-    public Serde<V> getValueSerde() {
-        return valueSerde;
+    public BaseFilter getFilter() {
+        return this.topicConfig.filter;
+    }
+
+    /**
+     * Accessor for the topic metrics.
+     * @return The topic metrics.
+     */
+    public Metrics getMetrics() {
+        return this.topicConfig.metrics;
+    }
+
+    /**
+     * Accessor for the topic state.
+     * @return The topic state.
+     */
+    public BaseState getState() {
+        return this.topicConfig.state;
     }
 
     /**
@@ -196,11 +192,11 @@ public abstract class BaseTopic<K, V> {
     public String toString() {
         return String.format(
                 "{shortName=%s,topicName=%s,currentOffset=%s,keySerde=%s,valueSerde=%s}",
-                shortName,
+                this.topicConfig.shortName,
                 topicName,
                 getCurrentOffset(),
-                keySerde.getClass().getName(),
-                valueSerde.getClass().getName()
+                this.topicConfig.keySerde.getClass().getName(),
+                this.topicConfig.valueSerde.getClass().getName()
         );
     }
 

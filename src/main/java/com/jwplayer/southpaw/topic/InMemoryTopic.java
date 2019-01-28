@@ -17,6 +17,7 @@ package com.jwplayer.southpaw.topic;
 
 import com.jwplayer.southpaw.record.BaseRecord;
 import com.jwplayer.southpaw.util.ByteArray;
+import com.jwplayer.southpaw.filter.BaseFilter.FilterMode;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 
 import java.util.*;
@@ -109,16 +110,31 @@ public final class InMemoryTopic<K, V> extends BaseTopic<K, V> {
     @Override
     public void write(K key, V value) {
         ConsumerRecord<K, V> record;
-        if(value instanceof BaseRecord && filter.isFiltered(shortName, (BaseRecord) value)) {
-            record = new ConsumerRecord<>(topicName, 0, records.size() + firstOffset, key, null);
-        } else {
-            record = new ConsumerRecord<>(topicName, 0, records.size() + firstOffset, key, value);
+        FilterMode filterMode = FilterMode.UPDATE;
+
+        if (value instanceof BaseRecord) {
+            filterMode = this.getFilter().filter(this.getShortName(), (BaseRecord) value, null);
         }
-        records.add(record);
-        if(key instanceof BaseRecord) {
-            recordsByPK.put(((BaseRecord) key).toByteArray(), record);
-        } else {
-            recordsByPK.put(ByteArray.toByteArray(key), record);
+
+        switch (filterMode) {
+            case DELETE:
+                record = new ConsumerRecord<>(topicName, 0, records.size() + firstOffset, key, null);
+                break;
+            case UPDATE:
+                record = new ConsumerRecord<>(topicName, 0, records.size() + firstOffset, key, value);
+                break;
+            case SKIP:
+            default:
+                record = null;
+        }
+
+        if (record != null) {
+            records.add(record);
+            if(key instanceof BaseRecord) {
+                recordsByPK.put(((BaseRecord) key).toByteArray(), record);
+            } else {
+                recordsByPK.put(ByteArray.toByteArray(key), record);
+            }
         }
     }
 }

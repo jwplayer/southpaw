@@ -20,6 +20,7 @@ import com.jwplayer.southpaw.util.ByteArray;
 import com.jwplayer.southpaw.util.FileHelper;
 import com.jwplayer.southpaw.util.S3Helper;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.codec.binary.Hex;
 import org.apache.log4j.Logger;
 import org.rocksdb.*;
 
@@ -28,6 +29,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.*;
+import java.util.concurrent.ExecutionException;
 
 
 /**
@@ -144,6 +146,10 @@ public class RocksDBState extends BaseState {
      */
     protected Options rocksDBOptions;
     /**
+     * S3 helper class for backups in S3
+     */
+    protected S3Helper s3Helper;
+    /**
      * The URI to the DB.
      */
     protected URI uri;
@@ -166,13 +172,12 @@ public class RocksDBState extends BaseState {
                 case S3Helper.SCHEME:
                     String localBackupPath = getLocalBackupPath(uri);
                     backup(localBackupPath);
-                    S3Helper s3Helper = new S3Helper(config);
                     s3Helper.syncToS3(new URI(localBackupPath), backupURI);
                     break;
                 default:
                     throw new RuntimeException("Unsupported schema: " + backupURI.getScheme());
             }
-        } catch(InterruptedException | URISyntaxException | RocksDBException ex) {
+        } catch(InterruptedException | ExecutionException | URISyntaxException | RocksDBException ex) {
             throw new RuntimeException(ex);
         }
     }
@@ -250,7 +255,6 @@ public class RocksDBState extends BaseState {
                     .setWalTtlSeconds(0L);
             rocksDBOptions.setMaxSubcompactions(maxSubcompactions);
 
-
             List<byte[]> families = RocksDB.listColumnFamilies(rocksDBOptions, uri.getPath());
             List<ColumnFamilyHandle> handles = new ArrayList<>(families.size() + 1);
             List<ColumnFamilyDescriptor> descriptors = new ArrayList<>(families.size() + 1);
@@ -264,9 +268,14 @@ public class RocksDBState extends BaseState {
             for (int i = 0; i < families.size(); i++) {
                 if (i > 0) {
                     ByteArray byteArray = new ByteArray(families.get(i));
-                    cfHandles.put(byteArray, handles.get(i));
                     dataBatches.put(byteArray, new HashMap<>());
                 }
+            }
+            for(ColumnFamilyHandle handle: handles) {
+                cfHandles.put(new ByteArray(handle.getName()), handle);
+            }
+            if(backupURI.getScheme().toLowerCase().equals(S3Helper.SCHEME)) {
+                s3Helper = new S3Helper(config);
             }
         } catch(Exception ex) {
             throw new RuntimeException(ex);
@@ -314,6 +323,7 @@ public class RocksDBState extends BaseState {
             WriteOptions writeOptions = new WriteOptions().setDisableWAL(true);
             rocksDB.delete(cfHandles.get(handleName), writeOptions, key);
         } catch(RocksDBException ex) {
+            logger.error("Problem deleting RocksDB record, keySpace: " + keySpace + ", key: " + Hex.encodeHexString(key));
             throw new RuntimeException(ex);
         }
     }
@@ -331,13 +341,12 @@ public class RocksDBState extends BaseState {
                     String localBackupPath = getLocalBackupPath(uri);
                     file = new File(localBackupPath);
                     FileUtils.deleteDirectory(file);
-                    S3Helper s3Helper = new S3Helper(config);
                     s3Helper.deleteKeys(backupURI);
                     break;
                 default:
                     throw new RuntimeException("Unsupported schema: " + backupURI.getScheme());
             }
-        } catch(IOException ex) {
+        } catch(IOException | InterruptedException | ExecutionException ex) {
             throw new RuntimeException(ex);
         }
     }
@@ -455,14 +464,13 @@ public class RocksDBState extends BaseState {
                     String localBackupPath = getLocalBackupPath(uri);
                     File file = new File(localBackupPath);
                     if(!file.exists()) file.mkdir();
-                    S3Helper s3Helper = new S3Helper(config);
                     s3Helper.syncFromS3(new URI(localBackupPath), backupURI);
                     restore(uri, localBackupPath);
                     break;
                 default:
                     throw new RuntimeException("Unsupported schema: " + backupURI.getScheme());
             }
-        } catch(InterruptedException | RocksDBException | URISyntaxException ex) {
+        } catch(InterruptedException | ExecutionException | RocksDBException | URISyntaxException ex) {
             throw new RuntimeException(ex);
         }
     }

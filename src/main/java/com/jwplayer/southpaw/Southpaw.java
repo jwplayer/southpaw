@@ -15,14 +15,11 @@
  */
 package com.jwplayer.southpaw;
 
-import com.codahale.metrics.*;
 import com.codahale.metrics.Timer;
-import com.codahale.metrics.jmx.JmxReporter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
 import com.jwplayer.southpaw.filter.BaseFilter;
-import com.jwplayer.southpaw.filter.DefaultFilter;
 import com.jwplayer.southpaw.index.BaseIndex;
 import com.jwplayer.southpaw.index.MultiIndex;
 import com.jwplayer.southpaw.index.Reversible;
@@ -35,6 +32,9 @@ import com.jwplayer.southpaw.topic.BaseTopic;
 import com.jwplayer.southpaw.util.ByteArray;
 import com.jwplayer.southpaw.util.ByteArraySet;
 import com.jwplayer.southpaw.util.FileHelper;
+import com.jwplayer.southpaw.metric.Metrics;
+import com.jwplayer.southpaw.metric.StaticGauge;
+import com.jwplayer.southpaw.topic.TopicConfig;
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
 import org.apache.commons.lang.ObjectUtils;
@@ -141,169 +141,6 @@ public class Southpaw {
      * State for Southpaw
      */
     protected BaseState state;
-
-    /**
-     * Simple gauge that we can update manually.
-     * @param <T> - Type stored / reported by the Gauge
-     */
-    protected static class StaticGauge<T> implements Gauge<T> {
-        protected T value;
-
-        public StaticGauge() { }
-
-        @Override
-        public T getValue() {
-            return value;
-        }
-
-        public void update(T value) {
-            this.value = value;
-        }
-    }
-
-    /**
-     * Simple metrics class for Southpaw
-     */
-    protected static class Metrics {
-        public static final String PREFIX = "jw.southpaw";
-        public static final String BACKUPS_CREATED = "backups.created";
-        public static final String BACKUPS_DELETED = "backups.deleted";
-        public static final String BACKUPS_RESTORED = "backups.restored";
-        public static final String DENORMALIZED_RECORDS_CREATED = "denormalized.records.created";
-        public static final String DENORMALIZED_RECORDS_TO_CREATE = "denormalized.records.to.create";
-        public static final String RECORDS_CONSUMED = "records.consumed";
-        public static final String STATE_COMMITTED = "states.committed";
-        public static final String STATES_DELETED = "states.deleted";
-        public static final String TOPIC_LAG = "topic.lag";
-
-        /**
-         * Registry where metrics are registered
-         */
-        protected static final MetricRegistry registry = new MetricRegistry();
-        /**
-         * Send the metrics to JMX.
-         */
-        protected final JmxReporter reporter = JmxReporter.forRegistry(registry).inDomain(PREFIX).build();
-        /**
-         * Timer for backups created
-         */
-        protected final com.codahale.metrics.Timer backupsCreated = registry.timer(BACKUPS_CREATED);
-        /**
-         * Number of backups deleted
-         */
-        protected final Meter backupsDeleted = registry.meter(BACKUPS_DELETED);
-        /**
-         * Timer for backups restored
-         */
-        protected final com.codahale.metrics.Timer backupsRestored = registry.timer(BACKUPS_RESTORED);
-        /**
-         * The number of denormalized records created for all topics
-         */
-        protected final Meter denormalizedRecordsCreated = registry.meter(DENORMALIZED_RECORDS_CREATED);
-        /**
-         * The number of denormalized records created by topic
-         */
-        protected final Map<String, Meter> denormalizedRecordsCreatedByTopic = new HashMap<>();
-        /**
-         * The number of denormalized records queued to create for all topics
-         */
-        protected StaticGauge<Long> denormalizedRecordsToCreate =  new StaticGauge<>();
-        /**
-         * The number of denormalized records to create by topic
-         */
-        protected final Map<String, StaticGauge<Long>> denormalizedRecordsToCreateByTopic = new HashMap<>();
-        /**
-         * Number of records consumed from all topics
-         */
-        protected final Meter recordsConsumed = registry.meter(RECORDS_CONSUMED);
-        /**
-         * Number of records consumed by topic
-         */
-        protected final Map<String, Meter> recordsConsumedByTopic = new HashMap<>();
-        /**
-         * The amount of time each state commit takes to run in milliseconds
-         */
-        protected final com.codahale.metrics.Timer stateCommitted = registry.timer(STATE_COMMITTED);
-        /**
-         * The number of states deleted
-         */
-        protected final Meter statesDeleted = registry.meter(STATES_DELETED);
-        /**
-         * The number of records yet to be consumed from all topics
-         */
-        protected StaticGauge<Long> topicLag = new StaticGauge<>();
-        /**
-         * The number of records yet to be consumed by topic
-         */
-        protected final Map<String, StaticGauge<Long>> topicLagByTopic = new HashMap<>();
-
-        /**
-         * Constructor
-         */
-        @SuppressWarnings("unchecked")
-        protected Metrics() {
-            reporter.start();
-            if(!registry.getMetrics().containsKey(TOPIC_LAG)) {
-                registry.register(TOPIC_LAG, topicLag);
-            } else {
-                topicLag = (StaticGauge<Long>) registry.getMetrics().get(TOPIC_LAG);
-            }
-            if(!registry.getMetrics().containsKey(DENORMALIZED_RECORDS_TO_CREATE)) {
-                registry.register(DENORMALIZED_RECORDS_TO_CREATE, denormalizedRecordsToCreate);
-            } else {
-                denormalizedRecordsToCreate = (StaticGauge<Long>) registry.getMetrics().get(DENORMALIZED_RECORDS_TO_CREATE);
-            }
-        }
-
-        /**
-         * Stops reporting on this metrics object
-         */
-        protected void close() {
-            reporter.close();
-        }
-
-        /**
-         * Register an input topic for per topic metrics.
-         * @param shortName - The topic short name to register the metric under
-         */
-        @SuppressWarnings("unchecked")
-        protected void registerInputTopic(String shortName) {
-            String meterName = String.join(".", RECORDS_CONSUMED, shortName);
-            if(!registry.getMetrics().containsKey(meterName)) {
-                recordsConsumedByTopic.put(shortName, registry.meter(meterName));
-            } else {
-                recordsConsumedByTopic.put(shortName, (Meter) registry.getMetrics().get(meterName));
-            }
-            meterName = String.join(".", TOPIC_LAG, shortName);
-            if(!registry.getMetrics().containsKey(meterName)) {
-                StaticGauge<Long> gauge = new StaticGauge<>();
-                registry.register(meterName, gauge);
-                topicLagByTopic.put(shortName, gauge);
-            } else {
-                topicLagByTopic.put(shortName, (StaticGauge<Long>) registry.getMetrics().get(meterName));
-            }
-        }
-
-        /**
-         * Register an output topic for per topic metrics.
-         * @param shortName - The topic short name to register the metric under
-         */
-        @SuppressWarnings("unchecked")
-        protected void registerOutputTopic(String shortName) {
-            String meterName = String.join(".", DENORMALIZED_RECORDS_CREATED, shortName);
-            if(!registry.getMetrics().containsKey(meterName)) {
-                denormalizedRecordsCreatedByTopic.put(shortName, registry.meter(meterName));
-            } else {
-                denormalizedRecordsCreatedByTopic.put(shortName, (Meter) registry.getMetrics().get(meterName));
-            }
-            meterName = String.join(".", DENORMALIZED_RECORDS_TO_CREATE, shortName);
-            if(!registry.getMetrics().containsKey(meterName)) {
-                denormalizedRecordsToCreateByTopic.put(shortName, registry.register(meterName, new StaticGauge<>()));
-            } else {
-                denormalizedRecordsToCreateByTopic.put(shortName, (StaticGauge<Long>) registry.getMetrics().get(meterName));
-            }
-        }
-    }
 
     /**
      * Base Southpaw config
@@ -448,9 +285,7 @@ public class Southpaw {
                     // Loop through each record and process it
                     while (records.hasNext()) {
                         ConsumerRecord<BaseRecord, BaseRecord> newRecord = records.next();
-                        // Grab the old record, if it exists
                         ByteArray primaryKey = newRecord.key().toByteArray();
-
                         for (Relation root : relations) {
                             Set<ByteArray> dePrimaryKeys = dePKsByType.get(root);
                             if (root.getEntity().equals(entity)) {
@@ -806,7 +641,8 @@ public class Southpaw {
                 topicConfig,
                 keySerde,
                 valueSerde,
-                new DefaultFilter()
+                new BaseFilter(),
+                metrics
         );
     }
 
@@ -843,14 +679,15 @@ public class Southpaw {
                 topicConfig,
                 keySerde,
                 valueSerde,
-                filter
+                filter,
+                metrics
         );
     }
 
     /**
      * Creates a new topic with the given parameters. Also useful for overriding for testing purposes.
      * @param shortName - The short name of the topic
-     * @param topicConfig - The topic configuration
+     * @param southpawConfig - The topic configuration
      * @param keySerde - The serde used to (de)serialize the key bytes
      * @param valueSerde - The serde used to (de)serialize the value bytes
      * @param filter - The filter used to filter out consumed records, treating them like a tombstone
@@ -861,16 +698,26 @@ public class Southpaw {
     @SuppressWarnings("unchecked")
     protected <K, V> BaseTopic<K, V> createTopic(
             String shortName,
-            Map<String, Object> topicConfig,
+            Map<String, Object> southpawConfig,
             Serde<K> keySerde,
             Serde<V> valueSerde,
-            BaseFilter filter) throws ClassNotFoundException, IllegalAccessException, InstantiationException {
-        Class topicClass = Class.forName(Preconditions.checkNotNull(topicConfig.get(BaseTopic.TOPIC_CLASS_CONFIG).toString()));
+            BaseFilter filter,
+            Metrics metrics) throws ClassNotFoundException, IllegalAccessException, InstantiationException {
+        Class topicClass = Class.forName(Preconditions.checkNotNull(southpawConfig.get(BaseTopic.TOPIC_CLASS_CONFIG).toString()));
         BaseTopic<K, V> topic = (BaseTopic<K, V>) topicClass.newInstance();
-        keySerde.configure(topicConfig, true);
-        valueSerde.configure(topicConfig, false);
-        filter.configure(topicConfig);
-        topic.configure(shortName, topicConfig, state, keySerde, valueSerde, filter);
+        keySerde.configure(southpawConfig, true);
+        valueSerde.configure(southpawConfig, false);
+        filter.configure(southpawConfig);
+
+        topic.configure(new TopicConfig<K, V>()
+            .setShortName(shortName)
+            .setSouthpawConfig(southpawConfig)
+            .setState(state)
+            .setKeySerde(keySerde)
+            .setValueSerde(valueSerde)
+            .setFilter(filter)
+            .setMetrics(metrics));
+        
         return topic;
     }
 

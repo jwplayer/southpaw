@@ -19,19 +19,33 @@ import com.jwplayer.southpaw.record.BaseRecord;
 
 public class TestFilter extends BaseFilter {
     String DELETED = "deleted";
+    String SKIP = "skip";
     String INVALID = "INVALID";
 
     public TestFilter() {}
 
     @Override
-    public boolean isFiltered(String entity, BaseRecord record) {
+    public FilterMode customFilter(String entity, BaseRecord record, BaseRecord oldRecord) {
+        FilterMode mode = FilterMode.UPDATE;
         switch(entity) {
             case "media":
-                return DELETED.equals(record.get("status"));
+                if (DELETED.equals(record.get("status"))) {
+                    mode = FilterMode.DELETE;
+                }
+                break;
             case "playlist_custom_params":
-                return INVALID.equals(record.get("value"));
+                if (INVALID.equals(record.get("value"))) {
+                    mode = FilterMode.DELETE;
+                }
+                break;
+            case "user":
+                if (SKIP.equals(record.get("name"))) {
+                    mode = FilterMode.SKIP;
+                }
+                break;
             default:
-                return false;
+                mode = FilterMode.UPDATE;
         }
+        return mode;
     }
 }

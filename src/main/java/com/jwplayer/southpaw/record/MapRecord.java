@@ -16,7 +16,6 @@
 package com.jwplayer.southpaw.record;
 
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSortedMap;
 
 import java.util.HashMap;
 import java.util.Map;

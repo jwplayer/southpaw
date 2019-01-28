@@ -30,10 +30,6 @@ import java.io.File;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.attribute.FileAttribute;
-import java.nio.file.attribute.PosixFileAttributes;
-import java.nio.file.attribute.PosixFilePermission;
-import java.nio.file.attribute.PosixFilePermissions;
 import java.util.*;
 
 import static org.junit.Assert.*;
@@ -74,7 +70,7 @@ public class S3HelperTest {
     }
 
     @Test
-    public void deleteKeys() {
+    public void deleteKeys() throws Exception {
         s3.deleteKeys(s3Uri);
         List<S3ObjectSummary> summaries = s3.listKeys(s3Uri);
 
@@ -146,6 +142,7 @@ public class S3HelperTest {
         playerPath.toFile().deleteOnExit();
         Files.write(playerPath, "player".getBytes());
         s3.syncToS3(localUri, backupUri);
+        s3.waitForSyncToS3();
 
         List<S3ObjectSummary> summaries = s3.listKeys(backupUri);
         List<String> keys = new ArrayList<>(summaries.size());

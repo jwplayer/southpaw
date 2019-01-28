@@ -13,13 +13,25 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.jwplayer.southpaw.filter;
+package com.jwplayer.southpaw.metric;
 
+import com.codahale.metrics.Gauge;
 
 /**
- * Default filter left for backwards compatibility.
+ * Simple gauge that we can update manually.
+ * @param <T> - Type stored / reported by the Gauge
  */
-@Deprecated
-public class DefaultFilter extends BaseFilter {
-    public DefaultFilter() {}
+public class StaticGauge<T> implements Gauge<T> {
+    protected T value;
+
+    public StaticGauge() { }
+
+    @Override
+    public T getValue() {
+        return value;
+    }
+
+    public void update(T value) {
+        this.value = value;
+    }
 }
