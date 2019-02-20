@@ -1,5 +1,10 @@
 # Change log
 
+## 0.2.2
+February 20th, 2019
+
+* Reduced # of flushes with RocksDB state [#18](https://github.com/jwplayer/southpaw/pull/18)  
+
 ## 0.2.1
 January 11th, 2019
 
