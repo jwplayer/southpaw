@@ -2,7 +2,7 @@ log.level: "INFO"
 
 backup.time.s: 1800
 backup.on.shutdown: true
-commit.time.s: 120
+commit.time.s: 0
 create.records.trigger: 1000000
 index.lru.cache.size: 1500
 index.write.batch.size: 1500

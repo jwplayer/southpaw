@@ -153,7 +153,7 @@ public class Southpaw {
         public static final int BACKUP_TIME_S_DEFAULT = 1800;
         public static final String BACKUP_TIME_S_DOC = "Time interval (roughly) between backups";
         public static final String COMMIT_TIME_S_CONFIG = "commit.time.s";
-        public static final int COMMIT_TIME_S_DEFAULT = 120;
+        public static final int COMMIT_TIME_S_DEFAULT = 0;
         public static final String COMMIT_TIME_S_DOC = "Time interval (roughly) between commits";
         public static final String CREATE_RECORDS_TRIGGER_CONFIG = "create.records.trigger";
         public static final int CREATE_RECORDS_TRIGGER_DEFAULT = 250000;

@@ -150,6 +150,14 @@ public class RocksDBState extends BaseState {
      */
     protected S3Helper s3Helper;
     /**
+     * SST File Manager for RocksDB
+     */
+    protected SstFileManager sstFileManager;
+    /**
+     * RocksDB stats object
+     */
+    protected Statistics statistics;
+    /**
      * The URI to the DB.
      */
     protected URI uri;
@@ -227,6 +235,8 @@ public class RocksDBState extends BaseState {
             uri = new URI(Preconditions.checkNotNull(config.get(URI_CONFIG).toString()));
 
             // Create the backing DB
+            sstFileManager = new SstFileManager(Env.getDefault());
+            statistics = new Statistics();
             DBOptions dbOptions = new DBOptions()
                     .setCreateIfMissing(true)
                     .setCreateMissingColumnFamilies(true)
@@ -234,12 +244,15 @@ public class RocksDBState extends BaseState {
                     .setMaxBackgroundCompactions(maxBackgroundCompactions)
                     .setMaxBackgroundFlushes(maxBackgroundFlushes)
                     .setWalSizeLimitMB(0L)
-                    .setMaxTotalWalSize(0L);
+                    .setMaxTotalWalSize(0L)
+                    .setStatistics(statistics)
+                    .setSstFileManager(sstFileManager);
             dbOptions.setMaxSubcompactions(maxSubcompactions);
             ColumnFamilyOptions cfOptions = new ColumnFamilyOptions()
                     .setCompactionStyle(CompactionStyle.LEVEL)
                     .setNumLevels(4)
-                    .setMaxWriteBufferNumber(maxWriteBufferNumber);
+                    .setMaxWriteBufferNumber(maxWriteBufferNumber)
+                    .setTargetFileSizeMultiplier(2);
             rocksDBOptions = new Options(dbOptions, cfOptions)
                     .setCreateIfMissing(true)
                     .setCreateMissingColumnFamilies(true)
@@ -252,7 +265,10 @@ public class RocksDBState extends BaseState {
                     .setMaxBackgroundFlushes(maxBackgroundFlushes)
                     .setMaxWriteBufferNumber(maxWriteBufferNumber)
                     .setWalSizeLimitMB(0L)
-                    .setWalTtlSeconds(0L);
+                    .setWalTtlSeconds(0L)
+                    .setTargetFileSizeMultiplier(2)
+                    .setSstFileManager(sstFileManager)
+                    .setStatistics(statistics);
             rocksDBOptions.setMaxSubcompactions(maxSubcompactions);
 
             List<byte[]> families = RocksDB.listColumnFamilies(rocksDBOptions, uri.getPath());
@@ -320,7 +336,7 @@ public class RocksDBState extends BaseState {
         Preconditions.checkNotNull(cfHandles.get(handleName));
         try {
             dataBatches.get(handleName).remove(new ByteArray(key));
-            WriteOptions writeOptions = new WriteOptions().setDisableWAL(true);
+            WriteOptions writeOptions = new WriteOptions().setDisableWAL(false);
             rocksDB.delete(cfHandles.get(handleName), writeOptions, key);
         } catch(RocksDBException ex) {
             logger.error("Problem deleting RocksDB record, keySpace: " + keySpace + ", key: " + Hex.encodeHexString(key));
@@ -355,20 +371,9 @@ public class RocksDBState extends BaseState {
     public void flush() {
         try {
             for(Map.Entry<ByteArray, Map<ByteArray, byte[]>> entry: dataBatches.entrySet()) {
-                WriteBatch writeBatch = new WriteBatch();
-                WriteOptions writeOptions = new WriteOptions().setDisableWAL(true);
-                for(Map.Entry<ByteArray, byte[]> batchEntry: entry.getValue().entrySet()) {
-                    writeBatch.put(
-                            cfHandles.get(entry.getKey()),
-                            batchEntry.getKey().getBytes(),
-                            batchEntry.getValue()
-                    );
-                }
-                rocksDB.write(writeOptions, writeBatch);
-                writeBatch.close();
-                writeOptions.close();
-                entry.getValue().clear();
+                putBatch(entry.getKey());
             }
+
             FlushOptions fOptions = new FlushOptions().setWaitForFlush(true);
             rocksDB.flush(fOptions);
             fOptions.close();
@@ -382,19 +387,7 @@ public class RocksDBState extends BaseState {
         Preconditions.checkNotNull(keySpace);
         ByteArray byteArray = new ByteArray(keySpace);
         try {
-            WriteBatch writeBatch = new WriteBatch();
-            WriteOptions writeOptions = new WriteOptions().setDisableWAL(true);
-            for(Map.Entry<ByteArray, byte[]> entry: dataBatches.get(byteArray).entrySet()) {
-                writeBatch.put(
-                        cfHandles.get(byteArray),
-                        entry.getKey().getBytes(),
-                        entry.getValue()
-                );
-            }
-            rocksDB.write(writeOptions, writeBatch);
-            writeBatch.close();
-            writeOptions.close();
-            dataBatches.get(byteArray).clear();
+            putBatch(byteArray);
             FlushOptions fOptions = new FlushOptions().setWaitForFlush(true);
             rocksDB.flush(new FlushOptions(), cfHandles.get(byteArray));
             fOptions.close();
@@ -449,7 +442,28 @@ public class RocksDBState extends BaseState {
         Map<ByteArray, byte[]> dataBatch = Preconditions.checkNotNull(dataBatches.get(byteArray));
         dataBatch.put(new ByteArray(key), value);
         if(dataBatch.size() >= putBatchSize) {
-            flush(keySpace);
+            putBatch(byteArray);
+        }
+    }
+
+    protected void putBatch(ByteArray keySpace) {
+        try {
+            Map<ByteArray, byte[]> dataBatch = dataBatches.get(keySpace);
+            WriteBatch writeBatch = new WriteBatch();
+            WriteOptions writeOptions = new WriteOptions().setDisableWAL(false);
+            for(Map.Entry<ByteArray, byte[]> batchEntry: dataBatch.entrySet()) {
+                writeBatch.put(
+                        cfHandles.get(keySpace),
+                        batchEntry.getKey().getBytes(),
+                        batchEntry.getValue()
+                );
+            }
+            rocksDB.write(writeOptions, writeBatch);
+            writeBatch.close();
+            writeOptions.close();
+            dataBatch.clear();
+        } catch(RocksDBException ex) {
+            throw new RuntimeException(ex);
         }
     }
 
