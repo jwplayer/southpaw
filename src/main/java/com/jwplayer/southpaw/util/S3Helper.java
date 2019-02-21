@@ -223,6 +223,7 @@ public class S3Helper {
      */
     public void syncFromS3(URI localUri, URI s3Uri) throws InterruptedException, ExecutionException {
         waitForSyncToS3();
+        TransferManager tx = null;
         try(Timer.Context context = metrics.s3Downloads.time()) {
             Preconditions.checkNotNull(localUri);
             Preconditions.checkNotNull(s3Uri);
@@ -230,7 +231,7 @@ public class S3Helper {
             Preconditions.checkArgument(SCHEME.equalsIgnoreCase(s3Uri.getScheme()));
             List<S3ObjectSummary> summaries = listKeys(s3Uri);
             String bucket = s3Uri.getHost();
-            TransferManager tx = TransferManagerBuilder.standard().withS3Client(s3).build();
+            tx = TransferManagerBuilder.standard().withS3Client(s3).build();
             Map<File, Download> downloads = new HashMap<>();
             logger.info(String.format("Downloading files from %s to %s", s3Uri.toString(), localUri.toString()));
             int downloadCount = 0;
@@ -265,6 +266,10 @@ public class S3Helper {
                 }
                 logger.info(String.format("Downloaded %s files", downloadCount));
                 downloads.clear();
+            }
+        } finally {
+            if (tx != null) {
+                tx.shutdownNow(false);
             }
         }
     }
@@ -323,33 +328,36 @@ public class S3Helper {
                     // Copy the new/updated files to S3
                     if (localFilesToCopy.size() > 0) {
                         TransferManager tx = TransferManagerBuilder.standard().withS3Client(s3).build();
-                        List<Upload> uploads = new ArrayList<>();
-                        for (File fileToCopy : localFilesToCopy) {
-                            String fullPath = getPath(fileToCopy);
-                            String suffix = StringUtils.substringAfter(fullPath, getPath(localUri));
-                            String key = getPath(s3Uri) + suffix;
-                            ObjectMetadata metadata = new ObjectMetadata();
-                            metadata.setLastModified(new Date(fileToCopy.lastModified()));
-                            PutObjectRequest request = new PutObjectRequest(bucket, key, fileToCopy).withMetadata(metadata);
-                            uploads.add(tx.upload(request));
-                            uploadCount++;
-                            metrics.s3FilesUploaded.mark(1);
-                            if (uploadCount % MAX_KEYS_PER_S3_OP == 0) {
+                        try{
+                            List<Upload> uploads = new ArrayList<>();
+                            for (File fileToCopy : localFilesToCopy) {
+                                String fullPath = getPath(fileToCopy);
+                                String suffix = StringUtils.substringAfter(fullPath, getPath(localUri));
+                                String key = getPath(s3Uri) + suffix;
+                                ObjectMetadata metadata = new ObjectMetadata();
+                                metadata.setLastModified(new Date(fileToCopy.lastModified()));
+                                PutObjectRequest request = new PutObjectRequest(bucket, key, fileToCopy).withMetadata(metadata);
+                                uploads.add(tx.upload(request));
+                                uploadCount++;
+                                metrics.s3FilesUploaded.mark(1);
+                                if (uploadCount % MAX_KEYS_PER_S3_OP == 0) {
+                                    for (Upload upload : uploads) {
+                                        upload.waitForUploadResult();
+                                    }
+                                    logger.info(String.format("Uploaded %s files", uploadCount));
+                                    uploads.clear();
+                                }
+                            }
+                            if (uploads.size() >= 0) {
                                 for (Upload upload : uploads) {
                                     upload.waitForUploadResult();
                                 }
                                 logger.info(String.format("Uploaded %s files", uploadCount));
                                 uploads.clear();
                             }
+                        } finally {
+                            tx.shutdownNow(false);
                         }
-                        if (uploads.size() >= 0) {
-                            for (Upload upload : uploads) {
-                                upload.waitForUploadResult();
-                            }
-                            logger.info(String.format("Uploaded %s files", uploadCount));
-                            uploads.clear();
-                        }
-                        tx.shutdownNow(false);
                     }
 
                     // Delete the extra S3 objects
