@@ -1,5 +1,10 @@
 # Change log
 
+## 0.2.3
+February 21st, 2019
+
+* Fixes a thread leak in S3Helper [#19](https://github.com/jwplayer/southpaw/pull/19)
+
 ## 0.2.2
 February 20th, 2019
 
