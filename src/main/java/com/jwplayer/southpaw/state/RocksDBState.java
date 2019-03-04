@@ -201,10 +201,14 @@ public class RocksDBState extends BaseState {
                 .setShareTableFiles(true)
                 .setMaxBackgroundOperations(parallelism);
         BackupEngine backupEngine = BackupEngine.open(Env.getDefault(), backupOptions);
-        backupEngine.createNewBackup(rocksDB, true);
-        backupEngine.purgeOldBackups(backupsToKeep);
-        backupEngine.close();
-        backupOptions.close();
+        try {
+            backupEngine.createNewBackup(rocksDB, true);
+            backupEngine.purgeOldBackups(backupsToKeep);
+        } finally {
+            logger.info("Shutting down backup engine");
+            backupEngine.close();
+            backupOptions.close();
+        }
     }
 
     @Override
@@ -506,11 +510,16 @@ public class RocksDBState extends BaseState {
             List<BackupInfo> backupInfo = backupEngine.getBackupInfo();
             if(backupInfo.size() > 0) {
                 delete();
-                backupEngine.restoreDbFromLatestBackup(dbUri.getPath(), dbUri.getPath(), restoreOptions);
-                backupEngine.purgeOldBackups(backupsToKeep);
-                backupEngine.close();
-                backupOptions.close();
-                restoreOptions.close();
+                try {
+                    backupEngine.restoreDbFromLatestBackup(dbUri.getPath(), dbUri.getPath(), restoreOptions);
+                    backupEngine.purgeOldBackups(backupsToKeep);
+                } finally {
+                    logger.info("Shutting down backup engine");
+                    backupEngine.close();
+                    backupOptions.close();
+                    restoreOptions.close();
+                }
+
                 configure(config);
             } else {
                 logger.warn("Skipping state restore, no backups found in backup URI");
