@@ -1,5 +1,10 @@
 # Change log
 
+## 0.2.4
+March 5th, 2019
+
+* Ensure rocksdb backup engine closes [#20](https://github.com/jwplayer/southpaw/pull/20)
+
 ## 0.2.3
 February 21st, 2019
 
