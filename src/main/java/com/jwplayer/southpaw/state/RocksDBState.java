@@ -42,6 +42,10 @@ public class RocksDBState extends BaseState {
      */
     public static final String BACKUP_URI_CONFIG = "rocks.db.backup.uri";
     /**
+     * If true rollback to previous rocksdb backup upon state restoration corruption
+     */
+    public static final String BACKUPS_AUTO_ROLLBACK_CONFIG = "rocks.db.backups.auto.rollback";
+    /**
      * The # of backups to keep
      */
     public static final String BACKUPS_TO_KEEP_CONFIG = "rocks.db.backups.to.keep";
@@ -117,6 +121,10 @@ public class RocksDBState extends BaseState {
      * Backup URI
      */
     protected URI backupURI;
+    /**
+     * Auto rollback to previous backups on restoration failure
+     */
+    protected boolean backupsAutoRollback;
     /**
      * The # of backups to keep
      */
@@ -251,6 +259,7 @@ public class RocksDBState extends BaseState {
         try {
             this.config = Preconditions.checkNotNull(config);
             backupURI = new URI(Preconditions.checkNotNull(config.get(BACKUP_URI_CONFIG).toString()));
+            backupsAutoRollback = (boolean) config.getOrDefault(BACKUPS_AUTO_ROLLBACK_CONFIG, false);
             backupsToKeep = (int) Preconditions.checkNotNull(config.get(BACKUPS_TO_KEEP_CONFIG));
             int compactionReadAheadSize = (int) Preconditions.checkNotNull(config.get(COMPACTION_READ_AHEAD_SIZE_CONFIG));
             int maxBackgroundCompactions = (int) config.getOrDefault(MAX_BACKGROUND_COMPACTIONS, 1);
@@ -526,28 +535,51 @@ public class RocksDBState extends BaseState {
     protected void restore(URI dbUri, String backupPath) throws RocksDBException {
         File path = new File(backupPath);
         if(path.exists()) {
-            RestoreOptions restoreOptions = new RestoreOptions(false);
-            BackupableDBOptions backupOptions = new BackupableDBOptions(backupPath)
-                    .setShareTableFiles(true)
-                    .setMaxBackgroundOperations(parallelism);
-            BackupEngine backupEngine = BackupEngine.open(Env.getDefault(), backupOptions);
-            try{
-                List<BackupInfo> backupInfo = backupEngine.getBackupInfo();
-                if(backupInfo.size() > 0) {
+            try (final BackupableDBOptions backupOptions = new BackupableDBOptions(backupPath)
+                         .setShareTableFiles(true)
+                         .setMaxBackgroundOperations(parallelism);
+                 final RestoreOptions restoreOptions = new RestoreOptions(false);
+                 final BackupEngine backupEngine = BackupEngine.open(Env.getDefault(), backupOptions)) {
+
+                final List<BackupInfo> backupInfo = backupEngine.getBackupInfo();
+
+                final int backups = backupInfo.size();
+                if(backups > 0) {
                     delete();
-
-                    backupEngine.restoreDbFromLatestBackup(dbUri.getPath(), dbUri.getPath(), restoreOptions);
+                    if(backupsAutoRollback) {
+                        boolean restored = false;
+                        int backupIndex = backups - 1;
+                        while (!restored){
+                            logger.info("Attempting to restore backup " + (backups - backupIndex) + " of " + backups);
+                            try {
+                                backupEngine.restoreDbFromBackup(backupInfo.get(backupIndex).backupId(),
+                                        dbUri.getPath(),
+                                        dbUri.getPath(),
+                                        restoreOptions);
+                            } catch (RocksDBException ex) {
+                                logger.warn("Failed to restore backup " + (backups - backupIndex) + " of "
+                                        + backups + " with exception: " + ex.getMessage());
+                                // Delete the corrupted backup
+                                backupEngine.deleteBackup(backupInfo.get(backupIndex).backupId());
+                                backupIndex -= 1;
+                                if (backupIndex < 0) {
+                                    logger.error("Failed to restore all backups");
+                                    throw ex;
+                                }
+                                continue;
+                            }
+                            restored = true;
+                        }
+                    } else {
+                        logger.info("Attempting to restore latest backup");
+                        backupEngine.restoreDbFromLatestBackup(dbUri.getPath(), dbUri.getPath(), restoreOptions);
+                    }
                     backupEngine.purgeOldBackups(backupsToKeep);
-
                     configure(config);
+                    logger.info("Backup restored");
                 } else {
                     logger.warn("Skipping state restore, no backups found in backup URI");
                 }
-            } finally {
-                logger.info("Shutting down backup engine");
-                backupEngine.close();
-                backupOptions.close();
-                restoreOptions.close();
             }
         } else {
             logger.warn("Skipping state restore, backup URI is empty");

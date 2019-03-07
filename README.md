@@ -156,6 +156,7 @@ The config is broken up into multiple sections:
 Currently, Southpaw uses RocksDB for its state, though this could be made pluggable in the future. Many of these options correspond directly to RocksDB options. Check the RocksDB documentation for more information.
 
 * rocks.db.backup.uri - Where to store backups. The local file system and S3 is supported.
+* rocks.db.backups.auto.rollback (default: false) - Rollback to previous rocksdb backup upon state restoration corruption
 * rocks.db.backups.to.keep - # of backups to keep
 * rocks.db.compaction.read.ahead.size - Heap allocated to the compaction read ahead process
 * rocks.db.max.background.compactions - Number of threads used for background compactions
