@@ -130,6 +130,10 @@ public class RocksDBState extends BaseState {
      */
     protected Map<String, Object> config;
     /**
+     * Flag for whether RocksDB is open
+     */
+    protected boolean dbOpen = false;
+    /**
      * Used for # of threads / parallelism for various Rocks DB config options
      */
     protected int parallelism;
@@ -145,6 +149,14 @@ public class RocksDBState extends BaseState {
      * Rocks DB options
      */
     protected Options rocksDBOptions;
+    /**
+     * Rocks DB Flush options
+     */
+    protected FlushOptions flushOptions;
+    /**
+     * Rocks DB Write options
+     */
+    protected WriteOptions writeOptions;
     /**
      * S3 helper class for backups in S3
      */
@@ -213,13 +225,25 @@ public class RocksDBState extends BaseState {
 
     @Override
     public void close() {
+        if(!dbOpen) {
+            return;
+        }
+        dbOpen = false;
+
         for(Map.Entry<ByteArray, ColumnFamilyHandle> entry: cfHandles.entrySet()) {
             entry.getValue().close();
         }
         cfHandles.clear();
         dataBatches.clear();
         rocksDBOptions.close();
+        flushOptions.close();
+        writeOptions.close();
         rocksDB.close();
+
+        rocksDBOptions = null;
+        flushOptions = null;
+        writeOptions = null;
+        rocksDB = null;
     }
 
     @Override
@@ -275,6 +299,12 @@ public class RocksDBState extends BaseState {
                     .setStatistics(statistics);
             rocksDBOptions.setMaxSubcompactions(maxSubcompactions);
 
+            flushOptions = new FlushOptions();
+            flushOptions.setWaitForFlush(true);
+
+            writeOptions = new WriteOptions();
+            writeOptions.setDisableWAL(false);
+
             List<byte[]> families = RocksDB.listColumnFamilies(rocksDBOptions, uri.getPath());
             List<ColumnFamilyHandle> handles = new ArrayList<>(families.size() + 1);
             List<ColumnFamilyDescriptor> descriptors = new ArrayList<>(families.size() + 1);
@@ -285,6 +315,8 @@ public class RocksDBState extends BaseState {
                 descriptors.add(new ColumnFamilyDescriptor(RocksDB.DEFAULT_COLUMN_FAMILY, cfOptions));
             }
             rocksDB = RocksDB.open(dbOptions, uri.getPath(), descriptors, handles);
+            dbOpen = true;
+
             for (int i = 0; i < families.size(); i++) {
                 if (i > 0) {
                     ByteArray byteArray = new ByteArray(families.get(i));
@@ -340,7 +372,6 @@ public class RocksDBState extends BaseState {
         Preconditions.checkNotNull(cfHandles.get(handleName));
         try {
             dataBatches.get(handleName).remove(new ByteArray(key));
-            WriteOptions writeOptions = new WriteOptions().setDisableWAL(false);
             rocksDB.delete(cfHandles.get(handleName), writeOptions, key);
         } catch(RocksDBException ex) {
             logger.error("Problem deleting RocksDB record, keySpace: " + keySpace + ", key: " + Hex.encodeHexString(key));
@@ -377,10 +408,7 @@ public class RocksDBState extends BaseState {
             for(Map.Entry<ByteArray, Map<ByteArray, byte[]>> entry: dataBatches.entrySet()) {
                 putBatch(entry.getKey());
             }
-
-            FlushOptions fOptions = new FlushOptions().setWaitForFlush(true);
-            rocksDB.flush(fOptions);
-            fOptions.close();
+            rocksDB.flush(flushOptions);
         } catch(RocksDBException ex) {
             throw new RuntimeException(ex);
         }
@@ -392,9 +420,7 @@ public class RocksDBState extends BaseState {
         ByteArray byteArray = new ByteArray(keySpace);
         try {
             putBatch(byteArray);
-            FlushOptions fOptions = new FlushOptions().setWaitForFlush(true);
-            rocksDB.flush(new FlushOptions(), cfHandles.get(byteArray));
-            fOptions.close();
+            rocksDB.flush(flushOptions, cfHandles.get(byteArray));
         } catch(RocksDBException ex) {
             throw new RuntimeException(ex);
         }
@@ -454,7 +480,6 @@ public class RocksDBState extends BaseState {
         try {
             Map<ByteArray, byte[]> dataBatch = dataBatches.get(keySpace);
             WriteBatch writeBatch = new WriteBatch();
-            WriteOptions writeOptions = new WriteOptions().setDisableWAL(false);
             for(Map.Entry<ByteArray, byte[]> batchEntry: dataBatch.entrySet()) {
                 writeBatch.put(
                         cfHandles.get(keySpace),
@@ -464,7 +489,6 @@ public class RocksDBState extends BaseState {
             }
             rocksDB.write(writeOptions, writeBatch);
             writeBatch.close();
-            writeOptions.close();
             dataBatch.clear();
         } catch(RocksDBException ex) {
             throw new RuntimeException(ex);
