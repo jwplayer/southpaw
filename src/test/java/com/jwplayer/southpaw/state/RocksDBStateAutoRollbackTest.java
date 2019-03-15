@@ -30,31 +30,33 @@ import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.*;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
 
-
-public class RocksDBStateTest {
+public class RocksDBStateAutoRollbackTest {
     private static final String ROCKSDB_BASE_URI = "file:///tmp/RocksDB/";
 
     protected static final String BACKUP_URI = "file:///tmp/RocksDB/RocksDBStateTestBackup";
     protected static final String KEY_SPACE = "Default";
     protected static final String URI = "file:///tmp/RocksDB/RocksDBStateTest";
+    protected static final int BACKUPS_TO_KEEP = 4;
 
     protected RocksDBState state;
 
     public static Map<String, Object> createConfig(String uri) {
         Map<String, Object> config = new HashMap<>();
         config.put(RocksDBState.BACKUP_URI_CONFIG, BACKUP_URI);
-        config.put(RocksDBState.BACKUPS_TO_KEEP_CONFIG, 5);
+        config.put(RocksDBState.BACKUPS_TO_KEEP_CONFIG, BACKUPS_TO_KEEP);
         config.put(RocksDBState.COMPACTION_READ_AHEAD_SIZE_CONFIG, 1048675);
         config.put(RocksDBState.MEMTABLE_SIZE, 1048675);
         config.put(RocksDBState.PARALLELISM_CONFIG, 4);
         config.put(RocksDBState.PUT_BATCH_SIZE, 5);
         config.put(RocksDBState.URI_CONFIG, uri);
+        config.put(RocksDBState.BACKUPS_AUTO_ROLLBACK_CONFIG, true);
         return config;
     }
 
-    @Rule public ExpectedException thrown = ExpectedException.none();
+    @Rule
+    public ExpectedException thrown = ExpectedException.none();
 
     @BeforeClass
     public static void classSetup() throws URISyntaxException, IOException {
@@ -73,7 +75,6 @@ public class RocksDBStateTest {
         state = new RocksDBState();
         state.configure(createConfig(URI));
         state.createKeySpace(KEY_SPACE);
-        writeData(0,100);
     }
 
     @After
@@ -84,6 +85,7 @@ public class RocksDBStateTest {
     @Test
     public void backupAndRestore() {
         state.deleteBackups();
+        writeData(0,100);
         state.backup();
         state.restore();
         BaseState.Iterator iter = state.iterate(KEY_SPACE);
@@ -94,99 +96,77 @@ public class RocksDBStateTest {
             assertEquals(count.toString(), new String(pair.getValue()));
             count++;
         }
+        iter.close();
         assertEquals(100, (int) count);
         state.deleteBackups();
     }
 
     @Test
-    public void backupAndRestoreCorrupt() throws URISyntaxException, IOException {
-        // Expected exception on corrupted backup
-        thrown.expect( RuntimeException.class );
-        thrown.expectMessage("org.rocksdb.RocksDBException: Checksum check failed");
-
+    public void BackupAndRestoreLatestCorrupt() throws URISyntaxException, IOException {
         state.deleteBackups();
+
+        // Create a few backups
+        writeData(0,100);
+        state.backup();
+        writeData(100,200);
+        state.backup();
+        writeData(200,250);
         state.backup();
 
+        //Corrupt the most recent backup
         corruptLatestSST();
 
         state.restore();
-    }
 
-    @Test
-    public void close() {
-        state.close();
-    }
-
-    @Test
-    public void createKeySpace() {
-        String newKeySpace = "NewKeySpace";
-        state.createKeySpace(newKeySpace);
-        state.put(newKeySpace, "A".getBytes(), "B".getBytes());
-        state.flush();
-        String value = new String(state.get(newKeySpace, "A".getBytes()));
-        assertEquals("B", value);
-    }
-
-    @Test
-    public void delete() {
-        state.delete();
-    }
-
-    @Test
-    public void deleteValue() {
-        byte[] key = new ByteArray(1).getBytes();
-        state.delete(KEY_SPACE, key);
-        byte[] value = state.get(KEY_SPACE, key);
-
-        assertNull(value);
-    }
-
-    @Test
-    public void flush() {
-        state.put(KEY_SPACE, "AA".getBytes(), "B".getBytes());
-        String value = new String(state.get(KEY_SPACE, "AA".getBytes()));
-        assertEquals("B", value);
-        state.flush();
-        value = new String(state.get(KEY_SPACE, "AA".getBytes()));
-        assertEquals("B", value);
-    }
-
-    @Test
-    public void flushKeySpace() {
-        state.put(KEY_SPACE, "AA".getBytes(), "B".getBytes());
-        String value = new String(state.get(KEY_SPACE, "AA".getBytes()));
-        assertEquals("B", value);
-        state.flush(KEY_SPACE);
-        value = new String(state.get(KEY_SPACE, "AA".getBytes()));
-        assertEquals("B", value);
-    }
-
-    @Test
-    public void get() {
-        String value = new String(state.get(KEY_SPACE, new ByteArray(1).getBytes()));
-        assertEquals("1", value);
-    }
-
-    @Test
-    public void iterate() {
+        //Check that the second backup restores with the expected data
         BaseState.Iterator iter = state.iterate(KEY_SPACE);
         Integer count = 0;
-        while(iter.hasNext()) {
+        while (iter.hasNext()) {
             AbstractMap.SimpleEntry<byte[], byte[]> pair = iter.next();
             assertEquals(new ByteArray(count), new ByteArray(pair.getKey()));
             assertEquals(count.toString(), new String(pair.getValue()));
             count++;
         }
         iter.close();
-        assertEquals(100, (int) count);
+        assertEquals(200, (int) count);
+
+        //Write more data and backup
+        writeData(200,250);
+        state.backup();
+        state.restore();
+
+        //Check that the newest backup contains the data from the last successfully restored backup and the new data
+        iter = state.iterate(KEY_SPACE);
+        count = 0;
+        while (iter.hasNext()) {
+            AbstractMap.SimpleEntry<byte[], byte[]> pair = iter.next();
+            assertEquals(new ByteArray(count), new ByteArray(pair.getKey()));
+            assertEquals(count.toString(), new String(pair.getValue()));
+            count++;
+        }
+        iter.close();
+
+        //Check that all expected data exists
+        assertEquals(250, (int) count);
+
+        state.deleteBackups();
     }
 
     @Test
-    public void put() {
-        state.put(KEY_SPACE, "A".getBytes(), "B".getBytes());
-        state.flush(KEY_SPACE);
-        String value = new String(state.get(KEY_SPACE, "A".getBytes()));
-        assertEquals("B", value);
+    public void backupAndRestoreAllCorrupted() throws URISyntaxException, IOException {
+        // Expected exception on corrupted backup
+        thrown.expect( RuntimeException.class );
+        thrown.expectMessage("org.rocksdb.RocksDBException: Checksum check failed");
+
+        state.deleteBackups();
+
+        writeData(0,100);
+        state.backup();
+
+        //Corrupt the most recent backup
+        corruptLatestSST();
+
+        state.restore();
     }
 
     private void corruptLatestSST() throws URISyntaxException, IOException {
