@@ -16,11 +16,10 @@
 package com.jwplayer.southpaw.state;
 
 import com.jwplayer.southpaw.util.ByteArray;
-import org.apache.commons.io.FileUtils;
 import org.junit.*;
 import org.junit.rules.ExpectedException;
+import org.junit.rules.TemporaryFolder;
 
-import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -33,47 +32,39 @@ import java.util.*;
 import static org.junit.Assert.assertEquals;
 
 public class RocksDBStateAutoRollbackTest {
-    private static final String ROCKSDB_BASE_URI = "file:///tmp/RocksDB/";
+    private static final String KEY_SPACE = "Default";
+    private static final int BACKUPS_TO_KEEP = 4;
 
-    protected static final String BACKUP_URI = "file:///tmp/RocksDB/RocksDBStateTestBackup";
-    protected static final String KEY_SPACE = "Default";
-    protected static final String URI = "file:///tmp/RocksDB/RocksDBStateTest";
-    protected static final int BACKUPS_TO_KEEP = 4;
+    private RocksDBState state;
 
-    protected RocksDBState state;
-
-    public static Map<String, Object> createConfig(String uri) {
+    private static Map<String, Object> createConfig(String dbUri, String backupUri) {
         Map<String, Object> config = new HashMap<>();
-        config.put(RocksDBState.BACKUP_URI_CONFIG, BACKUP_URI);
+        config.put(RocksDBState.BACKUP_URI_CONFIG, backupUri);
         config.put(RocksDBState.BACKUPS_TO_KEEP_CONFIG, BACKUPS_TO_KEEP);
         config.put(RocksDBState.COMPACTION_READ_AHEAD_SIZE_CONFIG, 1048675);
         config.put(RocksDBState.MEMTABLE_SIZE, 1048675);
         config.put(RocksDBState.PARALLELISM_CONFIG, 4);
         config.put(RocksDBState.PUT_BATCH_SIZE, 5);
-        config.put(RocksDBState.URI_CONFIG, uri);
+        config.put(RocksDBState.URI_CONFIG, dbUri);
         config.put(RocksDBState.BACKUPS_AUTO_ROLLBACK_CONFIG, true);
         return config;
     }
 
     @Rule
+    public TemporaryFolder dbFolder = new TemporaryFolder();
+
+    @Rule
+    public TemporaryFolder backupFolder = new TemporaryFolder();
+
+    @Rule
     public ExpectedException thrown = ExpectedException.none();
-
-    @BeforeClass
-    public static void classSetup() throws URISyntaxException, IOException {
-        File folder = new File(new URI(ROCKSDB_BASE_URI));
-        FileUtils.deleteDirectory(folder);
-        folder.mkdirs();
-    }
-
-    @AfterClass
-    public static void classCleanup() throws URISyntaxException, IOException {
-        FileUtils.deleteDirectory(new File(new URI(ROCKSDB_BASE_URI)));
-    }
 
     @Before
     public void setUp() {
+        String dbUri = dbFolder.getRoot().toURI().toString();
+        String backupUri = backupFolder.getRoot().toURI().toString();
         state = new RocksDBState();
-        state.configure(createConfig(URI));
+        state.configure(createConfig(dbUri, backupUri));
         state.createKeySpace(KEY_SPACE);
     }
 
@@ -170,7 +161,7 @@ public class RocksDBStateAutoRollbackTest {
     }
 
     private void corruptLatestSST() throws URISyntaxException, IOException {
-        Path dir = Paths.get(new URI(BACKUP_URI + "/shared"));
+        Path dir = Paths.get(new URI(backupFolder.getRoot().toURI().toString() + "/shared"));
         Optional<Path> lastFilePath = Files.list(dir)
                 .filter(f -> !Files.isDirectory(f))
                 .max(Comparator.naturalOrder());

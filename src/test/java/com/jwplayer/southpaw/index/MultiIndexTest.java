@@ -15,11 +15,11 @@
  */
 package com.jwplayer.southpaw.index;
 
-import com.jwplayer.southpaw.filter.DefaultFilter;
+import com.jwplayer.southpaw.MockState;
+import com.jwplayer.southpaw.filter.BaseFilter;
 import com.jwplayer.southpaw.record.BaseRecord;
 import com.jwplayer.southpaw.serde.JsonSerde;
-import com.jwplayer.southpaw.state.RocksDBState;
-import com.jwplayer.southpaw.state.RocksDBStateTest;
+import com.jwplayer.southpaw.state.BaseState;
 import com.jwplayer.southpaw.topic.BaseTopic;
 import com.jwplayer.southpaw.topic.InMemoryTopic;
 import com.jwplayer.southpaw.topic.TopicConfig;
@@ -27,41 +27,20 @@ import com.jwplayer.southpaw.util.ByteArray;
 import com.jwplayer.southpaw.util.FileHelper;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.junit.*;
-import org.junit.rules.TestName;
 
-import java.io.File;
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.util.*;
 
 import static org.junit.Assert.*;
 
 
 public class MultiIndexTest {
-    private static final String ROCKSDB_BASE_URI = "file:///tmp/RocksDB/";
-
-    protected MultiIndex<BaseRecord, BaseRecord> index;
-    protected RocksDBState state;
-
-
-    @Rule
-    public TestName testName = new TestName();
-
-    @BeforeClass
-    public static void classSetup() throws URISyntaxException {
-        File folder = new File(new URI(ROCKSDB_BASE_URI));
-        folder.mkdirs();
-    }
-
-    @AfterClass
-    public static void classCleanup() throws URISyntaxException {
-        File folder = new File(new URI(ROCKSDB_BASE_URI));
-        folder.delete();
-    }
+    private MultiIndex<BaseRecord, BaseRecord> index;
+    private BaseState state;
 
     @Before
     public void setup() {
-        state = new RocksDBState();
+        state = new MockState();
         index = createEmptyIndex(state);
     }
 
@@ -70,8 +49,8 @@ public class MultiIndexTest {
         state.delete();
     }
 
-    private MultiIndex<BaseRecord, BaseRecord> createEmptyIndex(RocksDBState state) {
-        Map<String, Object> config = RocksDBStateTest.createConfig(ROCKSDB_BASE_URI + testName);
+    private MultiIndex<BaseRecord, BaseRecord> createEmptyIndex(BaseState state) {
+        Map<String, Object> config = new HashMap<>();
         config.put(MultiIndex.INDEX_LRU_CACHE_SIZE, 2);
         config.put(MultiIndex.INDEX_WRITE_BATCH_SIZE, 5);
         JsonSerde keySerde = new JsonSerde();
@@ -86,7 +65,7 @@ public class MultiIndexTest {
             .setState(state)
             .setKeySerde(keySerde)
             .setValueSerde(valueSerde)
-            .setFilter(new DefaultFilter()));
+            .setFilter(new BaseFilter()));
         MultiIndex<BaseRecord, BaseRecord> index = new MultiIndex<>();
         index.configure("TestIndex", config, state, indexedTopic);
         return index;
