@@ -15,49 +15,27 @@
  */
 package com.jwplayer.southpaw.topic;
 
-import com.jwplayer.southpaw.filter.DefaultFilter;
-import com.jwplayer.southpaw.state.BaseState;
-import com.jwplayer.southpaw.state.RocksDBState;
-import com.jwplayer.southpaw.state.RocksDBStateTest;
+import com.jwplayer.southpaw.MockState;
+import com.jwplayer.southpaw.filter.BaseFilter;
 import com.jwplayer.southpaw.util.ByteArray;
-import com.jwplayer.southpaw.topic.TopicConfig;
 import org.apache.commons.lang.NotImplementedException;
 import org.apache.kafka.common.serialization.Serdes;
 import org.junit.*;
-import org.junit.rules.TestName;
 
-import java.io.File;
-import java.net.URI;
-import java.net.URISyntaxException;
+import java.util.HashMap;
 import java.util.Map;
 
 
 public class ConsoleTopicTest {
-    private static final String ROCKSDB_BASE_URI = "file:///tmp/RocksDB/";
+    private MockState state;
+    private ConsoleTopic<String, String> topic;
 
-    BaseState state;
-    public ConsoleTopic<String, String> topic;
-
-    @Rule
-    public TestName testName = new TestName();
-
-    @BeforeClass
-    public static void classSetup() throws URISyntaxException {
-        File folder = new File(new URI(ROCKSDB_BASE_URI));
-        folder.mkdirs();
-    }
-
-    @AfterClass
-    public static void classCleanup() throws URISyntaxException {
-        File folder = new File(new URI(ROCKSDB_BASE_URI));
-        folder.delete();
-    }
 
     @Before
     public void setUp() {
         topic = new ConsoleTopic<>();
-        Map<String, Object> config = RocksDBStateTest.createConfig(ROCKSDB_BASE_URI + testName);
-        state = new RocksDBState();
+        Map<String, Object> config = new HashMap<>();
+        state = new MockState();
         state.configure(config);
         topic.configure(new TopicConfig<String, String>()
             .setShortName("TestTopic")
@@ -65,7 +43,7 @@ public class ConsoleTopicTest {
             .setState(state)
             .setKeySerde(Serdes.String())
             .setValueSerde(Serdes.String())
-            .setFilter(new DefaultFilter()));
+            .setFilter(new BaseFilter()));
     }
 
     @After
