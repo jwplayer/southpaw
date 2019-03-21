@@ -180,6 +180,18 @@ public class RocksDBStateTest {
         assertEquals("B", value);
     }
 
+    @Test
+    public void needsRestore() {
+        assertTrue(state.needsRestore());
+
+        state.backup();
+
+        state.restore();
+
+        assertFalse(state.needsRestore());
+
+    }
+
     private void corruptLatestSST() throws URISyntaxException, IOException {
         Path dir = Paths.get(new URI(backupFolder.getRoot().toURI().toString() + "/shared"));
         Optional<Path> lastFilePath = Files.list(dir)

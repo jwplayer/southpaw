@@ -116,4 +116,10 @@ public abstract class BaseState {
      * Restore the state from a previous backup.
      */
     public abstract void restore();
+
+    /**
+     * A check to see if a restore has been previously performed.
+     * @return True if a restore has not been performed yet.
+     */
+    public abstract boolean needsRestore();
 }

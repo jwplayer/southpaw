@@ -38,6 +38,10 @@ import java.util.concurrent.ExecutionException;
 public class RocksDBState extends BaseState {
     private static final Logger logger = Logger.getLogger(RocksDBState.class);
     /**
+     * Marker for local database loaded
+     */
+    private static final String ROCKSDB_STATE_RESTORED_MARKER = "ROCKSDB-STATE-RESTORED";
+    /**
      * URI to backup RocksDB to
      */
     public static final String BACKUP_URI_CONFIG = "rocks.db.backup.uri";
@@ -324,6 +328,7 @@ public class RocksDBState extends BaseState {
                 descriptors.add(new ColumnFamilyDescriptor(RocksDB.DEFAULT_COLUMN_FAMILY, cfOptions));
             }
             rocksDB = RocksDB.open(dbOptions, uri.getPath(), descriptors, handles);
+
             dbOpen = true;
 
             for (int i = 0; i < families.size(); i++) {
@@ -521,9 +526,26 @@ public class RocksDBState extends BaseState {
                 default:
                     throw new RuntimeException("Unsupported schema: " + backupURI.getScheme());
             }
+
+            File restoreMarker = new File(uri.getPath() + "/" + ROCKSDB_STATE_RESTORED_MARKER);
+            try {
+                final boolean created = restoreMarker.createNewFile();
+                if (!created) {
+                    logger.warn("Failed to create restore marker file. File already existed. Moving on");
+                }
+            } catch(IOException | SecurityException ex) {
+                throw new RuntimeException("Failed to create restore marker file", ex);
+            }
+
         } catch(InterruptedException | ExecutionException | RocksDBException | URISyntaxException ex) {
             throw new RuntimeException(ex);
         }
+    }
+
+    @Override
+    public boolean needsRestore() {
+        File restoreMarker = new File(uri.getPath() + "/" + ROCKSDB_STATE_RESTORED_MARKER);
+        return !(restoreMarker.exists() && restoreMarker.isFile());
     }
 
     /**

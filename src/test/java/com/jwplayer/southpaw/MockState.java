@@ -91,4 +91,9 @@ public class MockState extends BaseState {
     public void restore() {
         throw new NotImplementedException();
     }
+
+    @Override
+    public boolean needsRestore() {
+        return false;
+    }
 }

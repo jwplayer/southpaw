@@ -186,6 +186,12 @@ public class Southpaw {
         }
     }
 
+    protected static class RestoreMode {
+        static final String ALWAYS = "always";
+        static final String NEVER = "never";
+        static final String WHEN_NEEDED = "when_needed";
+    }
+
     /**
      * Constructor
      * @param rawConfig - Southpaw configuration
@@ -799,6 +805,7 @@ public class Southpaw {
         String HELP = "help";
         String RELATIONS = "relations";
         String RESTORE = "restore";
+        String RESTORE_MODE = "restore-mode";
 
         OptionParser parser = new OptionParser() {
             {
@@ -808,6 +815,7 @@ public class Southpaw {
                 accepts(DELETE_BACKUP, "Deletes existing backups specified in the config file. BE VERY CAREFUL WITH THIS!!!");
                 accepts(DELETE_STATE, "Deletes the existing state specified in the config file. BE VERY CAREFUL WITH THIS!!!");
                 accepts(RESTORE, "Restores the state from existing backups.");
+                accepts(RESTORE_MODE, "Specifies when state restores should run. One of: never|always|when_needed Defaults to: never").withOptionalArg().ofType(String.class).defaultsTo(RestoreMode.NEVER);
                 accepts(DEBUG, "Sets logging to DEBUG.").withOptionalArg();
                 accepts(HELP, "Since you are seeing this, you probably know what this is for. :)").forHelp();
             }
@@ -833,9 +841,14 @@ public class Southpaw {
         if(options.has(DELETE_STATE)) {
             southpaw.deleteState();
         }
+
         if(options.has(RESTORE)) {
-            southpaw.restore();
+            logger.warn("The --restore flag is deprecated and will be removed in a future version. Please use --restore-mode.");
+            southpaw.restore(RestoreMode.ALWAYS);
+        } else {
+            southpaw.restore(options.valueOf(RESTORE_MODE).toString());
         }
+
         southpaw.startedSuccessfully = true;
         if(options.has(BUILD)) {
             southpaw.run(0);
@@ -880,6 +893,24 @@ public class Southpaw {
             for(Relation root: relations) {
                 inputTopics.putAll(createInputTopics(root));
             }
+        }
+    }
+
+    public void restore(String mode) throws IllegalAccessException, InstantiationException, ClassNotFoundException {
+        switch (mode) {
+            case RestoreMode.ALWAYS:
+                restore();
+            case RestoreMode.WHEN_NEEDED:
+                if (state.needsRestore()) {
+                    restore();
+                } else {
+                    logger.info("State already exists. Skipping restore");
+                }
+                break;
+            case RestoreMode.NEVER:
+                break;
+            default:
+                throw new RuntimeException("Unsupported restore mode: " + mode);
         }
     }
 
