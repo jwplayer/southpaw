@@ -911,6 +911,7 @@ public class Southpaw {
                 restore();
             case RestoreMode.WHEN_NEEDED:
                 if (state.needsRestore()) {
+                    logger.info("State not found locally. Attempting to restore state from backups");
                     restore();
                 } else {
                     logger.info("State already exists. Skipping restore");
