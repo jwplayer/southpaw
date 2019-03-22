@@ -809,15 +809,24 @@ public class Southpaw {
 
         OptionParser parser = new OptionParser() {
             {
-                accepts(CONFIG, "Path to the Southpaw config file").withRequiredArg().required();
-                accepts(RELATIONS, "Paths to one or more files containing input record relations").withRequiredArg().required();
+                accepts(CONFIG, "Path to the Southpaw config file")
+                        .withRequiredArg()
+                        .required();
+                accepts(RELATIONS, "Paths to one or more files containing input record relations")
+                        .withRequiredArg()
+                        .required();
                 accepts(BUILD, "Builds denormalized records using an existing state.");
                 accepts(DELETE_BACKUP, "Deletes existing backups specified in the config file. BE VERY CAREFUL WITH THIS!!!");
                 accepts(DELETE_STATE, "Deletes the existing state specified in the config file. BE VERY CAREFUL WITH THIS!!!");
-                accepts(RESTORE, "Restores the state from existing backups.");
-                accepts(RESTORE_MODE, "Specifies when state restores should run. One of: never|always|when_needed Defaults to: never").withOptionalArg().ofType(String.class).defaultsTo(RestoreMode.NEVER);
-                accepts(DEBUG, "Sets logging to DEBUG.").withOptionalArg();
-                accepts(HELP, "Since you are seeing this, you probably know what this is for. :)").forHelp();
+                accepts(RESTORE, "DEPRECATED: Restores the state from existing backups.");
+                accepts(RESTORE_MODE, "Specifies when state restores should run. One of: never|always|when_needed Defaults to: never")
+                        .withOptionalArg()
+                        .ofType(String.class)
+                        .defaultsTo(RestoreMode.NEVER);
+                accepts(DEBUG, "Sets logging to DEBUG.")
+                        .withOptionalArg();
+                accepts(HELP, "Since you are seeing this, you probably know what this is for. :)")
+                        .forHelp();
             }
         };
         OptionSet options = parser.parse(args);
