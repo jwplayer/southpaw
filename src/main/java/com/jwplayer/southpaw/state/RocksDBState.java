@@ -82,6 +82,10 @@ public class RocksDBState extends BaseState {
      */
     public static final String PUT_BATCH_SIZE = "rocks.db.put.batch.size";
     /**
+     * When a restore should be run. Expects a value of {@link RestoreMode}
+     */
+    public static final String RESTORE_MODE_CONFIG = "rocks.db.restore.mode";
+    /**
      * URI for RocksDB
      */
     public static final String URI_CONFIG = "rocks.db.uri";
@@ -118,6 +122,56 @@ public class RocksDBState extends BaseState {
     }
 
     /**
+     * The set of predefined RestoreMode options for RocksDB database restores.
+     */
+    public enum RestoreMode {
+        /**
+         * Always attempt to perform a RocksDB database restore. If a database backup exists this will restore
+         * and overwrite any existing local RocksDB database that might exist.
+         */
+        ALWAYS ("always"),
+
+        /**
+         * Only attempt to perform a RocksDB database restore if a local RocksDB database doesn't exist
+         */
+        WHEN_NEEDED ("when_needed"),
+
+        /**
+         * Never attempt to perform a RocksDB database restore.
+         */
+        NEVER ("never");
+
+        private final String value;
+
+        RestoreMode(String value) {
+            this.value = value;
+        }
+
+        public String getValue() {
+            return this.value;
+        }
+
+        /**
+         * Determine if the supplied value is one of the predefined options.
+         * @param value the configuration property value; may not be null
+         * @return the matching option, or null if match is not found
+         */
+        public static RestoreMode parse(String value) {
+            if (value == null) {
+                return null;
+            }
+
+            value = value.trim();
+            for (RestoreMode option : RestoreMode.values()) {
+                if (option.getValue().equalsIgnoreCase(value)) {
+                    return option;
+                }
+            }
+            return null;
+        }
+    }
+
+    /**
      * Backup URI
      */
     protected URI backupURI;
@@ -149,6 +203,10 @@ public class RocksDBState extends BaseState {
      * How many puts are batched before automatically being flushed
      */
     protected int putBatchSize;
+    /**
+     * When restores should be performed
+     */
+    protected RestoreMode restoreMode;
     /**
      * RocksDB itself
      */
@@ -231,9 +289,17 @@ public class RocksDBState extends BaseState {
         }
     }
 
+    /**
+     * Checks if the RocksDB database is open.
+     * @return True if the database is open; False if the database is closed.
+     */
+    public boolean isOpen() {
+        return this.dbOpen;
+    }
+
     @Override
     public void close() {
-        if(!dbOpen) {
+        if(!isOpen()) {
             return;
         }
         dbOpen = false;
@@ -256,6 +322,9 @@ public class RocksDBState extends BaseState {
 
     @Override
     public void configure(Map<String, Object> config) {
+        if(isOpen()){
+            throw new RuntimeException("RocksDB is already configured!");
+        }
         try {
             this.config = Preconditions.checkNotNull(config);
             backupURI = new URI(Preconditions.checkNotNull(config.get(BACKUP_URI_CONFIG).toString()));
@@ -269,13 +338,14 @@ public class RocksDBState extends BaseState {
             long memtableSize = ((Number) Preconditions.checkNotNull(config.get(MEMTABLE_SIZE))).longValue();
             parallelism = (int) config.getOrDefault(PARALLELISM_CONFIG, 1);
             putBatchSize = (int) Preconditions.checkNotNull(config.get(PUT_BATCH_SIZE));
+            restoreMode = RestoreMode.parse(config.getOrDefault(RESTORE_MODE_CONFIG, RestoreMode.NEVER.getValue()).toString());
             uri = new URI(Preconditions.checkNotNull(config.get(URI_CONFIG).toString()));
 
             // Create the backing DB
             sstFileManager = new SstFileManager(Env.getDefault());
             statistics = new Statistics();
             DBOptions dbOptions = new DBOptions()
-                    .setCreateIfMissing(true)
+                    .setCreateIfMissing(false) // Explicitly set to false here so we can potentially restore if it doesn't exist
                     .setCreateMissingColumnFamilies(true)
                     .setIncreaseParallelism(parallelism)
                     .setMaxBackgroundCompactions(maxBackgroundCompactions)
@@ -291,9 +361,10 @@ public class RocksDBState extends BaseState {
                     .setMaxWriteBufferNumber(maxWriteBufferNumber)
                     .setTargetFileSizeMultiplier(2);
             rocksDBOptions = new Options(dbOptions, cfOptions)
-                    .setCreateIfMissing(true)
+                    .setCreateIfMissing(false) // Explicitly set to false here so we can potentially restore if it doesn't exist
                     .setCreateMissingColumnFamilies(true)
                     .optimizeLevelStyleCompaction(memtableSize)
+
                     .setCompactionStyle(CompactionStyle.LEVEL)
                     .setNumLevels(4)
                     .setIncreaseParallelism(parallelism)
@@ -323,7 +394,21 @@ public class RocksDBState extends BaseState {
             if (descriptors.size() == 0) {
                 descriptors.add(new ColumnFamilyDescriptor(RocksDB.DEFAULT_COLUMN_FAMILY, cfOptions));
             }
-            rocksDB = RocksDB.open(dbOptions, uri.getPath(), descriptors, handles);
+
+            if (restoreMode == RestoreMode.ALWAYS){
+                this.restore();
+            }
+
+            try {
+                rocksDB = RocksDB.open(dbOptions, uri.getPath(), descriptors, handles);
+            } catch(RocksDBException ex) {
+                //DB must not exist yet.
+                if (restoreMode == RestoreMode.WHEN_NEEDED) {
+                    this.restore();
+                }
+                dbOptions.setCreateIfMissing(true); // Auto create db if no db exists at this point
+                rocksDB = RocksDB.open(dbOptions, uri.getPath(), descriptors, handles);
+            }
             dbOpen = true;
 
             for (int i = 0; i < families.size(); i++) {
@@ -364,14 +449,19 @@ public class RocksDBState extends BaseState {
     }
 
     @Override
-    public void delete() {
-        close();
-        try {
-            Options options = new Options();
-            RocksDB.destroyDB(uri.getPath(), options);
-            options.close();
-        } catch(RocksDBException ex) {
-            throw new RuntimeException(ex);
+    public void delete() throws RuntimeException{
+        if(isOpen()) {
+            throw new RuntimeException("RocksDB is currently open. Must call close() first.");
+        }
+
+        if (uri != null && new File(uri).exists()){
+            try {
+                Options options = new Options();
+                RocksDB.destroyDB(uri.getPath(), options);
+                options.close();
+            } catch(RocksDBException ex) {
+                throw new RuntimeException(ex);
+            }
         }
     }
 
@@ -536,8 +626,8 @@ public class RocksDBState extends BaseState {
         File path = new File(backupPath);
         if(path.exists()) {
             try (final BackupableDBOptions backupOptions = new BackupableDBOptions(backupPath)
-                         .setShareTableFiles(true)
-                         .setMaxBackgroundOperations(parallelism);
+                    .setShareTableFiles(true)
+                    .setMaxBackgroundOperations(parallelism);
                  final RestoreOptions restoreOptions = new RestoreOptions(false);
                  final BackupEngine backupEngine = BackupEngine.open(Env.getDefault(), backupOptions)) {
 
