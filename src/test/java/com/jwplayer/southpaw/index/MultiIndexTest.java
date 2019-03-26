@@ -57,7 +57,7 @@ public class MultiIndexTest {
         keySerde.configure(config, true);
         JsonSerde valueSerde = new JsonSerde();
         valueSerde.configure(config, true);
-        state.configure(config);
+        state.open(config);
         BaseTopic<BaseRecord, BaseRecord> indexedTopic = new InMemoryTopic<>(0);
         indexedTopic.configure(new TopicConfig<BaseRecord, BaseRecord>()
             .setShortName("IndexedTopic")

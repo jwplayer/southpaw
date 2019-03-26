@@ -65,7 +65,7 @@ public class KafkaTopicTest {
     @Before
     public void setup() {
         state = new MockState();
-        state.configure(new HashMap<>());
+        state.open(new HashMap<>());
         kafkaServer = new KafkaTestServer();
         topic = createTopic(TEST_TOPIC);
     }

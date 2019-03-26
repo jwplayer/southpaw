@@ -104,14 +104,6 @@ public abstract class BaseState {
     }
 
     /**
-     * @deprecated Should use {@link #open(Map)}
-     * Configure the state. Should be called after instantiation, but before using the state.
-     * @param config - Configuration for the state
-     */
-    @Deprecated
-    public abstract void configure(Map<String, Object> config);
-
-    /**
      * Create a new key space
      * @param keySpace - The key space to create
      */

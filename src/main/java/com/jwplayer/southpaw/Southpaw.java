@@ -213,7 +213,7 @@ public class Southpaw {
         logger.setLevel(Level.toLevel(config.logLevel, Level.INFO));
         this.relations = Preconditions.checkNotNull(relations);
         this.state = new RocksDBState();
-        this.state.configure(rawConfig);
+        this.state.open(rawConfig);
         this.state.createKeySpace(METADATA_KEYSPACE);
         this.inputTopics = new HashMap<>();
         this.outputTopics = new HashMap<>();

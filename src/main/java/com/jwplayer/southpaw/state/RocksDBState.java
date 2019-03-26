@@ -258,16 +258,6 @@ public class RocksDBState extends BaseState {
         rocksDB = null;
     }
 
-    /**
-     * @deprecated Should use {@link #open(Map)}
-     * @param config - Configuration for the state
-     */
-    @Override
-    @Deprecated
-    public void configure(Map<String, Object> config) {
-        open(config);
-    }
-
     @Override
     public void open(Map<String, Object> config) {
         if(isOpen()){
@@ -613,7 +603,7 @@ public class RocksDBState extends BaseState {
                         backupEngine.restoreDbFromLatestBackup(dbUri.getPath(), dbUri.getPath(), restoreOptions);
                     }
                     backupEngine.purgeOldBackups(backupsToKeep);
-                    configure(config);
+                    open(config);
                     logger.info("Backup restored");
                 } else {
                     logger.warn("Skipping state restore, no backups found in backup URI");

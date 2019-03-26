@@ -32,13 +32,9 @@ public class MockState extends BaseState {
     }
 
     @Override
-    public void close() {
-        throw new NotImplementedException();
-    }
-
-    @Override
-    public void configure(Map<String, Object> config) {
+    public void open(Map<String, Object> config) {
         dataBatches = new HashMap<>();
+        super.open(config);
     }
 
     @Override
