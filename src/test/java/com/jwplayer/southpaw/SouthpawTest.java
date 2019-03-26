@@ -63,6 +63,7 @@ public class SouthpawTest {
 
     @After
     public void cleanup() {
+        southpaw.close();
         southpaw.deleteBackups();
         southpaw.deleteState();
     }

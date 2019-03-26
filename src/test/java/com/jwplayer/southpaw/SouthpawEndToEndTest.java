@@ -135,6 +135,7 @@ public class SouthpawEndToEndTest {
                 });
             }
         }
+        southpaw.close();
         southpaw.deleteBackups();
         southpaw.deleteState();
 
