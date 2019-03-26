@@ -122,56 +122,6 @@ public class RocksDBState extends BaseState {
     }
 
     /**
-     * The set of predefined RestoreMode options for RocksDB database restores.
-     */
-    public enum RestoreMode {
-        /**
-         * Always attempt to perform a RocksDB database restore. If a database backup exists this will restore
-         * and overwrite any existing local RocksDB database that might exist.
-         */
-        ALWAYS ("always"),
-
-        /**
-         * Only attempt to perform a RocksDB database restore if a local RocksDB database doesn't exist
-         */
-        WHEN_NEEDED ("when_needed"),
-
-        /**
-         * Never attempt to perform a RocksDB database restore.
-         */
-        NEVER ("never");
-
-        private final String value;
-
-        RestoreMode(String value) {
-            this.value = value;
-        }
-
-        public String getValue() {
-            return this.value;
-        }
-
-        /**
-         * Determine if the supplied value is one of the predefined options.
-         * @param value the configuration property value; may not be null
-         * @return the matching option, or null if match is not found
-         */
-        public static RestoreMode parse(String value) {
-            if (value == null) {
-                return null;
-            }
-
-            value = value.trim();
-            for (RestoreMode option : RestoreMode.values()) {
-                if (option.getValue().equalsIgnoreCase(value)) {
-                    return option;
-                }
-            }
-            return null;
-        }
-    }
-
-    /**
      * Backup URI
      */
     protected URI backupURI;
@@ -191,10 +141,6 @@ public class RocksDBState extends BaseState {
      * Configuration for this state
      */
     protected Map<String, Object> config;
-    /**
-     * Flag for whether RocksDB is open
-     */
-    protected boolean dbOpen = false;
     /**
      * Used for # of threads / parallelism for various Rocks DB config options
      */
@@ -289,20 +235,12 @@ public class RocksDBState extends BaseState {
         }
     }
 
-    /**
-     * Checks if the RocksDB database is open.
-     * @return True if the database is open; False if the database is closed.
-     */
-    public boolean isOpen() {
-        return this.dbOpen;
-    }
-
     @Override
     public void close() {
         if(!isOpen()) {
             return;
         }
-        dbOpen = false;
+        super.close();
 
         for(Map.Entry<ByteArray, ColumnFamilyHandle> entry: cfHandles.entrySet()) {
             entry.getValue().close();
@@ -320,8 +258,18 @@ public class RocksDBState extends BaseState {
         rocksDB = null;
     }
 
+    /**
+     * @deprecated Should use {@link #open(Map)}
+     * @param config - Configuration for the state
+     */
     @Override
+    @Deprecated
     public void configure(Map<String, Object> config) {
+        open(config);
+    }
+
+    @Override
+    public void open(Map<String, Object> config) {
         if(isOpen()){
             throw new RuntimeException("RocksDB is already configured!");
         }
@@ -409,7 +357,6 @@ public class RocksDBState extends BaseState {
                 dbOptions.setCreateIfMissing(true); // Auto create db if no db exists at this point
                 rocksDB = RocksDB.open(dbOptions, uri.getPath(), descriptors, handles);
             }
-            dbOpen = true;
 
             for (int i = 0; i < families.size(); i++) {
                 if (i > 0) {
@@ -426,6 +373,7 @@ public class RocksDBState extends BaseState {
         } catch(Exception ex) {
             throw new RuntimeException(ex);
         }
+        super.open(config);
     }
 
     @Override

@@ -23,6 +23,59 @@ import java.util.Map;
  * Base state class for permanently storing indices and data
  */
 public abstract class BaseState {
+
+    private boolean isOpen = false;
+
+    /**
+     * The set of predefined RestoreMode options for {@link BaseState} restores.
+     */
+    public enum RestoreMode {
+        /**
+         * Always attempt to perform a state restore. If a state backup exists this will restore
+         * and overwrite any existing state that might exist.
+         */
+        ALWAYS ("always"),
+
+        /**
+         * Only attempt to perform a state restore if local state doesn't exist
+         */
+        WHEN_NEEDED ("when_needed"),
+
+        /**
+         * Never attempt to perform a state restore.
+         */
+        NEVER ("never");
+
+        private final String value;
+
+        RestoreMode(String value) {
+            this.value = value;
+        }
+
+        public String getValue() {
+            return this.value;
+        }
+
+        /**
+         * Determine if the supplied value is one of the predefined state restore modes.
+         * @param value the configuration property value; may not be null
+         * @return the matching mode, or null if match is not found
+         */
+        public static RestoreMode parse(String value) {
+            if (value == null) {
+                return null;
+            }
+
+            value = value.trim();
+            for (RestoreMode option : RestoreMode.values()) {
+                if (option.getValue().equalsIgnoreCase(value)) {
+                    return option;
+                }
+            }
+            return null;
+        }
+    }
+
     /**
      * An iterator for keys in the state.
      */
@@ -46,12 +99,16 @@ public abstract class BaseState {
     /**
      * Close the state
      */
-    public abstract void close();
+    public void close() {
+        this.isOpen = false;
+    }
 
     /**
+     * @deprecated Should use {@link #open(Map)}
      * Configure the state. Should be called after instantiation, but before using the state.
      * @param config - Configuration for the state
      */
+    @Deprecated
     public abstract void configure(Map<String, Object> config);
 
     /**
@@ -102,6 +159,22 @@ public abstract class BaseState {
      * @return An iterator for all keys in the key space
      */
     public abstract Iterator iterate(String keySpace);
+
+    /**
+     * Checks if the state is open.
+     * @return True if the state is open; False if the state is closed.
+     */
+    public boolean isOpen() {
+        return this.isOpen;
+    }
+
+    /**
+     * Open the state. Should be called after instantiation, but before using the state.
+     * @param config - Configuration for the state
+     */
+    public void open(Map<String, Object> config) {
+        this.isOpen = true;
+    };
 
     /**
      * Put a new value into the state for the given key and key space. Puts may be batched and the values may not be
