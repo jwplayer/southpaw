@@ -74,19 +74,20 @@ public class RocksDBStateTest {
     }
 
     @Test
-    public void backupAndRestore() {
+    public void backupAndRestoreDirectly() {
         Map<String, Object> config = createConfig(dbUri, backupUri);
-        testBackupAndRestore(config);
+        testBackupAndRestoreDirectly(config);
     }
 
     @Test
-    public void backupAndRestoreAutoRollback() {
+    public void backupAndRestoreDirectlyAutoRollback() {
         Map<String, Object> config = createConfig(dbUri, backupUri);
         config.put(RocksDBState.BACKUPS_AUTO_ROLLBACK_CONFIG, true);
-        testBackupAndRestore(config);
+        testBackupAndRestoreDirectly(config);
     }
 
-    private void testBackupAndRestore(Map<String, Object> config) {
+    private void testBackupAndRestoreDirectly(Map<String, Object> config) {
+        config.put(RocksDBState.RESTORE_MODE_CONFIG, "never"); // Force skip restore on open()
         state.open(config);
         state.createKeySpace(KEY_SPACE);
         writeData(0,100);
@@ -96,6 +97,46 @@ public class RocksDBStateTest {
         state.close();
 
         state.restore();
+
+        state.open(config);
+
+        BaseState.Iterator iter = state.iterate(KEY_SPACE);
+        Integer count = 0;
+        while (iter.hasNext()) {
+            AbstractMap.SimpleEntry<byte[], byte[]> pair = iter.next();
+            assertEquals(new ByteArray(count), new ByteArray(pair.getKey()));
+            assertEquals(count.toString(), new String(pair.getValue()));
+            count++;
+        }
+        assertEquals(100, (int) count);
+        state.deleteBackups();
+    }
+
+    @Test
+    public void backupAndRestoreOnOpen() {
+        Map<String, Object> config = createConfig(dbUri, backupUri);
+        testBackupAndRestoreDirectly(config);
+    }
+
+    @Test
+    public void backupAndRestoreOnOpenAutoRollback() {
+        Map<String, Object> config = createConfig(dbUri, backupUri);
+        config.put(RocksDBState.BACKUPS_AUTO_ROLLBACK_CONFIG, true);
+        testBackupAndRestoreOnOpen(config);
+    }
+
+    private void testBackupAndRestoreOnOpen(Map<String, Object> config) {
+        config.put(RocksDBState.RESTORE_MODE_CONFIG, "always"); // Force restore on open()
+        state.open(config);
+        state.createKeySpace(KEY_SPACE);
+        writeData(0,100);
+
+        state.deleteBackups();
+        state.backup();
+        state.close();
+
+        state.open(config);
+
         BaseState.Iterator iter = state.iterate(KEY_SPACE);
         Integer count = 0;
         while (iter.hasNext()) {
@@ -150,6 +191,8 @@ public class RocksDBStateTest {
 
         state.restore();
 
+        state.open(config);
+
         //Check that the second backup restores with the expected data
         BaseState.Iterator iter = state.iterate(KEY_SPACE);
         Integer count = 0;
@@ -168,6 +211,8 @@ public class RocksDBStateTest {
         state.close();
 
         state.restore();
+
+        state.open(config);
 
         //Check that the newest backup contains the data from the last successfully restored backup and the new data
         iter = state.iterate(KEY_SPACE);
@@ -207,62 +252,8 @@ public class RocksDBStateTest {
         corruptLatestSST();
 
         state.restore();
-    }
-
-    @Test
-    public void configureRestoreNever() {
-        RocksDBState spyState = spy(state);
-
-        Map<String, Object> config = createConfig(dbUri, backupUri);
-        config.put(RocksDBState.RESTORE_MODE_CONFIG, "never");
-        spyState.open(config);
-        spyState.createKeySpace(KEY_SPACE);
-
-        // The database should be open
-        assertTrue(spyState.isOpen());
-
-        // And we should not have tried to restore
-        verify(spyState, never()).restore();
-    }
-
-    @Test
-    public void configureRestoreWhenNeededNoLocalDB() {
-        Map<String, Object> config = createConfig(dbUri, backupUri);
-        config.put(RocksDBState.RESTORE_MODE_CONFIG, "when_needed");
-
-        RocksDBState spyState = spy(state);
-
-        spyState.open(config);
-        spyState.createKeySpace(KEY_SPACE);
-
-        // The database should be open
-        assertTrue(spyState.isOpen());
-
-        // We should have attempted to restore
-        verify(spyState, times(1)).restore();
-    }
-
-    @Test
-    public void configureRestoreWhenNeededWithLocalDB() {
-        Map<String, Object> config = createConfig(dbUri, backupUri);
-        config.put(RocksDBState.RESTORE_MODE_CONFIG, "when_needed");
 
         state.open(config);
-        state.createKeySpace(KEY_SPACE);
-        writeData(0,100);
-        state.close();
-
-        state = new RocksDBState();
-
-        RocksDBState spyState = spy(state);
-        spyState.open(config);
-        spyState.createKeySpace(KEY_SPACE);
-
-        // The database should be open
-        assertTrue(spyState.isOpen());
-
-        // We should not have attempted to restore
-        verify(spyState, never()).restore();
     }
 
     @Test
@@ -369,6 +360,328 @@ public class RocksDBStateTest {
         }
         iter.close();
         assertEquals(100, (int) count);
+    }
+
+    @Test
+    public void openRestoreAlwaysNoLocalDBMockRestore() {
+        RocksDBState spyState = spy(state);
+
+        Map<String, Object> config = createConfig(dbUri, backupUri);
+        config.put(RocksDBState.RESTORE_MODE_CONFIG, "always");
+        spyState.open(config);
+        spyState.createKeySpace(KEY_SPACE);
+
+        // The database should be open
+        assertTrue(spyState.isOpen());
+
+        // And we should not have tried to restore
+        verify(spyState, times(1)).restore();
+    }
+
+    @Test
+    public void openRestoreAlwaysNoLocalDB() {
+        Map<String, Object> config = createConfig(dbUri, backupUri);
+        config.put(RocksDBState.RESTORE_MODE_CONFIG, "always");
+
+        state.open(config);
+        state.createKeySpace(KEY_SPACE);
+        writeData(0,100);
+
+        state.deleteBackups();
+        state.backup();
+
+        // Write data after backup
+        writeData(0,200);
+
+        state.close();
+
+        // Delete the local db in order to restore restore
+        state.delete();
+
+        state.open(config);
+
+        BaseState.Iterator iter = state.iterate(KEY_SPACE);
+        Integer count = 0;
+        while (iter.hasNext()) {
+            AbstractMap.SimpleEntry<byte[], byte[]> pair = iter.next();
+            assertEquals(new ByteArray(count), new ByteArray(pair.getKey()));
+            assertEquals(count.toString(), new String(pair.getValue()));
+            count++;
+        }
+        // Backup data was loaded excluding data written after backup
+        assertEquals(100, (int) count);
+    }
+
+    @Test
+    public void openRestoreAlwaysWithLocalDBMockRestore() {
+        Map<String, Object> config = createConfig(dbUri, backupUri);
+        config.put(RocksDBState.RESTORE_MODE_CONFIG, "always");
+
+        //Setup existing local db
+        state.open(config);
+        state.createKeySpace(KEY_SPACE);
+        writeData(0,100);
+        state.close();
+
+        // Create new state for test
+        state = new RocksDBState();
+
+        RocksDBState spyState = spy(state);
+        spyState.open(config);
+        spyState.createKeySpace(KEY_SPACE);
+
+        // The database should be open
+        assertTrue(spyState.isOpen());
+
+        // We should not have attempted to restore
+        verify(spyState, times(1)).restore();
+    }
+
+    @Test
+    public void openRestoreAlwaysWithLocalDB() {
+        Map<String, Object> config = createConfig(dbUri, backupUri);
+        config.put(RocksDBState.RESTORE_MODE_CONFIG, "always");
+
+        state.open(config);
+        state.createKeySpace(KEY_SPACE);
+        writeData(0,100);
+
+        state.deleteBackups();
+        state.backup();
+
+        // Write data after backup
+        writeData(0,200);
+
+        state.close();
+
+        state.open(config);
+
+        BaseState.Iterator iter = state.iterate(KEY_SPACE);
+        Integer count = 0;
+        while (iter.hasNext()) {
+            AbstractMap.SimpleEntry<byte[], byte[]> pair = iter.next();
+            assertEquals(new ByteArray(count), new ByteArray(pair.getKey()));
+            assertEquals(count.toString(), new String(pair.getValue()));
+            count++;
+        }
+        // Backup data was loaded excluding data written after backup
+        assertEquals(100, (int) count);
+    }
+
+    @Test
+    public void openRestoreNeverNoLocalDBMockRestore() {
+        RocksDBState spyState = spy(state);
+
+        Map<String, Object> config = createConfig(dbUri, backupUri);
+        config.put(RocksDBState.RESTORE_MODE_CONFIG, "never");
+        spyState.open(config);
+        spyState.createKeySpace(KEY_SPACE);
+
+        // The database should be open
+        assertTrue(spyState.isOpen());
+
+        // And we should not have tried to restore
+        verify(spyState, never()).restore();
+    }
+
+    @Test
+    public void openRestoreNeverNoLocalDB() {
+        Map<String, Object> config = createConfig(dbUri, backupUri);
+        config.put(RocksDBState.RESTORE_MODE_CONFIG, "never");
+
+        state.open(config);
+        state.createKeySpace(KEY_SPACE);
+        writeData(0,100);
+
+        state.deleteBackups();
+        state.backup();
+
+        // Write data after backup
+        writeData(0,200);
+
+        state.close();
+
+        // Delete the local db in order to restore restore
+        state.delete();
+
+        state.open(config);
+
+        // Create the expected keyspace because it shouldn't exist at this point
+        state.createKeySpace(KEY_SPACE);
+
+        BaseState.Iterator iter = state.iterate(KEY_SPACE);
+        Integer count = 0;
+        while (iter.hasNext()) {
+            AbstractMap.SimpleEntry<byte[], byte[]> pair = iter.next();
+            assertEquals(new ByteArray(count), new ByteArray(pair.getKey()));
+            assertEquals(count.toString(), new String(pair.getValue()));
+            count++;
+        }
+        // Local database was used which has more recent data than the backup
+        assertEquals(0, (int) count);
+    }
+
+    @Test
+    public void openRestoreNeverWithLocalDBMockRestore() {
+        Map<String, Object> config = createConfig(dbUri, backupUri);
+        config.put(RocksDBState.RESTORE_MODE_CONFIG, "never");
+
+        //Setup existing local db
+        state.open(config);
+        state.createKeySpace(KEY_SPACE);
+        writeData(0,100);
+        state.close();
+
+        // Create new state for test
+        state = new RocksDBState();
+
+        RocksDBState spyState = spy(state);
+        spyState.open(config);
+        spyState.createKeySpace(KEY_SPACE);
+
+        // The database should be open
+        assertTrue(spyState.isOpen());
+
+        // We should not have attempted to restore
+        verify(spyState, never()).restore();
+    }
+
+    @Test
+    public void openRestoreNeverWithLocalDB() {
+        Map<String, Object> config = createConfig(dbUri, backupUri);
+        config.put(RocksDBState.RESTORE_MODE_CONFIG, "never");
+
+        state.open(config);
+        state.createKeySpace(KEY_SPACE);
+        writeData(0,100);
+
+        state.deleteBackups();
+        state.backup();
+
+        // Write data after backup
+        writeData(0,200);
+
+        state.close();
+
+        state.open(config);
+
+        BaseState.Iterator iter = state.iterate(KEY_SPACE);
+        Integer count = 0;
+        while (iter.hasNext()) {
+            AbstractMap.SimpleEntry<byte[], byte[]> pair = iter.next();
+            assertEquals(new ByteArray(count), new ByteArray(pair.getKey()));
+            assertEquals(count.toString(), new String(pair.getValue()));
+            count++;
+        }
+        // Local database was used which has more recent data than the backup
+        assertEquals(200, (int) count);
+    }
+
+    @Test
+    public void openRestoreWhenNeededNoLocalDBMockRestore() {
+        Map<String, Object> config = createConfig(dbUri, backupUri);
+        config.put(RocksDBState.RESTORE_MODE_CONFIG, "when_needed");
+
+        RocksDBState spyState = spy(state);
+
+        spyState.open(config);
+        spyState.createKeySpace(KEY_SPACE);
+
+        // The database should be open
+        assertTrue(spyState.isOpen());
+
+        // We should have attempted to restore
+        verify(spyState, times(1)).restore();
+    }
+
+    @Test
+    public void openRestoreWhenNeededNoLocalDB() {
+        Map<String, Object> config = createConfig(dbUri, backupUri);
+        config.put(RocksDBState.RESTORE_MODE_CONFIG, "when_needed");
+
+        state.open(config);
+        state.createKeySpace(KEY_SPACE);
+        writeData(0,100);
+
+        state.deleteBackups();
+        state.backup();
+
+        // Write data after backup
+        writeData(0,200);
+
+        state.close();
+
+        // Delete the local db in order to restore restore
+        state.delete();
+
+        state.open(config);
+
+        BaseState.Iterator iter = state.iterate(KEY_SPACE);
+        Integer count = 0;
+        while (iter.hasNext()) {
+            AbstractMap.SimpleEntry<byte[], byte[]> pair = iter.next();
+            assertEquals(new ByteArray(count), new ByteArray(pair.getKey()));
+            assertEquals(count.toString(), new String(pair.getValue()));
+            count++;
+        }
+        // Backup data was loaded excluding data written after backup
+        assertEquals(100, (int) count);
+    }
+
+    @Test
+    public void openRestoreWhenNeededWithLocalDBMockRestore() {
+        Map<String, Object> config = createConfig(dbUri, backupUri);
+        config.put(RocksDBState.RESTORE_MODE_CONFIG, "when_needed");
+
+        //Setup existing local db
+        state.open(config);
+        state.createKeySpace(KEY_SPACE);
+        writeData(0,100);
+        state.close();
+
+        // Create new state for test
+        state = new RocksDBState();
+
+        RocksDBState spyState = spy(state);
+        spyState.open(config);
+        spyState.createKeySpace(KEY_SPACE);
+
+        // The database should be open
+        assertTrue(spyState.isOpen());
+
+        // We should not have attempted to restore
+        verify(spyState, never()).restore();
+    }
+
+    @Test
+    public void openRestoreWhenNeededWithLocalDB() {
+        Map<String, Object> config = createConfig(dbUri, backupUri);
+        config.put(RocksDBState.RESTORE_MODE_CONFIG, "when_needed");
+
+        state.open(config);
+        state.createKeySpace(KEY_SPACE);
+        writeData(0,100);
+
+        state.deleteBackups();
+        state.backup();
+
+        // Write data after backup
+        writeData(0,200);
+
+        state.close();
+
+        state.open(config);
+
+        BaseState.Iterator iter = state.iterate(KEY_SPACE);
+        Integer count = 0;
+        while (iter.hasNext()) {
+            AbstractMap.SimpleEntry<byte[], byte[]> pair = iter.next();
+            assertEquals(new ByteArray(count), new ByteArray(pair.getKey()));
+            assertEquals(count.toString(), new String(pair.getValue()));
+            count++;
+        }
+        // Local database was used which has more recent data than the backup
+        assertEquals(200, (int) count);
     }
 
     @Test

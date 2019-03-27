@@ -323,6 +323,10 @@ public class RocksDBState extends BaseState {
             writeOptions = new WriteOptions();
             writeOptions.setDisableWAL(false);
 
+            if (restoreMode == RestoreMode.ALWAYS){
+                this.restore();
+            }
+
             List<byte[]> families = RocksDB.listColumnFamilies(rocksDBOptions, uri.getPath());
             List<ColumnFamilyHandle> handles = new ArrayList<>(families.size() + 1);
             List<ColumnFamilyDescriptor> descriptors = new ArrayList<>(families.size() + 1);
@@ -333,17 +337,24 @@ public class RocksDBState extends BaseState {
                 descriptors.add(new ColumnFamilyDescriptor(RocksDB.DEFAULT_COLUMN_FAMILY, cfOptions));
             }
 
-            if (restoreMode == RestoreMode.ALWAYS){
-                this.restore();
-            }
-
             try {
                 rocksDB = RocksDB.open(dbOptions, uri.getPath(), descriptors, handles);
             } catch(RocksDBException ex) {
                 //DB must not exist yet.
                 if (restoreMode == RestoreMode.WHEN_NEEDED) {
                     this.restore();
+
+                    families = RocksDB.listColumnFamilies(rocksDBOptions, uri.getPath());
+                    handles = new ArrayList<>(families.size() + 1);
+                    descriptors = new ArrayList<>(families.size() + 1);
+                    for (byte[] family : families) {
+                        descriptors.add(new ColumnFamilyDescriptor(family, cfOptions));
+                    }
+                    if (descriptors.size() == 0) {
+                        descriptors.add(new ColumnFamilyDescriptor(RocksDB.DEFAULT_COLUMN_FAMILY, cfOptions));
+                    }
                 }
+
                 dbOptions.setCreateIfMissing(true); // Auto create db if no db exists at this point
                 rocksDB = RocksDB.open(dbOptions, uri.getPath(), descriptors, handles);
             }
@@ -603,7 +614,6 @@ public class RocksDBState extends BaseState {
                         backupEngine.restoreDbFromLatestBackup(dbUri.getPath(), dbUri.getPath(), restoreOptions);
                     }
                     backupEngine.purgeOldBackups(backupsToKeep);
-                    open(config);
                     logger.info("Backup restored");
                 } else {
                     logger.warn("Skipping state restore, no backups found in backup URI");
