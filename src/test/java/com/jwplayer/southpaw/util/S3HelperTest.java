@@ -24,12 +24,13 @@ import com.amazonaws.services.s3.model.S3ObjectSummary;
 import io.findify.s3mock.S3Mock;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 
 import java.io.File;
 import java.net.URI;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.*;
 
 import static org.junit.Assert.*;
@@ -37,14 +38,15 @@ import static org.junit.Assert.*;
 
 public class S3HelperTest {
     protected String bucket = "bucket.com";
-    protected URI localUri;
     protected URI s3Uri;
     protected S3Mock s3Mock;
     protected S3Helper s3;
 
+    @Rule
+    public TemporaryFolder tmpDir = new TemporaryFolder();
+
     @Before
     public void setUp() throws Exception {
-        localUri = new URI("file:///tmp/path");
         s3Uri = new URI("s3://" + bucket + "/some/path");
         s3Mock = new S3Mock.Builder().withPort(8001).withInMemoryBackend().build();
         s3Mock.start();
@@ -106,11 +108,8 @@ public class S3HelperTest {
 
     @Test
     public void syncFromS3() throws Exception {
-        Path localPath = Files.createTempDirectory(null);
-        localPath.toFile().deleteOnExit();
-        URI localUri = localPath.toUri();
-        s3.syncFromS3(localUri, s3Uri);
-        Set<File> localFiles = FileHelper.listFiles(localUri);
+        s3.syncFromS3(tmpDir.getRoot().toURI(), s3Uri);
+        Set<File> localFiles = FileHelper.listFiles(tmpDir.getRoot().toURI());
         List<String> fileNames = new ArrayList<>(localFiles.size());
         for(File localFile: localFiles) fileNames.add(localFile.getName());
         fileNames.sort(Comparator.naturalOrder());
@@ -123,25 +122,24 @@ public class S3HelperTest {
 
     @Test
     public void syncToS3() throws Exception {
-        Path tempPath = Files.createTempDirectory(null);
-        tempPath.toFile().deleteOnExit();
-        Path accountPath = Files.createTempFile(tempPath, "account", "txt");
-        accountPath.toFile().deleteOnExit();
-        Files.write(accountPath, "account".getBytes());
-        Path feedPath = Files.createTempFile(tempPath, "feed", "txt");
-        feedPath.toFile().deleteOnExit();
-        Files.write(feedPath, "feed".getBytes());
-        Path mediaPath = Files.createTempFile(tempPath, "media", "txt");
-        mediaPath.toFile().deleteOnExit();
-        Files.write(mediaPath, "media".getBytes());
-        URI localUri = tempPath.toUri();
+        File accountFile = tmpDir.newFile("account.txt");
+        Files.write(accountFile.toPath(), "account".getBytes());
+
+        File feedFile = tmpDir.newFile("feed.txt");
+        Files.write(feedFile.toPath(), "feed".getBytes());
+
+        File mediaFile = tmpDir.newFile("media.txt");
+        Files.write(mediaFile.toPath(), "media".getBytes());
+
         URI backupUri = new URI("s3://" + bucket + "/backups");
-        s3.syncToS3(localUri, backupUri);
-        Files.delete(feedPath);
-        Path playerPath = Files.createTempFile(tempPath, "player", "txt");
-        playerPath.toFile().deleteOnExit();
-        Files.write(playerPath, "player".getBytes());
-        s3.syncToS3(localUri, backupUri);
+        s3.syncToS3(tmpDir.getRoot().toURI(), backupUri);
+
+        feedFile.delete();
+
+        File playerFile = tmpDir.newFile("player.txt");
+        Files.write(playerFile.toPath(), "player".getBytes());
+
+        s3.syncToS3(tmpDir.getRoot().toURI(), backupUri);
         s3.waitForSyncToS3();
 
         List<S3ObjectSummary> summaries = s3.listKeys(backupUri);
@@ -150,8 +148,8 @@ public class S3HelperTest {
         keys.sort(Comparator.naturalOrder());
 
         assertEquals(3, keys.size());
-        assertEquals("backups/" + accountPath.getFileName(), keys.get(0));
-        assertEquals("backups/" + mediaPath.getFileName(), keys.get(1));
-        assertEquals("backups/" + playerPath.getFileName(), keys.get(2));
+        assertEquals("backups/" + accountFile.getName(), keys.get(0));
+        assertEquals("backups/" + mediaFile.getName(), keys.get(1));
+        assertEquals("backups/" + playerFile.getName(), keys.get(2));
     }
 }
