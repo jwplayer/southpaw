@@ -31,7 +31,6 @@ import org.junit.rules.TemporaryFolder;
 import java.io.File;
 import java.net.URI;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.*;
 
 import static org.junit.Assert.*;
