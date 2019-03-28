@@ -340,6 +340,11 @@ public class RocksDBState extends BaseState {
             try {
                 rocksDB = RocksDB.open(dbOptions, uri.getPath(), descriptors, handles);
             } catch(RocksDBException ex) {
+                if(!ex.getMessage().contains("does not exist (create_if_missing is false)")) {
+                    // Received an unexpected exception
+                    throw ex;
+                }
+
                 //DB must not exist yet.
                 if (restoreMode == RestoreMode.WHEN_NEEDED) {
                     this.restore();
