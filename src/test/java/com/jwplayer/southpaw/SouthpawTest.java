@@ -20,10 +20,12 @@ import com.jwplayer.southpaw.json.Record;
 import com.jwplayer.southpaw.json.Relation;
 import com.jwplayer.southpaw.record.BaseRecord;
 import com.jwplayer.southpaw.record.MapRecord;
+import com.jwplayer.southpaw.state.RocksDBState;
 import com.jwplayer.southpaw.topic.BaseTopic;
 import com.jwplayer.southpaw.util.ByteArray;
 import com.jwplayer.southpaw.util.FileHelper;
 import org.junit.*;
+import org.junit.rules.TemporaryFolder;
 import org.yaml.snakeyaml.Yaml;
 
 import java.net.URI;
@@ -42,11 +44,18 @@ public class SouthpawTest {
     private MockSouthpaw southpaw;
     private URI relationsUri;
 
+    @Rule
+    public TemporaryFolder dbFolder = new TemporaryFolder();
+
     @Before
     public void setup() throws Exception {
         brokenRelationsUri = new URI(BROKEN_RELATIONS_PATH);
         Yaml yaml = new Yaml();
         config = yaml.load(FileHelper.getInputStream(new URI(CONFIG_PATH)));
+        // Override the db and backup URI's with the managed temp folder
+        config.put(RocksDBState.URI_CONFIG, dbFolder.getRoot().toURI().toString() + "/db");
+        config.put(RocksDBState.BACKUP_URI_CONFIG, dbFolder.getRoot().toURI().toString() + "/backup");
+
         relationsUri = new URI(RELATIONS_PATH);
         southpaw = new MockSouthpaw(config, Collections.singletonList(relationsUri));
         southpaw.deleteBackups();
