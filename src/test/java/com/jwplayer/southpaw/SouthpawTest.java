@@ -20,22 +20,21 @@ import com.jwplayer.southpaw.json.Record;
 import com.jwplayer.southpaw.json.Relation;
 import com.jwplayer.southpaw.record.BaseRecord;
 import com.jwplayer.southpaw.record.MapRecord;
+import com.jwplayer.southpaw.state.RocksDBState;
 import com.jwplayer.southpaw.topic.BaseTopic;
 import com.jwplayer.southpaw.util.ByteArray;
 import com.jwplayer.southpaw.util.FileHelper;
 import org.junit.*;
+import org.junit.rules.TemporaryFolder;
 import org.yaml.snakeyaml.Yaml;
 
-import java.io.File;
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.util.*;
 
 import static org.junit.Assert.*;
 
 
 public class SouthpawTest {
-    private static final String ROCKSDB_BASE_URI = "file:///tmp/RocksDB/";
     private static final String BROKEN_RELATIONS_PATH = "test-resources/broken_relations.sample.json";
     private static final String CONFIG_PATH = "test-resources/config.sample.yaml";
     private static final String RELATIONS_PATH = "test-resources/relations.sample.json";
@@ -45,23 +44,18 @@ public class SouthpawTest {
     private MockSouthpaw southpaw;
     private URI relationsUri;
 
-    @BeforeClass
-    public static void classSetup() throws URISyntaxException {
-        File folder = new File(new URI(ROCKSDB_BASE_URI));
-        folder.mkdirs();
-    }
-
-    @AfterClass
-    public static void classCleanup() throws URISyntaxException {
-        File folder = new File(new URI(ROCKSDB_BASE_URI));
-        folder.delete();
-    }
+    @Rule
+    public TemporaryFolder dbFolder = new TemporaryFolder();
 
     @Before
     public void setup() throws Exception {
         brokenRelationsUri = new URI(BROKEN_RELATIONS_PATH);
         Yaml yaml = new Yaml();
         config = yaml.load(FileHelper.getInputStream(new URI(CONFIG_PATH)));
+        // Override the db and backup URI's with the managed temp folder
+        config.put(RocksDBState.URI_CONFIG, dbFolder.getRoot().toURI().toString() + "/db");
+        config.put(RocksDBState.BACKUP_URI_CONFIG, dbFolder.getRoot().toURI().toString() + "/backup");
+
         relationsUri = new URI(RELATIONS_PATH);
         southpaw = new MockSouthpaw(config, Collections.singletonList(relationsUri));
         southpaw.deleteBackups();
