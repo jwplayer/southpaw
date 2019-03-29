@@ -241,7 +241,6 @@ public class Southpaw {
         * - The new empty DB is backed up, overwriting the existing backups
         * */
         if(config.backupOnShutdown && startedSuccessfully) {
-            logger.info("Setting shutdown hook");
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
                 logger.info("Backing up before shutting down");
                 this.state.backup();
