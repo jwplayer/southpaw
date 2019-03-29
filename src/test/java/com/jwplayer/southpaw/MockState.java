@@ -32,9 +32,14 @@ public class MockState extends BaseState {
     }
 
     @Override
-    public void open(Map<String, Object> config) {
+    public void configure(Map<String, Object> config) {
+
+    }
+
+    @Override
+    public void open() {
         dataBatches = new HashMap<>();
-        super.open(config);
+        super.open();
     }
 
     @Override

@@ -88,7 +88,8 @@ public class RocksDBStateTest {
 
     private void testBackupAndRestoreDirectly(Map<String, Object> config) {
         config.put(RocksDBState.RESTORE_MODE_CONFIG, "never"); // Force skip restore on open()
-        state.open(config);
+        state.configure(config);
+        state.open();
         state.createKeySpace(KEY_SPACE);
         writeData(0,100);
 
@@ -98,7 +99,7 @@ public class RocksDBStateTest {
 
         state.restore();
 
-        state.open(config);
+        state.open();
 
         BaseState.Iterator iter = state.iterate(KEY_SPACE);
         Integer count = 0;
@@ -127,7 +128,8 @@ public class RocksDBStateTest {
 
     private void testBackupAndRestoreOnOpen(Map<String, Object> config) {
         config.put(RocksDBState.RESTORE_MODE_CONFIG, "always"); // Force restore on open()
-        state.open(config);
+        state.configure(config);
+        state.open();
         state.createKeySpace(KEY_SPACE);
         writeData(0,100);
 
@@ -135,7 +137,7 @@ public class RocksDBStateTest {
         state.backup();
         state.close();
 
-        state.open(config);
+        state.open();
 
         BaseState.Iterator iter = state.iterate(KEY_SPACE);
         Integer count = 0;
@@ -154,8 +156,8 @@ public class RocksDBStateTest {
         // Expected exception on corrupted backup
         thrown.expect( RuntimeException.class );
         thrown.expectMessage("org.rocksdb.RocksDBException: Checksum check failed");
-
-        state.open(createConfig(dbUri, backupUri));
+        state.configure(createConfig(dbUri, backupUri));
+        state.open();
         state.createKeySpace(KEY_SPACE);
         writeData(0,100);
 
@@ -172,7 +174,8 @@ public class RocksDBStateTest {
     public void BackupAndRestoreLatestCorruptAutoRollback() throws URISyntaxException, IOException {
         Map<String, Object> config = createConfig(dbUri, backupUri);
         config.put(RocksDBState.BACKUPS_AUTO_ROLLBACK_CONFIG, true);
-        state.open(config);
+        state.configure(config);
+        state.open();
         state.createKeySpace(KEY_SPACE);
 
         state.deleteBackups();
@@ -191,7 +194,7 @@ public class RocksDBStateTest {
 
         state.restore();
 
-        state.open(config);
+        state.open();
 
         //Check that the second backup restores with the expected data
         BaseState.Iterator iter = state.iterate(KEY_SPACE);
@@ -212,7 +215,7 @@ public class RocksDBStateTest {
 
         state.restore();
 
-        state.open(config);
+        state.open();
 
         //Check that the newest backup contains the data from the last successfully restored backup and the new data
         iter = state.iterate(KEY_SPACE);
@@ -239,7 +242,8 @@ public class RocksDBStateTest {
 
         Map<String, Object> config = createConfig(dbUri, backupUri);
         config.put(RocksDBState.BACKUPS_AUTO_ROLLBACK_CONFIG, true);
-        state.open(config);
+        state.configure(config);
+        state.open();
         state.createKeySpace(KEY_SPACE);
 
         state.deleteBackups();
@@ -253,12 +257,13 @@ public class RocksDBStateTest {
 
         state.restore();
 
-        state.open(config);
+        state.open();
     }
 
     @Test
     public void close() {
-        state.open(createConfig(dbUri, backupUri));
+        state.configure(createConfig(dbUri, backupUri));
+        state.open();
         state.createKeySpace(KEY_SPACE);
         writeData(0,100);
 
@@ -267,7 +272,8 @@ public class RocksDBStateTest {
 
     @Test
     public void createKeySpace() {
-        state.open(createConfig(dbUri, backupUri));
+        state.configure(createConfig(dbUri, backupUri));
+        state.open();
 
         String newKeySpace = "NewKeySpace";
         state.createKeySpace(newKeySpace);
@@ -279,7 +285,8 @@ public class RocksDBStateTest {
 
     @Test
     public void delete() {
-        state.open(createConfig(dbUri, backupUri));
+        state.configure(createConfig(dbUri, backupUri));
+        state.open();
         state.createKeySpace(KEY_SPACE);
         writeData(0,100);
         state.close();
@@ -292,13 +299,15 @@ public class RocksDBStateTest {
         thrown.expect( RuntimeException.class );
         thrown.expectMessage("RocksDB is currently open. Must call close() first.");
 
-        state.open(createConfig(dbUri, backupUri));
+        state.configure(createConfig(dbUri, backupUri));
+        state.open();
         state.delete();
     }
 
     @Test
     public void deleteValue() {
-        state.open(createConfig(dbUri, backupUri));
+        state.configure(createConfig(dbUri, backupUri));
+        state.open();
         state.createKeySpace(KEY_SPACE);
 
         byte[] key = new ByteArray(1).getBytes();
@@ -310,7 +319,8 @@ public class RocksDBStateTest {
 
     @Test
     public void flush() {
-        state.open(createConfig(dbUri, backupUri));
+        state.configure(createConfig(dbUri, backupUri));
+        state.open();
         state.createKeySpace(KEY_SPACE);
 
         state.put(KEY_SPACE, "AA".getBytes(), "B".getBytes());
@@ -323,7 +333,8 @@ public class RocksDBStateTest {
 
     @Test
     public void flushKeySpace() {
-        state.open(createConfig(dbUri, backupUri));
+        state.configure(createConfig(dbUri, backupUri));
+        state.open();
         state.createKeySpace(KEY_SPACE);
 
         state.put(KEY_SPACE, "AA".getBytes(), "B".getBytes());
@@ -336,7 +347,8 @@ public class RocksDBStateTest {
 
     @Test
     public void get() {
-        state.open(createConfig(dbUri, backupUri));
+        state.configure(createConfig(dbUri, backupUri));
+        state.open();
         state.createKeySpace(KEY_SPACE);
         writeData(0,100);
 
@@ -346,7 +358,8 @@ public class RocksDBStateTest {
 
     @Test
     public void iterate() {
-        state.open(createConfig(dbUri, backupUri));
+        state.configure(createConfig(dbUri, backupUri));
+        state.open();
         state.createKeySpace(KEY_SPACE);
         writeData(0,100);
 
@@ -368,7 +381,8 @@ public class RocksDBStateTest {
 
         Map<String, Object> config = createConfig(dbUri, backupUri);
         config.put(RocksDBState.RESTORE_MODE_CONFIG, "always");
-        spyState.open(config);
+        spyState.configure(config);
+        spyState.open();
         spyState.createKeySpace(KEY_SPACE);
 
         // The database should be open
@@ -383,7 +397,8 @@ public class RocksDBStateTest {
         Map<String, Object> config = createConfig(dbUri, backupUri);
         config.put(RocksDBState.RESTORE_MODE_CONFIG, "always");
 
-        state.open(config);
+        state.configure(config);
+        state.open();
         state.createKeySpace(KEY_SPACE);
         writeData(0,100);
 
@@ -398,7 +413,7 @@ public class RocksDBStateTest {
         // Delete the local db in order to restore restore
         state.delete();
 
-        state.open(config);
+        state.open();
 
         BaseState.Iterator iter = state.iterate(KEY_SPACE);
         Integer count = 0;
@@ -418,7 +433,8 @@ public class RocksDBStateTest {
         config.put(RocksDBState.RESTORE_MODE_CONFIG, "always");
 
         //Setup existing local db
-        state.open(config);
+        state.configure(config);
+        state.open();
         state.createKeySpace(KEY_SPACE);
         writeData(0,100);
         state.close();
@@ -427,7 +443,8 @@ public class RocksDBStateTest {
         state = new RocksDBState();
 
         RocksDBState spyState = spy(state);
-        spyState.open(config);
+        spyState.configure(config);
+        spyState.open();
         spyState.createKeySpace(KEY_SPACE);
 
         // The database should be open
@@ -442,7 +459,8 @@ public class RocksDBStateTest {
         Map<String, Object> config = createConfig(dbUri, backupUri);
         config.put(RocksDBState.RESTORE_MODE_CONFIG, "always");
 
-        state.open(config);
+        state.configure(config);
+        state.open();
         state.createKeySpace(KEY_SPACE);
         writeData(0,100);
 
@@ -454,7 +472,7 @@ public class RocksDBStateTest {
 
         state.close();
 
-        state.open(config);
+        state.open();
 
         BaseState.Iterator iter = state.iterate(KEY_SPACE);
         Integer count = 0;
@@ -474,7 +492,8 @@ public class RocksDBStateTest {
 
         Map<String, Object> config = createConfig(dbUri, backupUri);
         config.put(RocksDBState.RESTORE_MODE_CONFIG, "never");
-        spyState.open(config);
+        spyState.configure(config);
+        spyState.open();
         spyState.createKeySpace(KEY_SPACE);
 
         // The database should be open
@@ -489,7 +508,8 @@ public class RocksDBStateTest {
         Map<String, Object> config = createConfig(dbUri, backupUri);
         config.put(RocksDBState.RESTORE_MODE_CONFIG, "never");
 
-        state.open(config);
+        state.configure(config);
+        state.open();
         state.createKeySpace(KEY_SPACE);
         writeData(0,100);
 
@@ -504,7 +524,7 @@ public class RocksDBStateTest {
         // Delete the local db in order to restore restore
         state.delete();
 
-        state.open(config);
+        state.open();
 
         // Create the expected keyspace because it shouldn't exist at this point
         state.createKeySpace(KEY_SPACE);
@@ -527,7 +547,8 @@ public class RocksDBStateTest {
         config.put(RocksDBState.RESTORE_MODE_CONFIG, "never");
 
         //Setup existing local db
-        state.open(config);
+        state.configure(config);
+        state.open();
         state.createKeySpace(KEY_SPACE);
         writeData(0,100);
         state.close();
@@ -536,7 +557,8 @@ public class RocksDBStateTest {
         state = new RocksDBState();
 
         RocksDBState spyState = spy(state);
-        spyState.open(config);
+        spyState.configure(config);
+        spyState.open();
         spyState.createKeySpace(KEY_SPACE);
 
         // The database should be open
@@ -551,7 +573,8 @@ public class RocksDBStateTest {
         Map<String, Object> config = createConfig(dbUri, backupUri);
         config.put(RocksDBState.RESTORE_MODE_CONFIG, "never");
 
-        state.open(config);
+        state.configure(config);
+        state.open();
         state.createKeySpace(KEY_SPACE);
         writeData(0,100);
 
@@ -563,7 +586,7 @@ public class RocksDBStateTest {
 
         state.close();
 
-        state.open(config);
+        state.open();
 
         BaseState.Iterator iter = state.iterate(KEY_SPACE);
         Integer count = 0;
@@ -584,7 +607,8 @@ public class RocksDBStateTest {
 
         RocksDBState spyState = spy(state);
 
-        spyState.open(config);
+        spyState.configure(config);
+        spyState.open();
         spyState.createKeySpace(KEY_SPACE);
 
         // The database should be open
@@ -599,7 +623,8 @@ public class RocksDBStateTest {
         Map<String, Object> config = createConfig(dbUri, backupUri);
         config.put(RocksDBState.RESTORE_MODE_CONFIG, "when_needed");
 
-        state.open(config);
+        state.configure(config);
+        state.open();
         state.createKeySpace(KEY_SPACE);
         writeData(0,100);
 
@@ -614,7 +639,7 @@ public class RocksDBStateTest {
         // Delete the local db in order to restore restore
         state.delete();
 
-        state.open(config);
+        state.open();
 
         BaseState.Iterator iter = state.iterate(KEY_SPACE);
         Integer count = 0;
@@ -634,7 +659,8 @@ public class RocksDBStateTest {
         config.put(RocksDBState.RESTORE_MODE_CONFIG, "when_needed");
 
         //Setup existing local db
-        state.open(config);
+        state.configure(config);
+        state.open();
         state.createKeySpace(KEY_SPACE);
         writeData(0,100);
         state.close();
@@ -643,7 +669,8 @@ public class RocksDBStateTest {
         state = new RocksDBState();
 
         RocksDBState spyState = spy(state);
-        spyState.open(config);
+        spyState.configure(config);
+        spyState.open();
         spyState.createKeySpace(KEY_SPACE);
 
         // The database should be open
@@ -658,7 +685,8 @@ public class RocksDBStateTest {
         Map<String, Object> config = createConfig(dbUri, backupUri);
         config.put(RocksDBState.RESTORE_MODE_CONFIG, "when_needed");
 
-        state.open(config);
+        state.configure(config);
+        state.open();
         state.createKeySpace(KEY_SPACE);
         writeData(0,100);
 
@@ -670,7 +698,7 @@ public class RocksDBStateTest {
 
         state.close();
 
-        state.open(config);
+        state.open();
 
         BaseState.Iterator iter = state.iterate(KEY_SPACE);
         Integer count = 0;
@@ -686,7 +714,8 @@ public class RocksDBStateTest {
 
     @Test
     public void put() {
-        state.open(createConfig(dbUri, backupUri));
+        state.configure(createConfig(dbUri, backupUri));
+        state.open();
         state.createKeySpace(KEY_SPACE);
 
         state.put(KEY_SPACE, "A".getBytes(), "B".getBytes());

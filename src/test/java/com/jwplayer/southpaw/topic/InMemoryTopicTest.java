@@ -38,7 +38,7 @@ public class InMemoryTopicTest {
     @Before
     public void setup() {
         state = new MockState();
-        state.open(new HashMap<>());
+        state.open();
     }
 
     @After

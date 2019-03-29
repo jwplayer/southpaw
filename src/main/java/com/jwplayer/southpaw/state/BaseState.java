@@ -76,6 +76,12 @@ public abstract class BaseState {
         }
     }
 
+    public BaseState() { }
+
+    public BaseState(Map<String, Object> config) {
+        configure(config);
+    }
+
     /**
      * An iterator for keys in the state.
      */
@@ -102,6 +108,12 @@ public abstract class BaseState {
     public void close() {
         this.isOpen = false;
     }
+
+    /**
+     * Configure the state. Should be called after instantiation, but before opening the state.
+     * @param config - Configuration for the state
+     */
+    public abstract void configure(Map<String, Object> config);
 
     /**
      * Create a new key space
@@ -162,9 +174,8 @@ public abstract class BaseState {
 
     /**
      * Open the state. Should be called after instantiation, but before using the state.
-     * @param config - Configuration for the state
      */
-    public void open(Map<String, Object> config) {
+    public void open() {
         this.isOpen = true;
     };
 

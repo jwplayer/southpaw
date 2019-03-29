@@ -15,7 +15,9 @@
  */
 package com.jwplayer.southpaw.state;
 
+import com.codahale.metrics.Timer;
 import com.google.common.base.Preconditions;
+import com.jwplayer.southpaw.metric.Metrics;
 import com.jwplayer.southpaw.util.ByteArray;
 import com.jwplayer.southpaw.util.FileHelper;
 import com.jwplayer.southpaw.util.S3Helper;
@@ -134,6 +136,10 @@ public class RocksDBState extends BaseState {
      */
     protected int backupsToKeep;
     /**
+     * The size in bytes of the compaction read ahead
+     */
+    protected int compactionReadAheadSize;
+    /**
      * RocksDB column family handles.
      */
     protected Map<ByteArray, ColumnFamilyHandle> cfHandles = new HashMap<>();
@@ -141,6 +147,30 @@ public class RocksDBState extends BaseState {
      * Configuration for this state
      */
     protected Map<String, Object> config;
+    /**
+     * Max # of background compactions
+     */
+    protected int maxBackgroundCompactions;
+    /**
+     * Max # of background flushes
+     */
+    protected int maxBackgroundFlushes;
+    /**
+     * Max # of subcompactions
+     */
+    protected int maxSubcompactions;
+    /**
+     * Max # of write buffer size
+     */
+    protected int maxWriteBufferNumber;
+    /**
+     * Size of the RocksDB memory
+     */
+    protected long memtableSize;
+    /**
+     * Simple metrics class for RocksDBState
+     */
+    protected final Metrics metrics = new Metrics();
     /**
      * Used for # of threads / parallelism for various Rocks DB config options
      */
@@ -191,6 +221,11 @@ public class RocksDBState extends BaseState {
     protected Map<ByteArray, Map<ByteArray, byte[]>> dataBatches = new HashMap<>();
 
     public RocksDBState() {
+        RocksDB.loadLibrary();
+    }
+
+    public RocksDBState(Map<String, Object> config) {
+        super(config);
         RocksDB.loadLibrary();
     }
 
@@ -259,26 +294,37 @@ public class RocksDBState extends BaseState {
     }
 
     @Override
-    public void open(Map<String, Object> config) {
+    public void configure(Map<String, Object> config) {
+        try {
+            this.config = Preconditions.checkNotNull(config);
+            this.backupURI = new URI(Preconditions.checkNotNull(config.get(BACKUP_URI_CONFIG).toString()));
+            this.backupsAutoRollback = (boolean) config.getOrDefault(BACKUPS_AUTO_ROLLBACK_CONFIG, false);
+            this.backupsToKeep = (int) Preconditions.checkNotNull(config.get(BACKUPS_TO_KEEP_CONFIG));
+            this.compactionReadAheadSize = (int) Preconditions.checkNotNull(config.get(COMPACTION_READ_AHEAD_SIZE_CONFIG));
+            this.maxBackgroundCompactions = (int) config.getOrDefault(MAX_BACKGROUND_COMPACTIONS, 1);
+            this.maxBackgroundFlushes = (int) config.getOrDefault(MAX_BACKGROUND_FLUSHES, 1);
+            this.maxSubcompactions = (int) config.getOrDefault(MAX_SUBCOMPACTIONS, 1);
+            this.maxWriteBufferNumber = (int) config.getOrDefault(MAX_WRITE_BUFFER_NUMBER, 1);
+            this.memtableSize = ((Number) Preconditions.checkNotNull(config.get(MEMTABLE_SIZE))).longValue();
+            this.parallelism = (int) config.getOrDefault(PARALLELISM_CONFIG, 1);
+            this.putBatchSize = (int) Preconditions.checkNotNull(config.get(PUT_BATCH_SIZE));
+            this.restoreMode = RestoreMode.parse(config.getOrDefault(RESTORE_MODE_CONFIG, RestoreMode.NEVER.getValue()).toString());
+            this.uri = new URI(Preconditions.checkNotNull(config.get(URI_CONFIG).toString()));
+
+            if(backupURI.getScheme().toLowerCase().equals(S3Helper.SCHEME)) {
+                s3Helper = new S3Helper(config);
+            }
+        } catch(Exception ex) {
+            throw new RuntimeException(ex);
+        }
+    }
+
+    @Override
+    public void open() {
         if(isOpen()){
             throw new RuntimeException("RocksDB is already configured!");
         }
         try {
-            this.config = Preconditions.checkNotNull(config);
-            backupURI = new URI(Preconditions.checkNotNull(config.get(BACKUP_URI_CONFIG).toString()));
-            backupsAutoRollback = (boolean) config.getOrDefault(BACKUPS_AUTO_ROLLBACK_CONFIG, false);
-            backupsToKeep = (int) Preconditions.checkNotNull(config.get(BACKUPS_TO_KEEP_CONFIG));
-            int compactionReadAheadSize = (int) Preconditions.checkNotNull(config.get(COMPACTION_READ_AHEAD_SIZE_CONFIG));
-            int maxBackgroundCompactions = (int) config.getOrDefault(MAX_BACKGROUND_COMPACTIONS, 1);
-            int maxBackgroundFlushes = (int) config.getOrDefault(MAX_BACKGROUND_FLUSHES, 1);
-            int maxSubcompactions = (int) config.getOrDefault(MAX_SUBCOMPACTIONS, 1);
-            int maxWriteBufferNumber = (int) config.getOrDefault(MAX_WRITE_BUFFER_NUMBER, 1);
-            long memtableSize = ((Number) Preconditions.checkNotNull(config.get(MEMTABLE_SIZE))).longValue();
-            parallelism = (int) config.getOrDefault(PARALLELISM_CONFIG, 1);
-            putBatchSize = (int) Preconditions.checkNotNull(config.get(PUT_BATCH_SIZE));
-            restoreMode = RestoreMode.parse(config.getOrDefault(RESTORE_MODE_CONFIG, RestoreMode.NEVER.getValue()).toString());
-            uri = new URI(Preconditions.checkNotNull(config.get(URI_CONFIG).toString()));
-
             // Create the backing DB
             sstFileManager = new SstFileManager(Env.getDefault());
             statistics = new Statistics();
@@ -373,13 +419,10 @@ public class RocksDBState extends BaseState {
             for(ColumnFamilyHandle handle: handles) {
                 cfHandles.put(new ByteArray(handle.getName()), handle);
             }
-            if(backupURI.getScheme().toLowerCase().equals(S3Helper.SCHEME)) {
-                s3Helper = new S3Helper(config);
-            }
         } catch(Exception ex) {
             throw new RuntimeException(ex);
         }
-        super.open(config);
+        super.open();
     }
 
     @Override
@@ -404,6 +447,7 @@ public class RocksDBState extends BaseState {
 
     @Override
     public void delete() throws RuntimeException{
+        logger.info("Deleting RocksDB state");
         if(isOpen()) {
             throw new RuntimeException("RocksDB is currently open. Must call close() first.");
         }
@@ -417,6 +461,8 @@ public class RocksDBState extends BaseState {
                 throw new RuntimeException(ex);
             }
         }
+        metrics.statesDeleted.mark();
+        logger.info("RocksDB state has been deleted");
     }
 
     @Override
@@ -434,6 +480,7 @@ public class RocksDBState extends BaseState {
 
     @Override
     public void deleteBackups() {
+        logger.info("Deleting RocksDB state backups");
         try {
             File file;
             switch(backupURI.getScheme().toLowerCase()) {
@@ -453,6 +500,8 @@ public class RocksDBState extends BaseState {
         } catch(IOException | InterruptedException | ExecutionException ex) {
             throw new RuntimeException(ex);
         }
+        metrics.backupsDeleted.mark();
+        logger.info("RocksDB state backups have been deleted");
     }
 
     @Override
@@ -550,24 +599,28 @@ public class RocksDBState extends BaseState {
 
     @Override
     public void restore() {
-        try {
-            switch(backupURI.getScheme().toLowerCase()) {
-                case FileHelper.SCHEME:
-                    restore(uri, backupURI.getPath());
-                    break;
-                case S3Helper.SCHEME:
-                    String localBackupPath = getLocalBackupPath(uri);
-                    File file = new File(localBackupPath);
-                    if(!file.exists()) file.mkdir();
-                    s3Helper.syncFromS3(new URI(localBackupPath), backupURI);
-                    restore(uri, localBackupPath);
-                    break;
-                default:
-                    throw new RuntimeException("Unsupported schema: " + backupURI.getScheme());
+        logger.info("Restoring RocksDB state from backups");
+        try(Timer.Context context = metrics.backupsRestored.time()) {
+            try {
+                switch (backupURI.getScheme().toLowerCase()) {
+                    case FileHelper.SCHEME:
+                        restore(uri, backupURI.getPath());
+                        break;
+                    case S3Helper.SCHEME:
+                        String localBackupPath = getLocalBackupPath(uri);
+                        File file = new File(localBackupPath);
+                        if (!file.exists()) file.mkdir();
+                        s3Helper.syncFromS3(new URI(localBackupPath), backupURI);
+                        restore(uri, localBackupPath);
+                        break;
+                    default:
+                        throw new RuntimeException("Unsupported schema: " + backupURI.getScheme());
+                }
+            } catch (InterruptedException | ExecutionException | RocksDBException | URISyntaxException ex) {
+                throw new RuntimeException(ex);
             }
-        } catch(InterruptedException | ExecutionException | RocksDBException | URISyntaxException ex) {
-            throw new RuntimeException(ex);
         }
+        logger.info("RocksDB state restoration complete");
     }
 
     /**

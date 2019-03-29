@@ -133,6 +133,7 @@ public class S3HelperTest {
 
         URI backupUri = new URI("s3://" + bucket + "/backups");
         s3.syncToS3(tmpDir.getRoot().toURI(), backupUri);
+        s3.waitForSyncToS3();
 
         feedFile.delete();
 

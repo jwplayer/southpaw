@@ -36,7 +36,7 @@ public class ConsoleTopicTest {
         topic = new ConsoleTopic<>();
         Map<String, Object> config = new HashMap<>();
         state = new MockState();
-        state.open(config);
+        state.open();
         topic.configure(new TopicConfig<String, String>()
             .setShortName("TestTopic")
             .setSouthpawConfig(config)

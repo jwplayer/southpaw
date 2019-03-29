@@ -58,14 +58,14 @@ public class SouthpawTest {
 
         relationsUri = new URI(RELATIONS_PATH);
         southpaw = new MockSouthpaw(config, Collections.singletonList(relationsUri));
-        southpaw.deleteBackups();
+        Southpaw.deleteBackups(config);
     }
 
     @After
     public void cleanup() {
         southpaw.close();
-        southpaw.deleteBackups();
-        southpaw.deleteState();
+        Southpaw.deleteBackups(config);
+        Southpaw.deleteState(config);
     }
 
     @Test
