@@ -42,7 +42,7 @@ Southpaw accepts command line arguments and has a help option:
     --restore              Restores the state from existing
                              backups.
 
-*NOTE: Setting the `--restore` flag functions similar to setting `rocks.db.restore.mode: always` config option except that it is performed without Southpaw starting up. If the `--restore` flag and `rocks.db.restore.mode` is not set to `never`, a restore can be performed twice before fully starting up.*
+*NOTE: Setting the `--restore` flag functions similar to setting `rocks.db.restore.mode: always` config option except that it can be used without dependencies on Kafka or opening RocksDB state. If the `--restore` flag is used with the `--build` flag and `rocks.db.restore.mode` is set to `always` or `when_needed`, a restore can be performed twice before fully starting up.*
 
 A typical use would look like this:
 
