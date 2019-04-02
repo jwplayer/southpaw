@@ -322,7 +322,7 @@ public class RocksDBState extends BaseState {
     @Override
     public void open() {
         if(isOpen()){
-            throw new RuntimeException("RocksDB is already configured!");
+            throw new RuntimeException("RocksDB is already open!");
         }
         try {
             // Create the backing DB
