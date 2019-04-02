@@ -17,8 +17,9 @@ rocks.db.max.subcompactions: 2
 rocks.db.max.write.buffer.number: 6
 rocks.db.memtable.size: 2000000000
 rocks.db.parallelism: 10
-rocks.db.uri: "file:///tmp/RocksDB/southpaw"
 rocks.db.put.batch.size: 1500
+rocks.db.restore.mode: "never"
+rocks.db.uri: "file:///tmp/RocksDB/southpaw"
 
 aws.s3.access.key.id: ABCDEFG
 aws.s3.secret.key: 1234567

@@ -165,8 +165,12 @@ Currently, Southpaw uses RocksDB for its state, though this could be made plugga
 * rocks.db.max.write.buffer.number - Number of threads used to flush write buffers
 * rocks.db.memtable.size - Heap allocated for RocksDB memtables
 * rocks.db.parallelism - Generic number of threads used for a number of RocksDB background processes
-* rocks.db.uri - Location where RocksDB is stored. Only the local file system is supported.
 * rocks.db.put.batch.size - The number of puts that are batched by the state before automatically committing
+* rocks.db.restore.mode - How RocksDB state should be restored on normal startup
+    * never - (Default) RocksDB state will never be auto restored on startup
+    * always - RocksDB state will attempt to restore from backup on each startup
+    * when_needed - RocksDB state will attempt to restore from backup only if a local db cannot be opened
+* rocks.db.uri - Location where RocksDB is stored. Only the local file system is supported
 
 ### S3 Config (For RocksDB backups to S3)
 
