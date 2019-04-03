@@ -15,7 +15,9 @@
  */
 package com.jwplayer.southpaw.state;
 
+import com.codahale.metrics.Timer;
 import com.google.common.base.Preconditions;
+import com.jwplayer.southpaw.metric.Metrics;
 import com.jwplayer.southpaw.util.ByteArray;
 import com.jwplayer.southpaw.util.FileHelper;
 import com.jwplayer.southpaw.util.S3Helper;
@@ -82,6 +84,10 @@ public class RocksDBState extends BaseState {
      */
     public static final String PUT_BATCH_SIZE = "rocks.db.put.batch.size";
     /**
+     * When a restore should be run. Expects a value of {@link RestoreMode}
+     */
+    public static final String RESTORE_MODE_CONFIG = "rocks.db.restore.mode";
+    /**
      * URI for RocksDB
      */
     public static final String URI_CONFIG = "rocks.db.uri";
@@ -130,6 +136,10 @@ public class RocksDBState extends BaseState {
      */
     protected int backupsToKeep;
     /**
+     * The size in bytes of the compaction read ahead
+     */
+    protected int compactionReadAheadSize;
+    /**
      * RocksDB column family handles.
      */
     protected Map<ByteArray, ColumnFamilyHandle> cfHandles = new HashMap<>();
@@ -138,9 +148,29 @@ public class RocksDBState extends BaseState {
      */
     protected Map<String, Object> config;
     /**
-     * Flag for whether RocksDB is open
+     * Max # of background compactions
      */
-    protected boolean dbOpen = false;
+    protected int maxBackgroundCompactions;
+    /**
+     * Max # of background flushes
+     */
+    protected int maxBackgroundFlushes;
+    /**
+     * Max # of subcompactions
+     */
+    protected int maxSubcompactions;
+    /**
+     * Max # of write buffer size
+     */
+    protected int maxWriteBufferNumber;
+    /**
+     * Size of the RocksDB memory
+     */
+    protected long memtableSize;
+    /**
+     * Simple metrics class for RocksDBState
+     */
+    protected final Metrics metrics = new Metrics();
     /**
      * Used for # of threads / parallelism for various Rocks DB config options
      */
@@ -149,6 +179,10 @@ public class RocksDBState extends BaseState {
      * How many puts are batched before automatically being flushed
      */
     protected int putBatchSize;
+    /**
+     * When restores should be performed
+     */
+    protected RestoreMode restoreMode;
     /**
      * RocksDB itself
      */
@@ -187,6 +221,11 @@ public class RocksDBState extends BaseState {
     protected Map<ByteArray, Map<ByteArray, byte[]>> dataBatches = new HashMap<>();
 
     public RocksDBState() {
+        RocksDB.loadLibrary();
+    }
+
+    public RocksDBState(Map<String, Object> config) {
+        super(config);
         RocksDB.loadLibrary();
     }
 
@@ -233,10 +272,10 @@ public class RocksDBState extends BaseState {
 
     @Override
     public void close() {
-        if(!dbOpen) {
+        if(!isOpen()) {
             return;
         }
-        dbOpen = false;
+        super.close();
 
         for(Map.Entry<ByteArray, ColumnFamilyHandle> entry: cfHandles.entrySet()) {
             entry.getValue().close();
@@ -258,24 +297,39 @@ public class RocksDBState extends BaseState {
     public void configure(Map<String, Object> config) {
         try {
             this.config = Preconditions.checkNotNull(config);
-            backupURI = new URI(Preconditions.checkNotNull(config.get(BACKUP_URI_CONFIG).toString()));
-            backupsAutoRollback = (boolean) config.getOrDefault(BACKUPS_AUTO_ROLLBACK_CONFIG, false);
-            backupsToKeep = (int) Preconditions.checkNotNull(config.get(BACKUPS_TO_KEEP_CONFIG));
-            int compactionReadAheadSize = (int) Preconditions.checkNotNull(config.get(COMPACTION_READ_AHEAD_SIZE_CONFIG));
-            int maxBackgroundCompactions = (int) config.getOrDefault(MAX_BACKGROUND_COMPACTIONS, 1);
-            int maxBackgroundFlushes = (int) config.getOrDefault(MAX_BACKGROUND_FLUSHES, 1);
-            int maxSubcompactions = (int) config.getOrDefault(MAX_SUBCOMPACTIONS, 1);
-            int maxWriteBufferNumber = (int) config.getOrDefault(MAX_WRITE_BUFFER_NUMBER, 1);
-            long memtableSize = ((Number) Preconditions.checkNotNull(config.get(MEMTABLE_SIZE))).longValue();
-            parallelism = (int) config.getOrDefault(PARALLELISM_CONFIG, 1);
-            putBatchSize = (int) Preconditions.checkNotNull(config.get(PUT_BATCH_SIZE));
-            uri = new URI(Preconditions.checkNotNull(config.get(URI_CONFIG).toString()));
+            this.backupURI = new URI(Preconditions.checkNotNull(config.get(BACKUP_URI_CONFIG).toString()));
+            this.backupsAutoRollback = (boolean) config.getOrDefault(BACKUPS_AUTO_ROLLBACK_CONFIG, false);
+            this.backupsToKeep = (int) Preconditions.checkNotNull(config.get(BACKUPS_TO_KEEP_CONFIG));
+            this.compactionReadAheadSize = (int) Preconditions.checkNotNull(config.get(COMPACTION_READ_AHEAD_SIZE_CONFIG));
+            this.maxBackgroundCompactions = (int) config.getOrDefault(MAX_BACKGROUND_COMPACTIONS, 1);
+            this.maxBackgroundFlushes = (int) config.getOrDefault(MAX_BACKGROUND_FLUSHES, 1);
+            this.maxSubcompactions = (int) config.getOrDefault(MAX_SUBCOMPACTIONS, 1);
+            this.maxWriteBufferNumber = (int) config.getOrDefault(MAX_WRITE_BUFFER_NUMBER, 1);
+            this.memtableSize = ((Number) Preconditions.checkNotNull(config.get(MEMTABLE_SIZE))).longValue();
+            this.parallelism = (int) config.getOrDefault(PARALLELISM_CONFIG, 1);
+            this.putBatchSize = (int) Preconditions.checkNotNull(config.get(PUT_BATCH_SIZE));
+            this.restoreMode = RestoreMode.parse(config.getOrDefault(RESTORE_MODE_CONFIG, RestoreMode.NEVER.getValue()).toString());
+            this.uri = new URI(Preconditions.checkNotNull(config.get(URI_CONFIG).toString()));
 
+            if(backupURI.getScheme().toLowerCase().equals(S3Helper.SCHEME)) {
+                s3Helper = new S3Helper(config);
+            }
+        } catch(Exception ex) {
+            throw new RuntimeException(ex);
+        }
+    }
+
+    @Override
+    public void open() {
+        if(isOpen()){
+            throw new RuntimeException("RocksDB is already open!");
+        }
+        try {
             // Create the backing DB
             sstFileManager = new SstFileManager(Env.getDefault());
             statistics = new Statistics();
             DBOptions dbOptions = new DBOptions()
-                    .setCreateIfMissing(true)
+                    .setCreateIfMissing(false) // Explicitly set to false here so we can potentially restore if it doesn't exist
                     .setCreateMissingColumnFamilies(true)
                     .setIncreaseParallelism(parallelism)
                     .setMaxBackgroundCompactions(maxBackgroundCompactions)
@@ -291,9 +345,10 @@ public class RocksDBState extends BaseState {
                     .setMaxWriteBufferNumber(maxWriteBufferNumber)
                     .setTargetFileSizeMultiplier(2);
             rocksDBOptions = new Options(dbOptions, cfOptions)
-                    .setCreateIfMissing(true)
+                    .setCreateIfMissing(false) // Explicitly set to false here so we can potentially restore if it doesn't exist
                     .setCreateMissingColumnFamilies(true)
                     .optimizeLevelStyleCompaction(memtableSize)
+
                     .setCompactionStyle(CompactionStyle.LEVEL)
                     .setNumLevels(4)
                     .setIncreaseParallelism(parallelism)
@@ -314,6 +369,10 @@ public class RocksDBState extends BaseState {
             writeOptions = new WriteOptions();
             writeOptions.setDisableWAL(false);
 
+            if (restoreMode == RestoreMode.ALWAYS){
+                this.restore();
+            }
+
             List<byte[]> families = RocksDB.listColumnFamilies(rocksDBOptions, uri.getPath());
             List<ColumnFamilyHandle> handles = new ArrayList<>(families.size() + 1);
             List<ColumnFamilyDescriptor> descriptors = new ArrayList<>(families.size() + 1);
@@ -323,8 +382,33 @@ public class RocksDBState extends BaseState {
             if (descriptors.size() == 0) {
                 descriptors.add(new ColumnFamilyDescriptor(RocksDB.DEFAULT_COLUMN_FAMILY, cfOptions));
             }
-            rocksDB = RocksDB.open(dbOptions, uri.getPath(), descriptors, handles);
-            dbOpen = true;
+
+            try {
+                rocksDB = RocksDB.open(dbOptions, uri.getPath(), descriptors, handles);
+            } catch(RocksDBException ex) {
+                if(!ex.getMessage().contains("does not exist (create_if_missing is false)")) {
+                    // Received an unexpected exception
+                    throw ex;
+                }
+
+                //DB must not exist yet.
+                if (restoreMode == RestoreMode.WHEN_NEEDED) {
+                    this.restore();
+
+                    families = RocksDB.listColumnFamilies(rocksDBOptions, uri.getPath());
+                    handles = new ArrayList<>(families.size() + 1);
+                    descriptors = new ArrayList<>(families.size() + 1);
+                    for (byte[] family : families) {
+                        descriptors.add(new ColumnFamilyDescriptor(family, cfOptions));
+                    }
+                    if (descriptors.size() == 0) {
+                        descriptors.add(new ColumnFamilyDescriptor(RocksDB.DEFAULT_COLUMN_FAMILY, cfOptions));
+                    }
+                }
+
+                dbOptions.setCreateIfMissing(true); // Auto create db if no db exists at this point
+                rocksDB = RocksDB.open(dbOptions, uri.getPath(), descriptors, handles);
+            }
 
             for (int i = 0; i < families.size(); i++) {
                 if (i > 0) {
@@ -335,12 +419,10 @@ public class RocksDBState extends BaseState {
             for(ColumnFamilyHandle handle: handles) {
                 cfHandles.put(new ByteArray(handle.getName()), handle);
             }
-            if(backupURI.getScheme().toLowerCase().equals(S3Helper.SCHEME)) {
-                s3Helper = new S3Helper(config);
-            }
         } catch(Exception ex) {
             throw new RuntimeException(ex);
         }
+        super.open();
     }
 
     @Override
@@ -364,15 +446,23 @@ public class RocksDBState extends BaseState {
     }
 
     @Override
-    public void delete() {
-        close();
-        try {
-            Options options = new Options();
-            RocksDB.destroyDB(uri.getPath(), options);
-            options.close();
-        } catch(RocksDBException ex) {
-            throw new RuntimeException(ex);
+    public void delete() throws RuntimeException{
+        logger.info("Deleting RocksDB state");
+        if(isOpen()) {
+            throw new RuntimeException("RocksDB is currently open. Must call close() first.");
         }
+
+        if (uri != null && new File(uri).exists()){
+            try {
+                Options options = new Options();
+                RocksDB.destroyDB(uri.getPath(), options);
+                options.close();
+            } catch(RocksDBException ex) {
+                throw new RuntimeException(ex);
+            }
+        }
+        metrics.statesDeleted.mark();
+        logger.info("RocksDB state has been deleted");
     }
 
     @Override
@@ -390,6 +480,7 @@ public class RocksDBState extends BaseState {
 
     @Override
     public void deleteBackups() {
+        logger.info("Deleting RocksDB state backups");
         try {
             File file;
             switch(backupURI.getScheme().toLowerCase()) {
@@ -409,6 +500,8 @@ public class RocksDBState extends BaseState {
         } catch(IOException | InterruptedException | ExecutionException ex) {
             throw new RuntimeException(ex);
         }
+        metrics.backupsDeleted.mark();
+        logger.info("RocksDB state backups have been deleted");
     }
 
     @Override
@@ -506,24 +599,28 @@ public class RocksDBState extends BaseState {
 
     @Override
     public void restore() {
-        try {
-            switch(backupURI.getScheme().toLowerCase()) {
-                case FileHelper.SCHEME:
-                    restore(uri, backupURI.getPath());
-                    break;
-                case S3Helper.SCHEME:
-                    String localBackupPath = getLocalBackupPath(uri);
-                    File file = new File(localBackupPath);
-                    if(!file.exists()) file.mkdir();
-                    s3Helper.syncFromS3(new URI(localBackupPath), backupURI);
-                    restore(uri, localBackupPath);
-                    break;
-                default:
-                    throw new RuntimeException("Unsupported schema: " + backupURI.getScheme());
+        logger.info("Restoring RocksDB state from backups");
+        try(Timer.Context context = metrics.backupsRestored.time()) {
+            try {
+                switch (backupURI.getScheme().toLowerCase()) {
+                    case FileHelper.SCHEME:
+                        restore(uri, backupURI.getPath());
+                        break;
+                    case S3Helper.SCHEME:
+                        String localBackupPath = getLocalBackupPath(uri);
+                        File file = new File(localBackupPath);
+                        if (!file.exists()) file.mkdir();
+                        s3Helper.syncFromS3(new URI(localBackupPath), backupURI);
+                        restore(uri, localBackupPath);
+                        break;
+                    default:
+                        throw new RuntimeException("Unsupported schema: " + backupURI.getScheme());
+                }
+            } catch (InterruptedException | ExecutionException | RocksDBException | URISyntaxException ex) {
+                throw new RuntimeException(ex);
             }
-        } catch(InterruptedException | ExecutionException | RocksDBException | URISyntaxException ex) {
-            throw new RuntimeException(ex);
         }
+        logger.info("RocksDB state restoration complete");
     }
 
     /**
@@ -536,8 +633,8 @@ public class RocksDBState extends BaseState {
         File path = new File(backupPath);
         if(path.exists()) {
             try (final BackupableDBOptions backupOptions = new BackupableDBOptions(backupPath)
-                         .setShareTableFiles(true)
-                         .setMaxBackgroundOperations(parallelism);
+                    .setShareTableFiles(true)
+                    .setMaxBackgroundOperations(parallelism);
                  final RestoreOptions restoreOptions = new RestoreOptions(false);
                  final BackupEngine backupEngine = BackupEngine.open(Env.getDefault(), backupOptions)) {
 
@@ -575,7 +672,6 @@ public class RocksDBState extends BaseState {
                         backupEngine.restoreDbFromLatestBackup(dbUri.getPath(), dbUri.getPath(), restoreOptions);
                     }
                     backupEngine.purgeOldBackups(backupsToKeep);
-                    configure(config);
                     logger.info("Backup restored");
                 } else {
                     logger.warn("Skipping state restore, no backups found in backup URI");

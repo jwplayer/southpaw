@@ -212,8 +212,8 @@ public class Southpaw {
         this.config = new Config(rawConfig);
         logger.setLevel(Level.toLevel(config.logLevel, Level.INFO));
         this.relations = Preconditions.checkNotNull(relations);
-        this.state = new RocksDBState();
-        this.state.configure(rawConfig);
+        this.state = new RocksDBState(rawConfig);
+        this.state.open();
         this.state.createKeySpace(METADATA_KEYSPACE);
         this.inputTopics = new HashMap<>();
         this.outputTopics = new HashMap<>();
@@ -740,20 +740,18 @@ public class Southpaw {
      * Deletes the backups for Southpaw state. Be very careful calling this! Unlike deleteState(), does not
      * require creating a new instance to continue processing.
      */
-    public void deleteBackups() {
-        logger.warn("Deleting backups!!!");
+    public static void deleteBackups(Map<String, Object> config) {
+        BaseState state =  new RocksDBState(config);
         state.deleteBackups();
-        metrics.backupsDeleted.mark();
     }
 
     /**
      * Resets Southpaw by deleting it's state. Denormalized records written to output topics are not deleted.
      * You must create a new Southpaw object to keep processing.
      */
-    public void deleteState() {
-        logger.warn("Deleting state!!!");
+    public static void deleteState(Map<String, Object> config) {
+        BaseState state =  new RocksDBState(config);
         state.delete();
-        metrics.statesDeleted.mark();
     }
 
     /**
@@ -825,19 +823,20 @@ public class Southpaw {
         List<?> relations = options.valuesOf(RELATIONS);
         List<URI> relURIs = new ArrayList<>();
         for(Object relation: relations) relURIs.add(new URI(relation.toString()));
-        Southpaw southpaw = new Southpaw(config, relURIs);
 
         if(options.has(DELETE_BACKUP)) {
-            southpaw.deleteBackups();
+            Southpaw.deleteBackups(config);
         }
         if(options.has(DELETE_STATE)) {
-            southpaw.deleteState();
+            Southpaw.deleteState(config);
         }
         if(options.has(RESTORE)) {
-            southpaw.restore();
+            Southpaw.restore(config);
         }
-        southpaw.startedSuccessfully = true;
+
         if(options.has(BUILD)) {
+            Southpaw southpaw = new Southpaw(config, relURIs);
+            southpaw.startedSuccessfully = true;
             southpaw.run(0);
         }
     }
@@ -872,15 +871,9 @@ public class Southpaw {
     /**
      * Restores Southpaw state from the latest backup.
      */
-    public void restore() throws IllegalAccessException, InstantiationException, ClassNotFoundException {
-        try(Timer.Context context = metrics.backupsRestored.time()) {
-            logger.info("Restoring state from backups");
-            state.restore();
-            inputTopics = new HashMap<>(inputTopics.size());
-            for(Relation root: relations) {
-                inputTopics.putAll(createInputTopics(root));
-            }
-        }
+    public static void restore(Map<String, Object> config){
+        RocksDBState state = new RocksDBState(config);
+        state.restore();
     }
 
     /**

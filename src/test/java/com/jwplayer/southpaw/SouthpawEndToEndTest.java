@@ -92,7 +92,7 @@ public class SouthpawEndToEndTest {
                 config,
                 Arrays.asList(new URI(RELATIONS_PATH), new URI(RELATIONS_PATH2), new URI(RELATIONS_PATH3))
         );
-        southpaw.deleteBackups();
+        Southpaw.deleteBackups(config);
         Map<String, BaseTopic<BaseRecord, BaseRecord>> normalizedTopics = southpaw.getNormalizedTopics();
         Map<String, String[]> records = new HashMap<>();
         for(Map.Entry<String, BaseTopic<BaseRecord, BaseRecord>> entry: normalizedTopics.entrySet()) {
@@ -135,8 +135,9 @@ public class SouthpawEndToEndTest {
                 });
             }
         }
-        southpaw.deleteBackups();
-        southpaw.deleteState();
+        southpaw.close();
+        Southpaw.deleteBackups(config);
+        Southpaw.deleteState(config);
 
         assertEquals(12, retVal.size());
         return retVal;

@@ -42,9 +42,11 @@ Southpaw accepts command line arguments and has a help option:
     --restore              Restores the state from existing
                              backups.
 
+*NOTE: Setting the `--restore` flag functions similar to setting `rocks.db.restore.mode: always` config option except that it can be used without dependencies on Kafka or opening RocksDB state. If the `--restore` flag is used with the `--build` flag and `rocks.db.restore.mode` is set to `always` or `when_needed`, a restore can be performed twice before fully starting up.*
+
 A typical use would look like this:
 
-    java -cp ./southpaw.jar com.jwplayer.southpaw.Southpaw --config conf/stretch.yaml --relations relations/media.json --restore --build
+    java -cp ./southpaw.jar com.jwplayer.southpaw.Southpaw --config conf/stretch.yaml --relations relations/media.json --build
 
 ## Project Structure
 
@@ -165,8 +167,12 @@ Currently, Southpaw uses RocksDB for its state, though this could be made plugga
 * rocks.db.max.write.buffer.number - Number of threads used to flush write buffers
 * rocks.db.memtable.size - Heap allocated for RocksDB memtables
 * rocks.db.parallelism - Generic number of threads used for a number of RocksDB background processes
-* rocks.db.uri - Location where RocksDB is stored. Only the local file system is supported.
 * rocks.db.put.batch.size - The number of puts that are batched by the state before automatically committing
+* rocks.db.restore.mode - How RocksDB state should be restored on normal startup (functions outside the scope of `--restore` flag)
+    * never - (Default) RocksDB state will never be auto restored on startup
+    * always - RocksDB state will attempt to restore from backup on each startup
+    * when_needed - RocksDB state will attempt to restore from backup only if a local db cannot be opened
+* rocks.db.uri - Location where RocksDB is stored. Only the local file system is supported
 
 ### S3 Config (For RocksDB backups to S3)
 
