@@ -1,5 +1,20 @@
 # Change log
 
+## 0.3.0
+April 3rd, 2019
+
+### New Features
+* Add support for restore modes [#30](https://github.com/jwplayer/southpaw/pull/30)
+* Add optional setting for auto restoring previous rocksdb backup [#23](https://github.com/jwplayer/southpaw/pull/23)
+
+### Bug Fixes
+* Cleanup SouthpawTest temp directories [#29](https://github.com/jwplayer/southpaw/pull/29)
+* Cleanup temporary directory usage [#28](https://github.com/jwplayer/southpaw/pull/28)
+* Remove unused curator-framework dependency[#25](https://github.com/jwplayer/southpaw/pull/25)
+* Cleanup tests that write to disk[#24](https://github.com/jwplayer/southpaw/pull/24)
+* Cleanup rocksdb options reference handling [#22](https://github.com/jwplayer/southpaw/pull/22)
+* Close backup engine when no backups [#21](https://github.com/jwplayer/southpaw/pull/21)
+
 ## 0.2.4
 March 5th, 2019
 
