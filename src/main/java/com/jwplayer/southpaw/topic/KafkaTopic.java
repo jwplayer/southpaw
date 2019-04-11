@@ -403,7 +403,7 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
         if (callbackException != null) {
             callbackException = null;
 
-            throw new RuntimeException("Failed to write record to Kafka: " + ex.getMessage(), ex);
+            throw new RuntimeException("Failed to write record to " + this.getShortName() + " topic: " + ex.getMessage(), ex);
         }
     }
 }
