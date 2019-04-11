@@ -24,17 +24,13 @@ import com.jwplayer.southpaw.util.ByteArray;
 import org.apache.commons.lang.ObjectUtils;
 import org.apache.commons.lang.time.StopWatch;
 import org.apache.kafka.clients.consumer.*;
-import org.apache.kafka.clients.producer.KafkaProducer;
-import org.apache.kafka.clients.producer.ProducerConfig;
-import org.apache.kafka.clients.producer.ProducerRecord;
-import org.apache.kafka.clients.producer.RecordMetadata;
+import org.apache.kafka.clients.producer.*;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.log4j.Logger;
 
 import java.util.*;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicLong;
 
 
 /**
@@ -222,6 +218,26 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
     }
 
     /**
+     * Callback to be used when issuing Kafka producer writes. This callback will be used to keep track of async write
+     * successes and failures. On a record write failure the {@link #callbackException} variable will store the failed
+     * records exception. Async exceptions should be checked for by calling {@link #checkCallbackExceptions()}
+     */
+    private class KafkaProducerCallback implements Callback {
+
+        @Override
+        public void onCompletion(RecordMetadata recordMetadata, Exception e) {
+            if (e != null && callbackException == null) {
+                callbackException = e;
+            }
+            inflightRecords.decrementAndGet();
+        }
+    }
+
+    /**
+     * An exception returned back from an async Kafka producer callback
+     */
+    private volatile Exception callbackException;
+    /**
      * The Kafka consumer this abstraction wraps around
      */
     private KafkaConsumer<byte[], byte[]> consumer;
@@ -238,6 +254,10 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
      */
     private StopWatch endOffsetWatch;
     /**
+     * A count of all currently in flight async writes to Kafka
+     */
+    private AtomicLong inflightRecords = new AtomicLong();
+    /**
      * The timeout for each poll call to Kafka
      */
     private long pollTimeout;
@@ -246,10 +266,9 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
      */
     private KafkaProducer<K, V> producer = null;
     /**
-     * List container future objects from the producer. Allows us to batch writes and check that records are
-     * properly sent to Kafka when flush() is called.
+     * The callback for Kafka producer writes
      */
-    private List<Future<RecordMetadata>> producerFutures = new ArrayList<>();
+    private final Callback producerCallback = new KafkaProducerCallback();
 
     @Override
     public void commit() {
@@ -304,22 +323,16 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
 
     @Override
     public void flush() {
-        boolean isSuccessful = true;
         if(producer != null) {
             producer.flush();
         }
-        for(Future<RecordMetadata> future: producerFutures) {
-            try {
-                future.get();
-            } catch(ExecutionException | InterruptedException ex) {
-                logger.error(ex);
-                isSuccessful = false;
-            }
+
+        long failedRecords = inflightRecords.get();
+        if(failedRecords != 0) {
+            throw new RuntimeException("Could not successfully flush " + failedRecords + " to the topic");
         }
-        if(!isSuccessful) {
-            throw new RuntimeException("Could not successfully flush all remaining record writes to the topic");
-        }
-        producerFutures.clear();
+
+        checkCallbackExceptions();
     }
 
     @Override
@@ -375,8 +388,26 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
 
     @Override
     public void write(K key, V value) {
-        if(producer == null) producer = new KafkaProducer<>(topicConfig.southpawConfig, 
-            this.getKeySerde().serializer(), this.getValueSerde().serializer());
-        producerFutures.add(producer.send(new ProducerRecord<>(topicName, 0, key, value)));
+        checkCallbackExceptions();
+
+        if(producer == null) {
+            producer = new KafkaProducer<>(topicConfig.southpawConfig,
+                    this.getKeySerde().serializer(), this.getValueSerde().serializer());
+        }
+
+        inflightRecords.incrementAndGet();
+
+        producer.send(new ProducerRecord<>(topicName, 0, key, value), producerCallback);
+
+        logger.info("There are " + inflightRecords.get() + " in flight records");
+    }
+
+    private void checkCallbackExceptions() throws RuntimeException {
+        Exception ex = callbackException;
+        if (callbackException != null) {
+            callbackException = null;
+
+            throw new RuntimeException("Failed to write record to Kafka: " + ex.getMessage(), ex);
+        }
     }
 }
