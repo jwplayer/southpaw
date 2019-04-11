@@ -327,9 +327,9 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
             producer.flush();
         }
 
-        long failedRecords = inflightRecords.get();
-        if(failedRecords != 0) {
-            throw new RuntimeException("Could not successfully flush " + failedRecords + " to the topic");
+        long count = inflightRecords.get();
+        if(count != 0) {
+            throw new RuntimeException("Could not successfully flush " + count + " records");
         }
 
         checkCallbackExceptions();
@@ -390,16 +390,12 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
     public void write(K key, V value) {
         checkCallbackExceptions();
 
-        if(producer == null) {
-            producer = new KafkaProducer<>(topicConfig.southpawConfig,
-                    this.getKeySerde().serializer(), this.getValueSerde().serializer());
-        }
+        if(producer == null) producer = new KafkaProducer<>(topicConfig.southpawConfig,
+                this.getKeySerde().serializer(), this.getValueSerde().serializer());
 
         inflightRecords.incrementAndGet();
 
         producer.send(new ProducerRecord<>(topicName, 0, key, value), producerCallback);
-
-        logger.info("There are " + inflightRecords.get() + " in flight records");
     }
 
     private void checkCallbackExceptions() throws RuntimeException {
