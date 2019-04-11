@@ -1,5 +1,11 @@
 # Change log
 
+## 0.3.1
+April 11th, 2019
+
+### Bug Fixes
+* Fix potential memory leak in KafkaTopics.flush() [#31](https://github.com/jwplayer/southpaw/pull/31)
+
 ## 0.3.0
 April 3rd, 2019
 
