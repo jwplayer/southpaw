@@ -837,7 +837,11 @@ public class Southpaw {
         if(options.has(BUILD)) {
             Southpaw southpaw = new Southpaw(config, relURIs);
             southpaw.startedSuccessfully = true;
-            southpaw.run(0);
+            try{
+                southpaw.run(0);
+            } finally {
+                southpaw.close();
+            }
         }
     }
 
