@@ -265,8 +265,6 @@ public class RocksDBState extends BaseState {
             final BackupEngine backupEngine = BackupEngine.open(Env.getDefault(), backupOptions)) {
             backupEngine.createNewBackup(rocksDB, true);
             backupEngine.purgeOldBackups(backupsToKeep);
-        } finally {
-            logger.info("Shutting down RocksDB backup engine");
         }
     }
 
@@ -577,9 +575,8 @@ public class RocksDBState extends BaseState {
     }
 
     protected void putBatch(ByteArray keySpace) {
-        try {
-            Map<ByteArray, byte[]> dataBatch = dataBatches.get(keySpace);
-            WriteBatch writeBatch = new WriteBatch();
+        Map<ByteArray, byte[]> dataBatch = dataBatches.get(keySpace);
+        try (WriteBatch writeBatch = new WriteBatch()){
             for(Map.Entry<ByteArray, byte[]> batchEntry: dataBatch.entrySet()) {
                 writeBatch.put(
                         cfHandles.get(keySpace),
@@ -588,7 +585,6 @@ public class RocksDBState extends BaseState {
                 );
             }
             rocksDB.write(writeOptions, writeBatch);
-            writeBatch.close();
             dataBatch.clear();
         } catch(RocksDBException ex) {
             throw new RuntimeException(ex);

@@ -283,9 +283,9 @@ public class S3Helper {
      */
     public void syncToS3(URI localUri, URI s3Uri) throws InterruptedException, ExecutionException {
         waitForSyncToS3();
+        logger.info("Initiating background sync to S3");
         syncToS3Future = executor.submit(() -> {
             try {
-                logger.info("Initiating background sync to S3");
                 try(Timer.Context context = metrics.s3Uploads.time()) {
                     Preconditions.checkNotNull(localUri);
                     Preconditions.checkArgument(localUri.getScheme() == null || FileHelper.SCHEME.equalsIgnoreCase(localUri.getScheme()));
