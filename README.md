@@ -145,7 +145,6 @@ The config is broken up into multiple sections:
 ### Generic Config
 
 * log.level - The level to log at (e.g. INFO or DEBUG). In the future should just be replaced with a properties file.
-* backup.on.shutdown - Instruct Southpaw to backup on shutdown (or not)
 * backup.time.s - The amount of time in seconds between backups
 * commit.time.s - The amount of time in seconds between full state commits
 * create.records.trigger - Number of denormalized record create actions to queue before creating denormalized records. Only queues creation of records when lagging. 
