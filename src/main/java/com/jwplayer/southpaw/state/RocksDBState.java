@@ -231,6 +231,7 @@ public class RocksDBState extends BaseState {
 
     @Override
     public void backup() {
+        logger.info("Backing up RocksDB state");
         try {
             switch(backupURI.getScheme().toLowerCase()) {
                 case FileHelper.SCHEME:
@@ -247,6 +248,7 @@ public class RocksDBState extends BaseState {
         } catch(InterruptedException | ExecutionException | URISyntaxException | RocksDBException ex) {
             throw new RuntimeException(ex);
         }
+        logger.info("RocksDB state backup complete");
     }
 
     /**
@@ -256,17 +258,15 @@ public class RocksDBState extends BaseState {
     protected void backup(String backupPath) throws RocksDBException {
         File file = new File(backupPath);
         if(!file.exists()) file.mkdir();
-        BackupableDBOptions backupOptions = new BackupableDBOptions(backupPath)
+        logger.info("Opening RocksDB backup engine");
+        try (final BackupableDBOptions backupOptions = new BackupableDBOptions(backupPath)
                 .setShareTableFiles(true)
                 .setMaxBackgroundOperations(parallelism);
-        BackupEngine backupEngine = BackupEngine.open(Env.getDefault(), backupOptions);
-        try {
+            final BackupEngine backupEngine = BackupEngine.open(Env.getDefault(), backupOptions)) {
             backupEngine.createNewBackup(rocksDB, true);
             backupEngine.purgeOldBackups(backupsToKeep);
         } finally {
-            logger.info("Shutting down backup engine");
-            backupEngine.close();
-            backupOptions.close();
+            logger.info("Shutting down RocksDB backup engine");
         }
     }
 
@@ -453,10 +453,8 @@ public class RocksDBState extends BaseState {
         }
 
         if (uri != null && new File(uri).exists()){
-            try {
-                Options options = new Options();
+            try (final Options options = new Options();){
                 RocksDB.destroyDB(uri.getPath(), options);
-                options.close();
             } catch(RocksDBException ex) {
                 throw new RuntimeException(ex);
             }
