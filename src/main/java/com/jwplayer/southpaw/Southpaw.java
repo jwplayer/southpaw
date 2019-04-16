@@ -134,10 +134,6 @@ public class Southpaw {
      */
     protected final Relation[] relations;
     /**
-     * Did Southpaw start up successfully?
-     */
-    protected boolean startedSuccessfully = false;
-    /**
      * State for Southpaw
      */
     protected BaseState state;
@@ -231,22 +227,6 @@ public class Southpaw {
         for (Relation root : relations) {
             byte[] bytes = state.get(METADATA_KEYSPACE, createDePKEntryName(root).getBytes());
             dePKsByType.put(root, ByteArraySet.deserialize(bytes));
-        }
-
-        /* Make sure we backup, and close before exiting. Also, prevents a scenario where Southpaw:
-        * - Starts up
-        * - Attempts to restore from backups
-        * - Restore fails, potentially due to a transient S3 error
-        * - Backup on shutdown is set to true
-        * - The new empty DB is backed up, overwriting the existing backups
-        * */
-        if(config.backupOnShutdown && startedSuccessfully) {
-            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-                logger.info("Backing up before shutting down");
-                this.state.backup();
-                this.close();
-                logger.info("Shutting down");
-            }));
         }
     }
 
@@ -836,8 +816,11 @@ public class Southpaw {
 
         if(options.has(BUILD)) {
             Southpaw southpaw = new Southpaw(config, relURIs);
-            southpaw.startedSuccessfully = true;
-            southpaw.run(0);
+            try{
+                southpaw.run(0);
+            } finally {
+                southpaw.close();
+            }
         }
     }
 

@@ -283,6 +283,7 @@ public class S3Helper {
      */
     public void syncToS3(URI localUri, URI s3Uri) throws InterruptedException, ExecutionException {
         waitForSyncToS3();
+        logger.info("Initiating background sync to S3");
         syncToS3Future = executor.submit(() -> {
             try {
                 try(Timer.Context context = metrics.s3Uploads.time()) {
@@ -389,13 +390,16 @@ public class S3Helper {
                     logger.warn("Unhandled exception during sync to S3", ex);
                 }
             }
+            logger.info("Background sync to S3 complete");
         });
     }
 
     protected void waitForSyncToS3() throws InterruptedException, ExecutionException {
         if(syncToS3Future != null) {
+            logger.info("Blocking for existing sync to S3 to complete");
             syncToS3Future.get();
             syncToS3Future = null;
+            logger.info("Existing sync to S3 complete");
         }
     }
 }

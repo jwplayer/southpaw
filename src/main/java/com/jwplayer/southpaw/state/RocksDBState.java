@@ -231,6 +231,7 @@ public class RocksDBState extends BaseState {
 
     @Override
     public void backup() {
+        logger.info("Backing up RocksDB state");
         try {
             switch(backupURI.getScheme().toLowerCase()) {
                 case FileHelper.SCHEME:
@@ -247,6 +248,7 @@ public class RocksDBState extends BaseState {
         } catch(InterruptedException | ExecutionException | URISyntaxException | RocksDBException ex) {
             throw new RuntimeException(ex);
         }
+        logger.info("RocksDB state backup complete");
     }
 
     /**
@@ -256,17 +258,13 @@ public class RocksDBState extends BaseState {
     protected void backup(String backupPath) throws RocksDBException {
         File file = new File(backupPath);
         if(!file.exists()) file.mkdir();
-        BackupableDBOptions backupOptions = new BackupableDBOptions(backupPath)
+        logger.info("Opening RocksDB backup engine");
+        try (final BackupableDBOptions backupOptions = new BackupableDBOptions(backupPath)
                 .setShareTableFiles(true)
                 .setMaxBackgroundOperations(parallelism);
-        BackupEngine backupEngine = BackupEngine.open(Env.getDefault(), backupOptions);
-        try {
+            final BackupEngine backupEngine = BackupEngine.open(Env.getDefault(), backupOptions)) {
             backupEngine.createNewBackup(rocksDB, true);
             backupEngine.purgeOldBackups(backupsToKeep);
-        } finally {
-            logger.info("Shutting down backup engine");
-            backupEngine.close();
-            backupOptions.close();
         }
     }
 
@@ -453,10 +451,8 @@ public class RocksDBState extends BaseState {
         }
 
         if (uri != null && new File(uri).exists()){
-            try {
-                Options options = new Options();
+            try (final Options options = new Options();){
                 RocksDB.destroyDB(uri.getPath(), options);
-                options.close();
             } catch(RocksDBException ex) {
                 throw new RuntimeException(ex);
             }
@@ -579,9 +575,8 @@ public class RocksDBState extends BaseState {
     }
 
     protected void putBatch(ByteArray keySpace) {
-        try {
-            Map<ByteArray, byte[]> dataBatch = dataBatches.get(keySpace);
-            WriteBatch writeBatch = new WriteBatch();
+        Map<ByteArray, byte[]> dataBatch = dataBatches.get(keySpace);
+        try (WriteBatch writeBatch = new WriteBatch()){
             for(Map.Entry<ByteArray, byte[]> batchEntry: dataBatch.entrySet()) {
                 writeBatch.put(
                         cfHandles.get(keySpace),
@@ -590,7 +585,6 @@ public class RocksDBState extends BaseState {
                 );
             }
             rocksDB.write(writeOptions, writeBatch);
-            writeBatch.close();
             dataBatch.clear();
         } catch(RocksDBException ex) {
             throw new RuntimeException(ex);
