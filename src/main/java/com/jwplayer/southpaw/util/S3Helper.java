@@ -224,6 +224,7 @@ public class S3Helper {
     public void syncFromS3(URI localUri, URI s3Uri) throws InterruptedException, ExecutionException {
         waitForSyncToS3();
         TransferManager tx = null;
+        logger.info("Initiating sync from S3");
         try(Timer.Context context = metrics.s3Downloads.time()) {
             Preconditions.checkNotNull(localUri);
             Preconditions.checkNotNull(s3Uri);
@@ -272,6 +273,7 @@ public class S3Helper {
                 tx.shutdownNow(false);
             }
         }
+        logger.info("Sync from S3 complete");
     }
 
     /**
