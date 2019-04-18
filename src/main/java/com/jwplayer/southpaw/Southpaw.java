@@ -246,12 +246,13 @@ public class Southpaw {
         StopWatch commitWatch = new StopWatch();
         commitWatch.start();
 
+        List<Map.Entry<String, BaseTopic<BaseRecord, BaseRecord>>> topics = new ArrayList<>(inputTopics.entrySet());
+        List<String> rootEntities = Arrays.stream(relations).map(Relation::getEntity).collect(Collectors.toList());
+        topics.sort((x, y) -> Boolean.compare(rootEntities.contains(x.getKey()), rootEntities.contains(y.getKey())));
+
         while(processRecords) {
             // Loop through each input topic and read a batch of records
-            List<Map.Entry<String, BaseTopic<BaseRecord, BaseRecord>>> topics =
-                    new ArrayList<>(inputTopics.entrySet());
-            List<String> rootEntities = Arrays.stream(relations).map(Relation::getEntity).collect(Collectors.toList());
-            topics.sort((x, y) -> Boolean.compare(rootEntities.contains(x.getKey()), rootEntities.contains(y.getKey())));
+
             for (Map.Entry<String, BaseTopic<BaseRecord, BaseRecord>> entry : topics) {
                 String entity = entry.getKey();
                 BaseTopic<BaseRecord, BaseRecord> inputTopic = entry.getValue();
