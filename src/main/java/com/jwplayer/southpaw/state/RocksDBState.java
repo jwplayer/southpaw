@@ -289,6 +289,10 @@ public class RocksDBState extends BaseState {
         flushOptions = null;
         writeOptions = null;
         rocksDB = null;
+
+        if (s3Helper != null) {
+            s3Helper.close();
+        }
     }
 
     @Override

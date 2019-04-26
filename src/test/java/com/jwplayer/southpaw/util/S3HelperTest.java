@@ -63,7 +63,7 @@ public class S3HelperTest {
         client.putObject(s3Uri.getHost(), prefix + "/fileA.txt", "ABCD");
         client.putObject(s3Uri.getHost(), prefix + "/fileB.txt", "1234");
         client.putObject(s3Uri.getHost(), prefix + "/fileC.txt", "AB34");
-        s3 = new S3Helper(client);
+        s3 = new S3Helper(new HashMap<>(), client);
     }
 
     @After

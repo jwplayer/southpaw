@@ -106,7 +106,7 @@ public class S3Helper {
     public static final String SECRET_KEY_CONFIG = "aws.s3.secret.key";
     private static final Logger logger = Logger.getLogger(S3Helper.class);
 
-    private ExecutorService executor = Executors.newSingleThreadExecutor();
+    private ExecutorService executor;
     protected boolean exceptionOnError;
     protected Metrics metrics = new Metrics();
     protected AmazonS3 s3;
@@ -117,6 +117,21 @@ public class S3Helper {
      * @param config - Configuration map
      */
     public S3Helper(Map<String, Object> config) {
+        this(config, S3Helper.buildS3Client(config));
+    }
+
+    /**
+     * Constructor, Exposed for testing.
+     * @param config - Configuration map
+     * @param s3 - Prebuilt S3 client
+     */
+    protected S3Helper(Map<String, Object> config, AmazonS3 s3) {
+        this.executor = Executors.newSingleThreadExecutor();
+        this.s3 = s3;
+        this.exceptionOnError = (boolean) config.getOrDefault(EXCEPTION_ON_ERROR_CONFIG, EXCEPTION_ON_ERROR_DEFAULT);
+    }
+
+    private static AmazonS3 buildS3Client(Map<String, Object> config) {
         AmazonS3ClientBuilder builder = AmazonS3ClientBuilder.standard();
         if(config.containsKey(ACCESS_KEY_ID_CONFIG) && config.containsKey(SECRET_KEY_CONFIG)) {
             builder.withCredentials(
@@ -133,16 +148,16 @@ public class S3Helper {
             AwsRegionProvider regionProvider = new DefaultAwsRegionProviderChain();
             builder.withRegion(regionProvider.getRegion());
         }
-        s3 = builder.build();
-        exceptionOnError = (boolean) config.getOrDefault(EXCEPTION_ON_ERROR_CONFIG, EXCEPTION_ON_ERROR_DEFAULT);
+        return builder.build();
     }
 
     /**
-     * Constructor, useful for testing.
-     * @param s3 - Prebuilt S3 client
+     * Shuts down running thread pools
      */
-    public S3Helper(AmazonS3 s3) {
-        this.s3 = s3;
+    public void close() {
+        logger.info("Shutting down");
+        this.executor.shutdown();
+        this.s3.shutdown();
     }
 
     /**
