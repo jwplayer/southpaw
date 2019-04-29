@@ -400,16 +400,17 @@ public class S3Helper {
                         }
                     }
                 }
-            } catch(InterruptedException | URISyntaxException ex) {
-                metrics.s3UploadFailures.mark(1);
-
             } catch (SdkClientException ex) {
                 metrics.s3UploadFailures.mark(1);
                 if(exceptionOnError) {
                     throw new RuntimeException(ex);
                 } else {
                     logger.warn("Ignoring SdkClientException during sync to S3", ex);
+                    return;
                 }
+            } catch(InterruptedException | URISyntaxException ex) {
+                metrics.s3UploadFailures.mark(1);
+                throw new RuntimeException(ex);
             }
             logger.info("Background sync to S3 complete");
         });
