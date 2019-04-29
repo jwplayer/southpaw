@@ -147,6 +147,7 @@ public class RocksDBState extends BaseState {
      * Configuration for this state
      */
     protected Map<String, Object> config;
+    private List<Iterator> iterators = new ArrayList<>();
     /**
      * Max # of background compactions
      */
@@ -274,6 +275,10 @@ public class RocksDBState extends BaseState {
             return;
         }
         super.close();
+
+        for (Iterator iterator : iterators) {
+            iterator.close();
+        }
 
         for(Map.Entry<ByteArray, ColumnFamilyHandle> entry: cfHandles.entrySet()) {
             entry.getValue().close();
@@ -564,7 +569,9 @@ public class RocksDBState extends BaseState {
         // you need to iterate everything.
         ByteArray handleName = new ByteArray(keySpace);
         Preconditions.checkNotNull(cfHandles.get(handleName));
-        return new Iterator(rocksDB.newIterator(cfHandles.get(handleName)));
+        Iterator iterator = new Iterator(rocksDB.newIterator(cfHandles.get(handleName)));
+        iterators.add(iterator);
+        return iterator;
     }
 
     @Override
