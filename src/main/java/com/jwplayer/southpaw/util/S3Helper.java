@@ -15,6 +15,7 @@
  */
 package com.jwplayer.southpaw.util;
 
+import com.amazonaws.SdkClientException;
 import com.amazonaws.auth.*;
 import com.amazonaws.regions.AwsRegionProvider;
 import com.amazonaws.regions.DefaultAwsRegionProviderChain;
@@ -401,10 +402,13 @@ public class S3Helper {
                 }
             } catch(InterruptedException | URISyntaxException ex) {
                 metrics.s3UploadFailures.mark(1);
+
+            } catch (SdkClientException ex) {
+                metrics.s3UploadFailures.mark(1);
                 if(exceptionOnError) {
                     throw new RuntimeException(ex);
                 } else {
-                    logger.warn("Unhandled exception during sync to S3", ex);
+                    logger.warn("Ignoring SdkClientException during sync to S3", ex);
                 }
             }
             logger.info("Background sync to S3 complete");
