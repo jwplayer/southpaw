@@ -1,5 +1,16 @@
 # Change log
 
+## 0.3.2
+April 30th, 2019
+
+### Bug Fixes
+* Keep track of and close all iterators on RocksDBState close [#40](https://github.com/jwplayer/southpaw/pull/40)
+* Catch and optionally ignore the proper s3 exceptions [#39](https://github.com/jwplayer/southpaw/pull/39)
+* Shutdown threadpools when shutting down RocksDbState instances [#38](https://github.com/jwplayer/southpaw/pull/38)
+* Move topic ordering outside the main loop [#34](https://github.com/jwplayer/southpaw/pull/34)
+* Add logging around syncFromS3 [#33](https://github.com/jwplayer/southpaw/pull/33)
+* Ensure RocksDB closes on exceptions [#32](https://github.com/jwplayer/southpaw/pull/32)
+
 ## 0.3.1
 April 11th, 2019
 
