@@ -211,6 +211,7 @@ public class RocksDBState extends BaseState {
      * RocksDB stats object
      */
     protected Statistics statistics;
+    protected StatisticsCollector statisticsCollector;
     /**
      * The URI to the DB.
      */
@@ -282,6 +283,11 @@ public class RocksDBState extends BaseState {
         }
         cfHandles.clear();
         dataBatches.clear();
+        try {
+            statisticsCollector.shutDown(1000);
+        } catch (InterruptedException ignore){
+
+        }
         rocksDBOptions.close();
         flushOptions.close();
         writeOptions.close();
@@ -328,6 +334,11 @@ public class RocksDBState extends BaseState {
             // Create the backing DB
             sstFileManager = new SstFileManager(Env.getDefault());
             statistics = new Statistics();
+            statistics.setStatsLevel(StatsLevel.ALL);
+
+            BlockBasedTableConfig tableConfig = new BlockBasedTableConfig();
+            tableConfig.setFilter(new BloomFilter()).setWholeKeyFiltering(true);
+
             DBOptions dbOptions = new DBOptions()
                     .setCreateIfMissing(false) // Explicitly set to false here so we can potentially restore if it doesn't exist
                     .setCreateMissingColumnFamilies(true)
@@ -360,7 +371,8 @@ public class RocksDBState extends BaseState {
                     .setWalTtlSeconds(0L)
                     .setTargetFileSizeMultiplier(2)
                     .setSstFileManager(sstFileManager)
-                    .setStatistics(statistics);
+                    .setStatistics(statistics)
+                    .setTableFormatConfig(tableConfig);
             rocksDBOptions.setMaxSubcompactions(maxSubcompactions);
 
             flushOptions = new FlushOptions();
@@ -419,6 +431,63 @@ public class RocksDBState extends BaseState {
             for(ColumnFamilyHandle handle: handles) {
                 cfHandles.put(new ByteArray(handle.getName()), handle);
             }
+
+            StatisticsCollectorCallback callback = new StatisticsCollectorCallback() {
+                @Override
+                public void tickerCallback(TickerType tickerType, long l) {
+                    if (tickerType == TickerType.NUMBER_KEYS_WRITTEN) {
+                        logger.info("Keys written: " + l);
+                    } else if (tickerType == TickerType.BLOOM_FILTER_USEFUL) {
+                        logger.info("Bloom filter useful: " + l);
+                    } else if (tickerType == TickerType.BLOOM_FILTER_PREFIX_CHECKED) {
+                        logger.info("Bloom filter checked: " + l);
+                    } else if (tickerType == TickerType.BLOOM_FILTER_PREFIX_USEFUL) {
+                        logger.info("Bloom filter prefix useful: " + l);
+                    } else if (tickerType == TickerType.BLOCK_CACHE_MISS) {
+                        logger.info("Block cache miss: " + l);
+                    } else if (tickerType == TickerType.BLOCK_CACHE_HIT) {
+                        logger.info("Block cache hit: " + l);
+                    }  else if (tickerType == TickerType.BLOCK_CACHE_INDEX_ADD) {
+                        logger.info("Block cache index add: " + l);
+                    }  else if (tickerType == TickerType.BLOCK_CACHE_INDEX_HIT) {
+                        logger.info("Block cache index hit: " + l);
+                    }  else if (tickerType == TickerType.BLOCK_CACHE_INDEX_MISS) {
+                        logger.info("Block cache index miss: " + l);
+                    } else if (tickerType == TickerType.BLOCK_CACHE_FILTER_ADD) {
+                        logger.info("Block cache filter add: " + l);
+                    } else if (tickerType == TickerType.BLOCK_CACHE_FILTER_HIT) {
+                        logger.info("Block cache filter hit: " + l);
+                    } else if (tickerType == TickerType.BLOCK_CACHE_FILTER_MISS) {
+                        logger.info("Block cache filter miss: " + l);
+                    } else if (tickerType == TickerType.MEMTABLE_MISS) {
+                        logger.info("memtable miss: " + l);
+                    } else if (tickerType == TickerType.MEMTABLE_HIT) {
+                        logger.info("memtable hit: " + l);
+                    } else if (tickerType == TickerType.GET_HIT_L0) {
+                        logger.info("L0 hit: " + l);
+                    } else if (tickerType == TickerType.GET_HIT_L1) {
+                        logger.info("L1 hit: " + l);
+                    } else if (tickerType == TickerType.GET_HIT_L2_AND_UP) {
+                        logger.info("L2+ hit: " + l);
+                    }  else if (tickerType == TickerType.BYTES_READ) {
+                        logger.info("Bytes read: " + l);
+                    }  else if (tickerType == TickerType.BYTES_WRITTEN) {
+                        logger.info("Bytes written: " + l);
+                    }
+                }
+
+                @Override
+                public void histogramCallback(HistogramType histogramType, HistogramData histogramData) {
+
+                }
+            };
+
+            StatsCollectorInput statsInput = new StatsCollectorInput(rocksDBOptions.statistics(), callback);
+
+            statisticsCollector = new StatisticsCollector(Collections.singletonList(statsInput), 1000);
+            statisticsCollector.start();
+
+
         } catch(Exception ex) {
             throw new RuntimeException(ex);
         }
