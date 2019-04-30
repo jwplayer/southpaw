@@ -205,7 +205,6 @@ public class RocksDBStateTest {
             assertEquals(count.toString(), new String(pair.getValue()));
             count++;
         }
-        iter.close();
         assertEquals(200, (int) count);
 
         //Write more data and backup
@@ -226,7 +225,6 @@ public class RocksDBStateTest {
             assertEquals(count.toString(), new String(pair.getValue()));
             count++;
         }
-        iter.close();
 
         //Check that all expected data exists
         assertEquals(250, (int) count);
@@ -371,7 +369,6 @@ public class RocksDBStateTest {
             assertEquals(count.toString(), new String(pair.getValue()));
             count++;
         }
-        iter.close();
         assertEquals(100, (int) count);
     }
 
