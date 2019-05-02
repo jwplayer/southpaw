@@ -88,6 +88,14 @@ public class RocksDBState extends BaseState {
      */
     public static final String RESTORE_MODE_CONFIG = "rocks.db.restore.mode";
     /**
+     * Sets the size of the base L1 sst file sizes
+     */
+    public static final String TARGET_FILE_SIZE_BASE = "rocks.db.target.file.size.base";
+    /**
+     * Sets the multiplier for sst file sizes for level L1 + N
+     */
+    public static final String TARGET_FILE_SIZE_MULTIPLIER = "rocks.db.target.file.size.multiplier";
+    /**
      * URI for RocksDB
      */
     public static final String URI_CONFIG = "rocks.db.uri";
@@ -192,6 +200,14 @@ public class RocksDBState extends BaseState {
      * Rocks DB options
      */
     protected Options rocksDBOptions;
+    /**
+     * Size of the L1 files
+     */
+    protected long targetFileSizeBase;
+    /**
+     * Multiplier for L1 + N file sizes
+     */
+    protected int targetFileSizeMultiplier;
     /**
      * Rocks DB Flush options
      */
@@ -316,6 +332,8 @@ public class RocksDBState extends BaseState {
             this.parallelism = (int) config.getOrDefault(PARALLELISM_CONFIG, 1);
             this.putBatchSize = (int) Preconditions.checkNotNull(config.get(PUT_BATCH_SIZE));
             this.restoreMode = RestoreMode.parse(config.getOrDefault(RESTORE_MODE_CONFIG, RestoreMode.NEVER.getValue()).toString());
+            this.targetFileSizeBase = (long) config.getOrDefault(TARGET_FILE_SIZE_BASE, 67108864); // 64MB
+            this.targetFileSizeMultiplier = (int) config.getOrDefault(TARGET_FILE_SIZE_MULTIPLIER, 2);
             this.uri = new URI(Preconditions.checkNotNull(config.get(URI_CONFIG).toString()));
 
             if(backupURI.getScheme().toLowerCase().equals(S3Helper.SCHEME)) {
@@ -350,7 +368,8 @@ public class RocksDBState extends BaseState {
                     .setCompactionStyle(CompactionStyle.LEVEL)
                     .setNumLevels(4)
                     .setMaxWriteBufferNumber(maxWriteBufferNumber)
-                    .setTargetFileSizeMultiplier(2);
+                    .setTargetFileSizeBase(targetFileSizeBase)
+                    .setTargetFileSizeMultiplier(targetFileSizeMultiplier);
             rocksDBOptions = new Options(dbOptions, cfOptions)
                     .setCreateIfMissing(false) // Explicitly set to false here so we can potentially restore if it doesn't exist
                     .setCreateMissingColumnFamilies(true)
@@ -365,7 +384,8 @@ public class RocksDBState extends BaseState {
                     .setMaxWriteBufferNumber(maxWriteBufferNumber)
                     .setWalSizeLimitMB(0L)
                     .setWalTtlSeconds(0L)
-                    .setTargetFileSizeMultiplier(2)
+                    .setTargetFileSizeBase(targetFileSizeBase)
+                    .setTargetFileSizeMultiplier(targetFileSizeMultiplier)
                     .setSstFileManager(sstFileManager)
                     .setStatistics(statistics);
             rocksDBOptions.setMaxSubcompactions(maxSubcompactions);
