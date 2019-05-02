@@ -332,7 +332,7 @@ public class RocksDBState extends BaseState {
             this.parallelism = (int) config.getOrDefault(PARALLELISM_CONFIG, 1);
             this.putBatchSize = (int) Preconditions.checkNotNull(config.get(PUT_BATCH_SIZE));
             this.restoreMode = RestoreMode.parse(config.getOrDefault(RESTORE_MODE_CONFIG, RestoreMode.NEVER.getValue()).toString());
-            this.targetFileSizeBase = (long) config.getOrDefault(TARGET_FILE_SIZE_BASE, 67108864); // 64MB
+            this.targetFileSizeBase = ((Number) Preconditions.checkNotNull(config.getOrDefault(TARGET_FILE_SIZE_BASE, 67108864))).longValue(); // 64MB
             this.targetFileSizeMultiplier = (int) config.getOrDefault(TARGET_FILE_SIZE_MULTIPLIER, 2);
             this.uri = new URI(Preconditions.checkNotNull(config.get(URI_CONFIG).toString()));
 
