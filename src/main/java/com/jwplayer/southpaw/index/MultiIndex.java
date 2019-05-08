@@ -114,8 +114,6 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
         }
         pendingWrites.clear();
         pendingRIWrites.clear();
-        state.flush(indexName);
-        state.flush(reverseIndexName);
     }
 
     @Override
@@ -166,7 +164,6 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
                 writeToState(entry.getKey(), entry.getValue());
             }
             pendingWrites.clear();
-            state.flush(indexName);
         }
     }
 
@@ -181,7 +178,6 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
                 writeRIToState(entry.getKey(), entry.getValue());
             }
             pendingRIWrites.clear();
-            state.flush(reverseIndexName);
         }
     }
 
