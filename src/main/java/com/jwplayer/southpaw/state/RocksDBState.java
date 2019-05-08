@@ -354,12 +354,12 @@ public class RocksDBState extends BaseState {
                     .setCompactionStyle(CompactionStyle.LEVEL)
                     .setNumLevels(4)
                     .setMaxWriteBufferNumber(maxWriteBufferNumber)
+                    .setTableFormatConfig(tableConfig)
                     .setTargetFileSizeMultiplier(2);
             rocksDBOptions = new Options(dbOptions, cfOptions)
                     .setCreateIfMissing(false) // Explicitly set to false here so we can potentially restore if it doesn't exist
                     .setCreateMissingColumnFamilies(true)
                     .optimizeLevelStyleCompaction(memtableSize)
-
                     .setCompactionStyle(CompactionStyle.LEVEL)
                     .setNumLevels(4)
                     .setIncreaseParallelism(parallelism)
@@ -604,7 +604,11 @@ public class RocksDBState extends BaseState {
         try {
             byte[] retVal = dataBatches.get(new ByteArray(keySpace)).get(new ByteArray(key));
             if(retVal == null) {
-                retVal = rocksDB.get(cfHandles.get(handleName), key);
+                StringBuilder retValue = new StringBuilder();
+                boolean mayExist = rocksDB.keyMayExist(cfHandles.get(handleName), key, retValue);
+                if (mayExist){
+                    retVal = rocksDB.get(cfHandles.get(handleName), key);
+                }
             }
             return retVal;
         } catch(RocksDBException ex) {
