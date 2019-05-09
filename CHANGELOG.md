@@ -1,5 +1,14 @@
 # Change log
 
+## 0.4.0
+May 9th, 2019
+
+### New Features
+* Add optional setting for configuring RocksDB log level
+
+### Bug Fixes
+* Avoid excessive RocksDB column family flushes [#41](https://github.com/jwplayer/southpaw/pull/41) *Note: This change may lead to higher memory utilization than previously experienced as we are flushing memory to disk less often with the trade off of more efficient read/writes*
+
 ## 0.3.2
 April 30th, 2019
 
