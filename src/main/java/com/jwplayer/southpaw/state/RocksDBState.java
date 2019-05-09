@@ -56,6 +56,10 @@ public class RocksDBState extends BaseState {
      */
     public static final String COMPACTION_READ_AHEAD_SIZE_CONFIG = "rocks.db.compaction.read.ahead.size";
     /**
+     * Log level for RocksDB native layer
+     */
+    public static final String LOG_LEVEL = "rocks.db.log.level";
+    /**
      * Sets the max # of background compaction threads
      */
     public static final String MAX_BACKGROUND_COMPACTIONS = "rocks.db.max.background.compactions";
@@ -147,6 +151,10 @@ public class RocksDBState extends BaseState {
      * Configuration for this state
      */
     protected Map<String, Object> config;
+    /**
+     * Log level for RocksDB native layer
+     */
+    protected InfoLogLevel infoLogLevel;
     private List<Iterator> iterators = new ArrayList<>();
     /**
      * Max # of background compactions
@@ -308,6 +316,7 @@ public class RocksDBState extends BaseState {
             this.backupsAutoRollback = (boolean) config.getOrDefault(BACKUPS_AUTO_ROLLBACK_CONFIG, false);
             this.backupsToKeep = (int) Preconditions.checkNotNull(config.get(BACKUPS_TO_KEEP_CONFIG));
             this.compactionReadAheadSize = (int) Preconditions.checkNotNull(config.get(COMPACTION_READ_AHEAD_SIZE_CONFIG));
+            this.infoLogLevel = InfoLogLevel.valueOf(config.getOrDefault(LOG_LEVEL, "INFO_LEVEL").toString());
             this.maxBackgroundCompactions = (int) config.getOrDefault(MAX_BACKGROUND_COMPACTIONS, 1);
             this.maxBackgroundFlushes = (int) config.getOrDefault(MAX_BACKGROUND_FLUSHES, 1);
             this.maxSubcompactions = (int) config.getOrDefault(MAX_SUBCOMPACTIONS, 1);
@@ -339,35 +348,36 @@ public class RocksDBState extends BaseState {
                     .setCreateIfMissing(false) // Explicitly set to false here so we can potentially restore if it doesn't exist
                     .setCreateMissingColumnFamilies(true)
                     .setIncreaseParallelism(parallelism)
+                    .setInfoLogLevel(infoLogLevel)
                     .setMaxBackgroundCompactions(maxBackgroundCompactions)
                     .setMaxBackgroundFlushes(maxBackgroundFlushes)
-                    .setWalSizeLimitMB(0L)
                     .setMaxTotalWalSize(0L)
                     .setStatistics(statistics)
-                    .setSstFileManager(sstFileManager);
+                    .setSstFileManager(sstFileManager)
+                    .setWalSizeLimitMB(0L);
             dbOptions.setMaxSubcompactions(maxSubcompactions);
             ColumnFamilyOptions cfOptions = new ColumnFamilyOptions()
                     .setCompactionStyle(CompactionStyle.LEVEL)
-                    .setNumLevels(4)
                     .setMaxWriteBufferNumber(maxWriteBufferNumber)
+                    .setNumLevels(4)
                     .setTargetFileSizeMultiplier(2);
             rocksDBOptions = new Options(dbOptions, cfOptions)
+                    .optimizeLevelStyleCompaction(memtableSize)
+                    .setCompactionReadaheadSize(compactionReadAheadSize)
+                    .setCompactionStyle(CompactionStyle.LEVEL)
                     .setCreateIfMissing(false) // Explicitly set to false here so we can potentially restore if it doesn't exist
                     .setCreateMissingColumnFamilies(true)
-                    .optimizeLevelStyleCompaction(memtableSize)
-
-                    .setCompactionStyle(CompactionStyle.LEVEL)
-                    .setNumLevels(4)
                     .setIncreaseParallelism(parallelism)
-                    .setCompactionReadaheadSize(compactionReadAheadSize)
+                    .setInfoLogLevel(infoLogLevel)
                     .setMaxBackgroundCompactions(maxBackgroundCompactions)
                     .setMaxBackgroundFlushes(maxBackgroundFlushes)
                     .setMaxWriteBufferNumber(maxWriteBufferNumber)
-                    .setWalSizeLimitMB(0L)
-                    .setWalTtlSeconds(0L)
-                    .setTargetFileSizeMultiplier(2)
+                    .setNumLevels(4)
                     .setSstFileManager(sstFileManager)
-                    .setStatistics(statistics);
+                    .setStatistics(statistics)
+                    .setTargetFileSizeMultiplier(2)
+                    .setWalSizeLimitMB(0L)
+                    .setWalTtlSeconds(0L);
             rocksDBOptions.setMaxSubcompactions(maxSubcompactions);
 
             flushOptions = new FlushOptions();

@@ -160,6 +160,13 @@ Currently, Southpaw uses RocksDB for its state, though this could be made plugga
 * rocks.db.backups.auto.rollback (default: false) - Rollback to previous rocksdb backup upon state restoration corruption
 * rocks.db.backups.to.keep - # of backups to keep
 * rocks.db.compaction.read.ahead.size - Heap allocated to the compaction read ahead process
+* rocks.db.log.level (default: INFO_LEVEL) - The log level of the native RocksDB layer logs. Acceptable values are:
+    * DEBUG_LEVEL
+    * INFO_LEVEL
+    * WARN_LEVEL
+    * ERROR_LEVEL
+    * FATAL_LEVEL
+    * HEADER_LEVEL
 * rocks.db.max.background.compactions - Number of threads used for background compactions
 * rocks.db.max.background.flushes - Number of threads used for background flushes
 * rocks.db.max.subcompactions - Number of threads used for subcompactions
