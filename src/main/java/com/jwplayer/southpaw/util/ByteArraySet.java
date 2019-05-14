@@ -59,6 +59,10 @@ public class ByteArraySet implements Set<ByteArray> {
      * Static empty chunk for easy reference
      */
     public static final byte[] EMPTY_SET_BYTES = { FORMAT.EMPTY.getValue() };
+    /**
+     * Force a max size on the fronting set to prevent uncontrolled growth and OOM errors
+     */
+    public static final int MAX_FRONTING_SET_SIZE = 1000;
 
     /**
      * A chunk contains a sorted set of ByteArrays within a single byte array. The set values are formatted such that
@@ -357,6 +361,9 @@ public class ByteArraySet implements Set<ByteArray> {
         boolean retVal = false;
         if(!contains(byteArray)) {
             frontingSet.add(byteArray);
+            if(frontingSet.size() > MAX_FRONTING_SET_SIZE) {
+                merge();
+            }
             retVal = true;
         }
         return retVal;
