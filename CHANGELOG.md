@@ -1,5 +1,11 @@
 # Change log
 
+## 0.4.1
+May 14th, 2019
+
+### Bug Fixes
+* Cap the size on the fronting set in the ByteArraySet class to prevent uncontrolled growth and OOM errors [#42](https://github.com/jwplayer/southpaw/pull/42) 
+
 ## 0.4.0
 May 9th, 2019
 
