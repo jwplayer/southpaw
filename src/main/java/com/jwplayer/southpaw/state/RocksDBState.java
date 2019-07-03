@@ -461,43 +461,48 @@ public class RocksDBState extends BaseState {
                 @Override
                 public void tickerCallback(TickerType tickerType, long l) {
                     if (tickerType == TickerType.NUMBER_KEYS_WRITTEN) {
-                        logger.info("Keys written: " + l);
-                    } else if (tickerType == TickerType.BLOOM_FILTER_USEFUL) {
-                        logger.info("Bloom filter useful: " + l);
-                    } else if (tickerType == TickerType.BLOOM_FILTER_PREFIX_CHECKED) {
-                        logger.info("Bloom filter checked: " + l);
-                    } else if (tickerType == TickerType.BLOOM_FILTER_PREFIX_USEFUL) {
-                        logger.info("Bloom filter prefix useful: " + l);
-                    } else if (tickerType == TickerType.BLOCK_CACHE_MISS) {
-                        logger.info("Block cache miss: " + l);
-                    } else if (tickerType == TickerType.BLOCK_CACHE_HIT) {
-                        logger.info("Block cache hit: " + l);
-                    }  else if (tickerType == TickerType.BLOCK_CACHE_INDEX_ADD) {
-                        logger.info("Block cache index add: " + l);
-                    }  else if (tickerType == TickerType.BLOCK_CACHE_INDEX_HIT) {
-                        logger.info("Block cache index hit: " + l);
-                    }  else if (tickerType == TickerType.BLOCK_CACHE_INDEX_MISS) {
-                        logger.info("Block cache index miss: " + l);
-                    } else if (tickerType == TickerType.BLOCK_CACHE_FILTER_ADD) {
-                        logger.info("Block cache filter add: " + l);
-                    } else if (tickerType == TickerType.BLOCK_CACHE_FILTER_HIT) {
-                        logger.info("Block cache filter hit: " + l);
-                    } else if (tickerType == TickerType.BLOCK_CACHE_FILTER_MISS) {
-                        logger.info("Block cache filter miss: " + l);
-                    } else if (tickerType == TickerType.MEMTABLE_MISS) {
-                        logger.info("memtable miss: " + l);
-                    } else if (tickerType == TickerType.MEMTABLE_HIT) {
-                        logger.info("memtable hit: " + l);
-                    } else if (tickerType == TickerType.GET_HIT_L0) {
-                        logger.info("L0 hit: " + l);
-                    } else if (tickerType == TickerType.GET_HIT_L1) {
-                        logger.info("L1 hit: " + l);
-                    } else if (tickerType == TickerType.GET_HIT_L2_AND_UP) {
-                        logger.info("L2+ hit: " + l);
-                    }  else if (tickerType == TickerType.BYTES_READ) {
-                        logger.info("Bytes read: " + l);
-                    }  else if (tickerType == TickerType.BYTES_WRITTEN) {
-                        logger.info("Bytes written: " + l);
+//                        logger.info("Keys written: " + l);
+                        try {
+                            logger.info(rocksDB.getProperty("rocksdb.dbstats"));
+                        } catch (RocksDBException e){
+                            logger.warn("Failed to get db stats", e);
+                        }
+//                    } else if (tickerType == TickerType.BLOOM_FILTER_USEFUL) {
+//                        logger.info("Bloom filter useful: " + l);
+//                    } else if (tickerType == TickerType.BLOOM_FILTER_PREFIX_CHECKED) {
+//                        logger.info("Bloom filter checked: " + l);
+//                    } else if (tickerType == TickerType.BLOOM_FILTER_PREFIX_USEFUL) {
+//                        logger.info("Bloom filter prefix useful: " + l);
+//                    } else if (tickerType == TickerType.BLOCK_CACHE_MISS) {
+//                        logger.info("Block cache miss: " + l);
+//                    } else if (tickerType == TickerType.BLOCK_CACHE_HIT) {
+//                        logger.info("Block cache hit: " + l);
+//                    }  else if (tickerType == TickerType.BLOCK_CACHE_INDEX_ADD) {
+//                        logger.info("Block cache index add: " + l);
+//                    }  else if (tickerType == TickerType.BLOCK_CACHE_INDEX_HIT) {
+//                        logger.info("Block cache index hit: " + l);
+//                    }  else if (tickerType == TickerType.BLOCK_CACHE_INDEX_MISS) {
+//                        logger.info("Block cache index miss: " + l);
+//                    } else if (tickerType == TickerType.BLOCK_CACHE_FILTER_ADD) {
+//                        logger.info("Block cache filter add: " + l);
+//                    } else if (tickerType == TickerType.BLOCK_CACHE_FILTER_HIT) {
+//                        logger.info("Block cache filter hit: " + l);
+//                    } else if (tickerType == TickerType.BLOCK_CACHE_FILTER_MISS) {
+//                        logger.info("Block cache filter miss: " + l);
+//                    } else if (tickerType == TickerType.MEMTABLE_MISS) {
+//                        logger.info("memtable miss: " + l);
+//                    } else if (tickerType == TickerType.MEMTABLE_HIT) {
+//                        logger.info("memtable hit: " + l);
+//                    } else if (tickerType == TickerType.GET_HIT_L0) {
+//                        logger.info("L0 hit: " + l);
+//                    } else if (tickerType == TickerType.GET_HIT_L1) {
+//                        logger.info("L1 hit: " + l);
+//                    } else if (tickerType == TickerType.GET_HIT_L2_AND_UP) {
+//                        logger.info("L2+ hit: " + l);
+//                    }  else if (tickerType == TickerType.BYTES_READ) {
+//                        logger.info("Bytes read: " + l);
+//                    }  else if (tickerType == TickerType.BYTES_WRITTEN) {
+//                        logger.info("Bytes written: " + l);
                     }
                 }
 
@@ -602,8 +607,9 @@ public class RocksDBState extends BaseState {
             for(Map.Entry<ByteArray, Map<ByteArray, byte[]>> entry: dataBatches.entrySet()) {
                 putBatch(entry.getKey());
             }
+            logger.info("full flush");
             rocksDB.flush(flushOptions);
-        } catch(RocksDBException ex) {
+        } catch(Exception ex) {
             throw new RuntimeException(ex);
         }
     }
@@ -614,8 +620,9 @@ public class RocksDBState extends BaseState {
         ByteArray byteArray = new ByteArray(keySpace);
         try {
             putBatch(byteArray);
+            logger.info("Keyspace flush: " + keySpace);
             rocksDB.flush(flushOptions, cfHandles.get(byteArray));
-        } catch(RocksDBException ex) {
+        } catch(Exception ex) {
             throw new RuntimeException(ex);
         }
     }

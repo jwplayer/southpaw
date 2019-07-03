@@ -21,6 +21,7 @@ import com.jwplayer.southpaw.topic.BaseTopic;
 import com.jwplayer.southpaw.util.ByteArray;
 import com.jwplayer.southpaw.util.ByteArraySet;
 import org.apache.commons.collections4.map.LRUMap;
+import org.apache.log4j.Logger;
 
 import java.util.*;
 
@@ -32,6 +33,7 @@ import java.util.*;
  * @param <V> - The type of the value stored in the indexed topic
  */
 public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements Reversible {
+    private static final Logger logger = Logger.getLogger(MultiIndex.class);
     /**
      * Size of the LRU cache for storing the index entries containing more than one key
      */
@@ -114,8 +116,6 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
         }
         pendingWrites.clear();
         pendingRIWrites.clear();
-        state.flush(indexName);
-        state.flush(reverseIndexName);
     }
 
     @Override
@@ -162,6 +162,7 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
         if(value.size() > LRU_CACHE_THRESHOLD) entryCache.put(key, value);
         pendingWrites.put(key, value);
         if(pendingWrites.size() > indexWriteBatchSize) {
+            logger.info("putToState: flushing state");
             for(Map.Entry<ByteArray, ByteArraySet> entry: pendingWrites.entrySet()) {
                 writeToState(entry.getKey(), entry.getValue());
             }
