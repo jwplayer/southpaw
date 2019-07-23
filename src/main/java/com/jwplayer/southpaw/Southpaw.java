@@ -407,6 +407,7 @@ public class Southpaw {
         }
         for(Map.Entry<Relation, ByteArraySet> entry: dePKsByType.entrySet()) {
             state.put(METADATA_KEYSPACE, createDePKEntryName(entry.getKey()).getBytes(), entry.getValue().serialize());
+            state.flush(METADATA_KEYSPACE);
         }
         for(Map.Entry<String, BaseTopic<BaseRecord, BaseRecord>> entry: inputTopics.entrySet()) {
             entry.getValue().commit();
