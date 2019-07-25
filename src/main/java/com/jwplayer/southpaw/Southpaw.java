@@ -1015,6 +1015,11 @@ public class Southpaw {
         }
     }
 
+    /**
+     * Utility command to verify all indices and reverse indices in the State are in sync with each other. Keys that
+     * are not set properly in the index and reverse index are logged to error.
+     * <b>Note: this requires a full scan of each index dataset. This could be an expensive operation on larger datasets</b>
+     */
     protected void verifyState() {
         for(Map.Entry<String, BaseIndex<BaseRecord, BaseRecord, Set<ByteArray>>> index: fkIndices.entrySet()) {
             logger.info("Verifying index state integrity: " + index.getValue().getIndexedTopic().getShortName());
