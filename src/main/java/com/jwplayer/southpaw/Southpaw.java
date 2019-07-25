@@ -779,6 +779,7 @@ public class Southpaw {
         String HELP = "help";
         String RELATIONS = "relations";
         String RESTORE = "restore";
+        String VERIFY_STATE = "verify-state";
 
         OptionParser parser = new OptionParser() {
             {
@@ -790,6 +791,7 @@ public class Southpaw {
                 accepts(RESTORE, "Restores the state from existing backups.");
                 accepts(DEBUG, "Sets logging to DEBUG.").withOptionalArg();
                 accepts(HELP, "Since you are seeing this, you probably know what this is for. :)").forHelp();
+                accepts(VERIFY_STATE, "Verifies that the Southpaw state indices and reverse indices are in sync");
             }
         };
         OptionSet options = parser.parse(args);
@@ -805,6 +807,16 @@ public class Southpaw {
         List<?> relations = options.valuesOf(RELATIONS);
         List<URI> relURIs = new ArrayList<>();
         for(Object relation: relations) relURIs.add(new URI(relation.toString()));
+
+        if(options.has(VERIFY_STATE)) {
+            Southpaw southpaw = new Southpaw(config, relURIs);
+            try{
+                southpaw.verifyState();
+            } finally {
+                southpaw.close();
+            }
+            System.exit(0);
+        }
 
         if(options.has(DELETE_BACKUP)) {
             Southpaw.deleteBackups(config);
@@ -999,6 +1011,26 @@ public class Southpaw {
 
             for(Relation child: relation.getChildren()) {
                 validateChildRelation(child);
+            }
+        }
+    }
+
+    protected void verifyState() {
+        for(Map.Entry<String, BaseIndex<BaseRecord, BaseRecord, Set<ByteArray>>> index: fkIndices.entrySet()) {
+            logger.info("Verifying index state integrity: " + index.getValue().getIndexedTopic().getShortName());
+            Set<String> missingIndexKeys = ((MultiIndex)index.getValue()).verifyIndexState();
+            if(missingIndexKeys.isEmpty()){
+                logger.info("Index " + index.getValue().getIndexedTopic().getShortName() +  " integrity check complete");
+            } else {
+                logger.error("Index " + index.getValue().getIndexedTopic().getShortName() + " check failed for the following " + missingIndexKeys.size() + " keys: " + missingIndexKeys.toString());
+            }
+
+            logger.info("Verifying reverse index state integrity: " + index.getValue().getIndexedTopic().getShortName());
+            Set<String> missingReverseIndexKeys = ((MultiIndex)index.getValue()).verifyReverseIndexState();
+            if(missingReverseIndexKeys.isEmpty()){
+                logger.info("Reverse index " + index.getValue().getIndexedTopic().getShortName() +  " integrity check complete");
+            } else {
+                logger.error("Reverse index " + index.getValue().getIndexedTopic().getShortName() + " check failed for the following " + missingReverseIndexKeys.size() + " keys: " + missingReverseIndexKeys.toString());
             }
         }
     }

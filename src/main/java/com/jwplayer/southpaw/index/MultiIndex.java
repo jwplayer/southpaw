@@ -292,4 +292,48 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
             state.put(indexName, foreignKey.getBytes(), primaryKeys.serialize());
         }
     }
+
+    public Set<String> verifyIndexState() {
+        System.out.println("Verifying reverse index: " + reverseIndexName + " against index: " + indexName);
+        Set<String> missingKeys = new HashSet<>();
+        BaseState.Iterator iter = state.iterate(reverseIndexName);
+        while (iter.hasNext()) {
+            AbstractMap.SimpleEntry<byte[], byte[]> pair = iter.next();
+            ByteArray revIndexPrimaryKey = new ByteArray(pair.getKey());
+            ByteArraySet revIndexForeignKeySet = ByteArraySet.deserialize(pair.getValue());
+            for (ByteArray indexPrimaryKey : revIndexForeignKeySet.toArray()) {
+                ByteArraySet indexForeignKeySet = getIndexEntry(indexPrimaryKey);
+
+                if(indexForeignKeySet != null) {
+                    if(indexForeignKeySet.contains(revIndexPrimaryKey)) {
+                        continue;
+                    }
+                }
+                missingKeys.add(revIndexPrimaryKey.toString());
+            }
+        }
+        return missingKeys;
+    }
+
+    public Set<String> verifyReverseIndexState() {
+        System.out.println("Verifying index: " + indexName + " against reverse index: " + reverseIndexName);
+        Set<String> missingKeys = new HashSet<>();
+        BaseState.Iterator iter = state.iterate(indexName);
+        while (iter.hasNext()) {
+            AbstractMap.SimpleEntry<byte[], byte[]> pair = iter.next();
+            ByteArray indexPrimaryKey = new ByteArray(pair.getKey());
+            ByteArraySet indexForeignKeySet = ByteArraySet.deserialize(pair.getValue());
+            for (ByteArray revIndexPrimaryKey : indexForeignKeySet.toArray()) {
+                ByteArraySet revIndexforeignKeySet = getForeignKeys(revIndexPrimaryKey);
+
+                if(revIndexforeignKeySet != null) {
+                    if(revIndexforeignKeySet.contains(indexPrimaryKey)) {
+                        continue;
+                    }
+                }
+                missingKeys.add(indexPrimaryKey.toString());
+            }
+        }
+        return missingKeys;
+    }
 }

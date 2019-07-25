@@ -15,18 +15,21 @@
  */
 package com.jwplayer.southpaw.index;
 
-import com.jwplayer.southpaw.MockState;
 import com.jwplayer.southpaw.filter.BaseFilter;
 import com.jwplayer.southpaw.record.BaseRecord;
 import com.jwplayer.southpaw.serde.JsonSerde;
 import com.jwplayer.southpaw.state.BaseState;
+import com.jwplayer.southpaw.state.RocksDBState;
 import com.jwplayer.southpaw.topic.BaseTopic;
 import com.jwplayer.southpaw.topic.InMemoryTopic;
 import com.jwplayer.southpaw.topic.TopicConfig;
 import com.jwplayer.southpaw.util.ByteArray;
+import com.jwplayer.southpaw.util.ByteArraySet;
 import com.jwplayer.southpaw.util.FileHelper;
+import org.apache.commons.codec.binary.Hex;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.junit.*;
+import org.junit.rules.TemporaryFolder;
 
 import java.net.URI;
 import java.util.*;
@@ -38,14 +41,31 @@ public class MultiIndexTest {
     private MultiIndex<BaseRecord, BaseRecord> index;
     private BaseState state;
 
+    @Rule
+    public TemporaryFolder dbFolder = new TemporaryFolder();
+
+    @Rule
+    public TemporaryFolder backupFolder = new TemporaryFolder();
+
     @Before
     public void setup() {
-        state = new MockState();
+        Map<String, Object> config = new HashMap<>();
+        config.put(RocksDBState.BACKUP_URI_CONFIG, backupFolder.getRoot().toURI().toString());
+        config.put(RocksDBState.BACKUPS_TO_KEEP_CONFIG, 1);
+        config.put(RocksDBState.COMPACTION_READ_AHEAD_SIZE_CONFIG, 1048675);
+        config.put(RocksDBState.MEMTABLE_SIZE, 1048675);
+        config.put(RocksDBState.PARALLELISM_CONFIG, 4);
+        config.put(RocksDBState.PUT_BATCH_SIZE, 4);
+        config.put(RocksDBState.URI_CONFIG, dbFolder.getRoot().toURI().toString());
+
+        state = new RocksDBState(config);
+
         index = createEmptyIndex(state);
     }
 
     @After
     public void cleanup() {
+        state.close();
         state.delete();
     }
 
@@ -80,6 +100,7 @@ public class MultiIndexTest {
             index.add(ByteArray.toByteArray(record.value().get("JoinKey")), record.key().toByteArray());
         }
         index.getIndexedTopic().resetCurrentOffset();
+        index.flush();
         return index;
     }
 
@@ -286,5 +307,63 @@ public class MultiIndexTest {
         MultiIndex<BaseRecord, BaseRecord> index = createMultiIndex();
         String string = index.toString();
         assertNotNull(string);
+    }
+
+    @Test
+    public void testVerifyIndexState() {
+        //Populate some records properly in the index / reverse index
+        index.add(new ByteArray("A"), new ByteArray(0L));
+        index.add(new ByteArray("B"), new ByteArray(1L));
+        index.add(new ByteArray("B"), new ByteArray(2L));
+        index.add(new ByteArray("B"), new ByteArray(3L));
+        index.add(new ByteArray("C"), new ByteArray(4L));
+        index.add(new ByteArray("C"), new ByteArray(5L));
+
+        //Populate a record only on the reverse index
+        ByteArraySet foreignKeys = new ByteArraySet();
+        foreignKeys.add(new ByteArray(6L));
+        foreignKeys.add(new ByteArray(7L));
+        index.writeRIToState(new ByteArray("D"), foreignKeys);
+
+        //Flush all pending records
+        index.flush();
+
+        //Check the index state integrity
+        Set<String> missingKeys =  index.verifyIndexState();
+
+        Set<String> expected = new HashSet<>();
+        expected.add(Hex.encodeHexString("D".getBytes()));
+
+        //Should find the record that was only written to the reverse index
+        assertEquals(expected, missingKeys);
+    }
+
+    @Test
+    public void testVerifyReverseIndexState() {
+        //Populate some records properly in the index / reverse index
+        index.add(new ByteArray("A"), new ByteArray(0L));
+        index.add(new ByteArray("B"), new ByteArray(1L));
+        index.add(new ByteArray("B"), new ByteArray(2L));
+        index.add(new ByteArray("B"), new ByteArray(3L));
+        index.add(new ByteArray("C"), new ByteArray(4L));
+        index.add(new ByteArray("C"), new ByteArray(5L));
+
+        //Populate a record only on the index
+        ByteArraySet foreignKeys = new ByteArraySet();
+        foreignKeys.add(new ByteArray(6L));
+        foreignKeys.add(new ByteArray(7L));
+        index.writeToState(new ByteArray("D"), foreignKeys);
+
+        //Flush all pending records
+        index.flush();
+
+        //Check the reverse index state integrity
+        Set<String> missingKeys =  index.verifyReverseIndexState();
+
+        Set<String> expected = new HashSet<>();
+        expected.add(Hex.encodeHexString("D".getBytes()));
+
+        //Should find the record that was only written to the index
+        assertEquals(expected, missingKeys);
     }
 }
