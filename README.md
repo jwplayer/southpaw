@@ -41,6 +41,9 @@ Southpaw accepts command line arguments and has a help option:
                              input record relations
     --restore              Restores the state from existing
                              backups.
+    --verify-state         Compares the state index to reverse index
+                             for each relational join and logs any
+                             errors
 
 *NOTE: Setting the `--restore` flag functions similar to setting `rocks.db.restore.mode: always` config option except that it can be used without dependencies on Kafka or opening RocksDB state. If the `--restore` flag is used with the `--build` flag and `rocks.db.restore.mode` is set to `always` or `when_needed`, a restore can be performed twice before fully starting up.*
 
