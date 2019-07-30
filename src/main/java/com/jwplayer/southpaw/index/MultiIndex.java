@@ -204,12 +204,8 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
         ByteArraySet primaryKeys = getIndexEntry(foreignKey);
         if(primaryKeys != null) {
             state.delete(indexName, foreignKey.getBytes());
-            if(entryCache.containsKey(foreignKey)) {
-                entryCache.remove(foreignKey);
-            }
-            if(pendingWrites.containsKey(foreignKey)) {
-                pendingWrites.remove(foreignKey);
-            }
+            entryCache.remove(foreignKey);
+            pendingWrites.remove(foreignKey);
             for(ByteArray primaryKey: primaryKeys) {
                 removeRI(foreignKey, primaryKey);
             }
@@ -228,12 +224,8 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
             foreignKeys.remove(foreignKey);
             if(foreignKeys.size() == 0) {
                 state.delete(reverseIndexName, primaryKey.getBytes());
-                if(entryRICache.containsKey(primaryKey)) {
-                    entryRICache.remove(primaryKey);
-                }
-                if(pendingRIWrites.containsKey(primaryKey)) {
-                    pendingRIWrites.remove(primaryKey);
-                }
+                entryRICache.remove(primaryKey);
+                pendingRIWrites.remove(primaryKey);
             } else {
                 putRIToState(primaryKey, foreignKeys);
             }
@@ -249,9 +241,7 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
             if(primaryKeys.remove(primaryKey)) {
                 if(primaryKeys.size() == 0) {
                     state.delete(indexName, foreignKey.getBytes());
-                    if(entryCache.containsKey(foreignKey)) {
-                        entryCache.remove(foreignKey);
-                    }
+                    entryCache.remove(foreignKey);
                     pendingWrites.remove(foreignKey);
                 } else {
                     putToState(foreignKey, primaryKeys);
