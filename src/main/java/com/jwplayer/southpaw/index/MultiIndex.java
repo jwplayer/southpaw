@@ -114,6 +114,8 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
         }
         pendingWrites.clear();
         pendingRIWrites.clear();
+        state.flush(indexName);
+        state.flush(reverseIndexName);
     }
 
     @Override
