@@ -931,17 +931,14 @@ public class Southpaw {
         if(newRecord.value() != null) {
             newJoinKey = ByteArray.toByteArray(newRecord.value().get(relation.getJoinKey()));
         }
-        boolean addNewJoinKey = true;
         if (oldJoinKeys != null && oldJoinKeys.size() > 0) {
             for(ByteArray oldJoinKey: oldJoinKeys) {
                 if(!oldJoinKey.equals(newJoinKey)) {
                     joinIndex.remove(oldJoinKey, primaryKey);
-                } else {
-                    addNewJoinKey = false;
                 }
             }
         }
-        if (newJoinKey != null && addNewJoinKey) {
+        if (newJoinKey != null) {
             joinIndex.add(newJoinKey, primaryKey);
         }
     }

@@ -68,8 +68,8 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
         if(pks == null) {
             pks = new ByteArraySet();
         }
+        addRI(foreignKey, primaryKey);
         if(pks.add(primaryKey)) {
-            addRI(foreignKey, primaryKey);
             putToState(foreignKey, pks);
         }
     }
@@ -245,6 +245,7 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
         Preconditions.checkNotNull(foreignKey);
         ByteArraySet primaryKeys = getIndexEntry(foreignKey);
         if(primaryKeys != null) {
+            removeRI(foreignKey, primaryKey);
             if(primaryKeys.remove(primaryKey)) {
                 if(primaryKeys.size() == 0) {
                     state.delete(indexName, foreignKey.getBytes());
@@ -255,7 +256,6 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
                 } else {
                     putToState(foreignKey, primaryKeys);
                 }
-                removeRI(foreignKey, primaryKey);
                 return true;
             } else {
                 return false;
