@@ -366,4 +366,61 @@ public class MultiIndexTest {
         //Should find the record that was only written to the index
         assertEquals(expected, missingKeys);
     }
+
+    @Test
+    public void testMultiIndexConsistency() {
+        //Populate a record only to the index
+        ByteArraySet indexKeys = new ByteArraySet();
+        indexKeys.add(new ByteArray(0L));
+        indexKeys.add(new ByteArray(1L));
+        index.writeToState(new ByteArray("A"), indexKeys);
+
+        //Populate a record only to the reverse index
+        ByteArraySet revIndexKeys = new ByteArraySet();
+        revIndexKeys.add(new ByteArray(2L));
+        revIndexKeys.add(new ByteArray(3L));
+        index.writeToState(new ByteArray("B"), revIndexKeys);
+
+
+        //Flush the data
+        index.flush();
+
+        //Populate all records to both indices correctly
+        index.add(new ByteArray("A"), new ByteArray(0L));
+        index.add(new ByteArray("A"), new ByteArray(1L));
+        index.add(new ByteArray("B"), new ByteArray(2L));
+        index.add(new ByteArray("B"), new ByteArray(3L));
+
+        //Flush the data
+        index.flush();
+
+        //The record originally written only to the index now exists in both
+        Set<ByteArray> actualKeys = index.getIndexEntry(new ByteArray("A"));
+        assertTrue(actualKeys.containsAll(indexKeys));
+
+        actualKeys = index.getForeignKeys(new ByteArray(0L));
+        assertNotNull(actualKeys);
+        assertEquals(1, actualKeys.size());
+        assertEquals(new ByteArray("A"), actualKeys.toArray(new ByteArray[1])[0]);
+
+        actualKeys = index.getForeignKeys(new ByteArray(1L));
+        assertNotNull(actualKeys);
+        assertEquals(1, actualKeys.size());
+        assertEquals(new ByteArray("A"), actualKeys.toArray(new ByteArray[1])[0]);
+
+
+        //The record originally written only to the reverse index now exists in both
+        actualKeys = index.getIndexEntry(new ByteArray("B"));
+        assertTrue(actualKeys.containsAll(revIndexKeys));
+
+        actualKeys = index.getForeignKeys(new ByteArray(2L));
+        assertNotNull(actualKeys);
+        assertEquals(1, actualKeys.size());
+        assertEquals(new ByteArray("B"), actualKeys.toArray(new ByteArray[1])[0]);
+
+        actualKeys = index.getForeignKeys(new ByteArray(3L));
+        assertNotNull(actualKeys);
+        assertEquals(1, actualKeys.size());
+        assertEquals(new ByteArray("B"), actualKeys.toArray(new ByteArray[1])[0]);
+    }
 }
