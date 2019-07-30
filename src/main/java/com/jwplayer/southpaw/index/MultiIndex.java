@@ -293,6 +293,11 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
         }
     }
 
+    /**
+     * Iterates through each entry in the reverse index and verifies the symmetric entries exist in the regular index
+     * and correctly point to the reverse index
+     * @return A string representation set of reverse index entry keys that are missing from the regular index.
+     */
     public Set<String> verifyIndexState() {
         System.out.println("Verifying reverse index: " + reverseIndexName + " against index: " + indexName);
         Set<String> missingKeys = new HashSet<>();
@@ -315,6 +320,11 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
         return missingKeys;
     }
 
+    /**
+     * Iterates through each entry in the regular index and verifies the symmetric entries exist in the reverse index
+     * and correctly point to the regular index
+     * @return A string representation set of regular index entry keys that are missing from the reverse index.
+     */
     public Set<String> verifyReverseIndexState() {
         System.out.println("Verifying index: " + indexName + " against reverse index: " + reverseIndexName);
         Set<String> missingKeys = new HashSet<>();
