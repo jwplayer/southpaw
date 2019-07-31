@@ -413,6 +413,7 @@ public class Southpaw {
             entry.getValue().commit();
         }
         state.flush();
+        verifyState();
     }
 
     /**
