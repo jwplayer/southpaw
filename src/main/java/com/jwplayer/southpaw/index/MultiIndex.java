@@ -17,12 +17,15 @@ package com.jwplayer.southpaw.index;
 
 import com.google.common.base.Preconditions;
 import com.jwplayer.southpaw.state.BaseState;
+import com.jwplayer.southpaw.state.RocksDBState;
 import com.jwplayer.southpaw.topic.BaseTopic;
 import com.jwplayer.southpaw.util.ByteArray;
 import com.jwplayer.southpaw.util.ByteArraySet;
 import org.apache.commons.collections4.map.LRUMap;
+import org.apache.log4j.Logger;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 
 /**
@@ -32,6 +35,8 @@ import java.util.*;
  * @param <V> - The type of the value stored in the indexed topic
  */
 public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements Reversible {
+    private static final Logger logger = Logger.getLogger(RocksDBState.class);
+
     /**
      * Size of the LRU cache for storing the index entries containing more than one key
      */
@@ -316,7 +321,7 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
      * @return A string representation set of reverse index entry keys that are missing from the regular index.
      */
     public Set<String> verifyIndexState() {
-        System.out.println("Verifying reverse index: " + reverseIndexName + " against index: " + indexName);
+        logger.info("Verifying reverse index: " + reverseIndexName + " against index: " + indexName);
         Set<String> missingKeys = new HashSet<>();
         BaseState.Iterator iter = state.iterate(reverseIndexName);
         while (iter.hasNext()) {
@@ -343,7 +348,7 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
      * @return A string representation set of regular index entry keys that are missing from the reverse index.
      */
     public Set<String> verifyReverseIndexState() {
-        System.out.println("Verifying index: " + indexName + " against reverse index: " + reverseIndexName);
+        logger.info("Verifying index: " + indexName + " against reverse index: " + reverseIndexName);
         Set<String> missingKeys = new HashSet<>();
         BaseState.Iterator iter = state.iterate(indexName);
         while (iter.hasNext()) {
@@ -366,11 +371,12 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
 
     private void traceKey(ByteArray key, String msg) {
         if (traceKeys.contains(key.toString())) {
-            System.out.println(msg);
+            logger.info(msg + " | "+ indexName + " " + reverseIndexName);
         }
     }
 
     public void setTraceKeys(Set<String> keys) {
-        traceKeys = keys;
+        traceKeys = keys.stream().limit(10).collect(Collectors.toSet());
+        logger.info("Watching the following keys for Multi Index: " + indexName + " " + reverseIndexName + ". Keys: " + traceKeys);
     }
 }

@@ -1026,12 +1026,13 @@ public class Southpaw {
      */
     protected void verifyState() {
         for(Map.Entry<String, BaseIndex<BaseRecord, BaseRecord, Set<ByteArray>>> index: fkIndices.entrySet()) {
+            Set<String> missingKeys = new HashSet<>();
             logger.info("Verifying index state integrity: " + index.getValue().getIndexedTopic().getShortName());
             Set<String> missingIndexKeys = ((MultiIndex)index.getValue()).verifyIndexState();
             if(missingIndexKeys.isEmpty()){
                 logger.info("Index " + index.getValue().getIndexedTopic().getShortName() +  " integrity check complete");
             } else {
-               ((MultiIndex<BaseRecord, BaseRecord>) index.getValue()).setTraceKeys(missingIndexKeys);
+                missingKeys.addAll(missingIndexKeys);
                 logger.error("Index " + index.getValue().getIndexedTopic().getShortName() + " check failed for the following " + missingIndexKeys.size() + " keys: " + missingIndexKeys.toString());
             }
 
@@ -1040,9 +1041,11 @@ public class Southpaw {
             if(missingReverseIndexKeys.isEmpty()){
                 logger.info("Reverse index " + index.getValue().getIndexedTopic().getShortName() +  " integrity check complete");
             } else {
-                ((MultiIndex<BaseRecord, BaseRecord>) index.getValue()).setTraceKeys(missingReverseIndexKeys);
+                missingKeys.addAll(missingReverseIndexKeys);
                 logger.error("Reverse index " + index.getValue().getIndexedTopic().getShortName() + " check failed for the following " + missingReverseIndexKeys.size() + " keys: " + missingReverseIndexKeys.toString());
             }
+
+            ((MultiIndex<BaseRecord, BaseRecord>) index.getValue()).setTraceKeys(missingKeys);
         }
 
     }
