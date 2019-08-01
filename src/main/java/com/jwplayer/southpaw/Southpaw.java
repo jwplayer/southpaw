@@ -837,6 +837,7 @@ public class Southpaw {
         if(options.has(BUILD)) {
             Southpaw southpaw = new Southpaw(config, relURIs);
             try{
+                southpaw.verifyState();
                 southpaw.run(0);
             } finally {
                 southpaw.close();
@@ -1030,6 +1031,7 @@ public class Southpaw {
             if(missingIndexKeys.isEmpty()){
                 logger.info("Index " + index.getValue().getIndexedTopic().getShortName() +  " integrity check complete");
             } else {
+               ((MultiIndex<BaseRecord, BaseRecord>) index.getValue()).setTraceKeys(missingIndexKeys);
                 logger.error("Index " + index.getValue().getIndexedTopic().getShortName() + " check failed for the following " + missingIndexKeys.size() + " keys: " + missingIndexKeys.toString());
             }
 
@@ -1038,8 +1040,10 @@ public class Southpaw {
             if(missingReverseIndexKeys.isEmpty()){
                 logger.info("Reverse index " + index.getValue().getIndexedTopic().getShortName() +  " integrity check complete");
             } else {
+                ((MultiIndex<BaseRecord, BaseRecord>) index.getValue()).setTraceKeys(missingReverseIndexKeys);
                 logger.error("Reverse index " + index.getValue().getIndexedTopic().getShortName() + " check failed for the following " + missingReverseIndexKeys.size() + " keys: " + missingReverseIndexKeys.toString());
             }
         }
+
     }
 }

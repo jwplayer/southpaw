@@ -61,6 +61,8 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
     protected Map<ByteArray, ByteArraySet> pendingRIWrites = new HashMap<>();
     protected String reverseIndexName;
 
+    protected Set<String> traceKeys = new HashSet<>();
+
     @Override
     public void add(ByteArray foreignKey, ByteArray primaryKey) {
         traceKey(primaryKey, "Hit add function primary key " + primaryKey + " foreign key: " + foreignKey);
@@ -363,14 +365,12 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
     }
 
     private void traceKey(ByteArray key, String msg) {
-        List<String> keys = new ArrayList<String>() {{
-            add("5fdd");
-            add("2977d7");
-            add("026163");
-            add("292403");
-        }};
-        if (keys.contains(key.toString())) {
+        if (traceKeys.contains(key.toString())) {
             System.out.println(msg);
         }
+    }
+
+    public void setTraceKeys(Set<String> keys) {
+        traceKeys = keys;
     }
 }
