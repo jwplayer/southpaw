@@ -254,6 +254,7 @@ public class Southpaw {
             // Loop through each input topic and read a batch of records
 
             for (Map.Entry<String, BaseTopic<BaseRecord, BaseRecord>> entry : topics) {
+                logger.info("Processing topic: " + entry.getValue().getTopicName() + " from offset: " + entry.getValue().getCurrentOffset());
                 String entity = entry.getKey();
                 BaseTopic<BaseRecord, BaseRecord> inputTopic = entry.getValue();
 
@@ -400,7 +401,9 @@ public class Southpaw {
     public void commit() {
         // Commit / flush changes
         for(Map.Entry<String, BaseTopic<byte[], DenormalizedRecord>> topic: outputTopics.entrySet()) {
+            logger.info("Before flush topic: " + topic.getValue().getTopicName() + " offset: " + topic.getValue().getCurrentOffset());
             topic.getValue().flush();
+            logger.info("After flush topic: " + topic.getValue().getTopicName() + " offset: " + topic.getValue().getCurrentOffset());
         }
         for(Map.Entry<String, BaseIndex<BaseRecord, BaseRecord, Set<ByteArray>>> index: fkIndices.entrySet()) {
             index.getValue().flush();
@@ -410,7 +413,9 @@ public class Southpaw {
             state.flush(METADATA_KEYSPACE);
         }
         for(Map.Entry<String, BaseTopic<BaseRecord, BaseRecord>> entry: inputTopics.entrySet()) {
+            logger.info("Before flush topic: " + entry.getValue().getTopicName() + " offset: " + entry.getValue().getCurrentOffset());
             entry.getValue().commit();
+            logger.info("After flush topic: " + entry.getValue().getTopicName() + " offset: " + entry.getValue().getCurrentOffset());
         }
         state.flush();
         verifyState();

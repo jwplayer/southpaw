@@ -63,6 +63,9 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
 
     @Override
     public void add(ByteArray foreignKey, ByteArray primaryKey) {
+        traceKey(primaryKey, "Hit add function primary key " + primaryKey + " foreign key: " + foreignKey);
+        traceKey(foreignKey, "Hit add function primary key " + primaryKey + " foreign key: " + foreignKey);
+
         Preconditions.checkNotNull(foreignKey);
         ByteArraySet pks = getIndexEntry(foreignKey);
         if(pks == null) {
@@ -80,6 +83,8 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
      * @param primaryKey - The primary key to add
      */
     protected void addRI(ByteArray foreignKey, ByteArray primaryKey) {
+        traceKey(primaryKey, "Hit addRI function primary key " + primaryKey + " foreign key: " + foreignKey);
+
         ByteArraySet keys = getForeignKeys(primaryKey);
         if(keys == null) {
             keys = new ByteArraySet();
@@ -120,9 +125,12 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
 
     @Override
     public ByteArraySet getForeignKeys(ByteArray primaryKey) {
+        traceKey(primaryKey, "Hit getForeignKeys primary key: " + primaryKey);
         if(entryRICache.containsKey(primaryKey)) {
+            traceKey(primaryKey, "Hit entryRICache in getForeignKeys function primary key " + primaryKey);
             return entryRICache.get(primaryKey);
         } else if(pendingRIWrites.containsKey(primaryKey)) {
+            traceKey(primaryKey, "Hit pendingRIWrites in getForeignKeys function primary key " + primaryKey);
             return pendingRIWrites.get(primaryKey);
         } else {
             byte[] bytes = state.get(reverseIndexName, primaryKey.getBytes());
@@ -138,10 +146,13 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
 
     @Override
     public ByteArraySet getIndexEntry(ByteArray foreignKey) {
+        traceKey(foreignKey, "Hit getForeignKeys foreign key: " + foreignKey);
         Preconditions.checkNotNull(foreignKey);
         if(entryCache.containsKey(foreignKey)) {
+            traceKey(foreignKey, "Hit entryRICache in getIndexEntry function foreign key " + foreignKey);
             return entryCache.get(foreignKey);
         } else if(pendingWrites.containsKey(foreignKey)) {
+            traceKey(foreignKey, "Hit pendingWrites in getIndexEntry function foreign key " + foreignKey);
             return pendingWrites.get(foreignKey);
         } else {
             byte[] bytes = state.get(indexName, foreignKey.getBytes());
@@ -159,6 +170,8 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
      * Method for keeping pending writes manageable by auto-flushing once it reaches a certain size.
      */
     public void putToState(ByteArray key, ByteArraySet value) {
+        traceKey(key, "Hit putToState function key " + key);
+
         if(value.size() > LRU_CACHE_THRESHOLD) entryCache.put(key, value);
         pendingWrites.put(key, value);
         if(pendingWrites.size() > indexWriteBatchSize) {
@@ -173,6 +186,8 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
      * Method for keeping RI pending writes manageable by auto-flushing once it reaches a certain size.
      */
     public void putRIToState(ByteArray key, ByteArraySet value) {
+        traceKey(key, "Hit putRIToState function key " + key);
+
         if(value.size() > LRU_CACHE_THRESHOLD) entryRICache.put(key, value);
         pendingRIWrites.put(key, value);
         if(pendingRIWrites.size() > indexWriteBatchSize) {
@@ -200,6 +215,8 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
 
     @Override
     public ByteArraySet remove(ByteArray foreignKey) {
+        traceKey(foreignKey, "Hit remove function foreign key: " + foreignKey);
+
         Preconditions.checkNotNull(foreignKey);
         ByteArraySet primaryKeys = getIndexEntry(foreignKey);
         if(primaryKeys != null) {
@@ -219,6 +236,8 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
      * @param primaryKey - The primary key of the entry
      */
     protected void removeRI(ByteArray foreignKey, ByteArray primaryKey) {
+        traceKey(foreignKey, "Hit removeRI function primary key " + primaryKey + " foreign key: " + foreignKey);
+
         ByteArraySet foreignKeys = getForeignKeys(primaryKey);
         if(foreignKeys != null) {
             foreignKeys.remove(foreignKey);
@@ -234,6 +253,8 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
 
     @Override
     public boolean remove(ByteArray foreignKey, ByteArray primaryKey) {
+        traceKey(foreignKey, "Hit remove overloaded function primary key " + primaryKey + " foreign key: " + foreignKey);
+
         Preconditions.checkNotNull(foreignKey);
         removeRI(foreignKey, primaryKey);
         ByteArraySet primaryKeys = getIndexEntry(foreignKey);
@@ -261,6 +282,8 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
      * @param foreignKeys - The foreign keys to record
      */
     protected void writeRIToState(ByteArray primaryKey, ByteArraySet foreignKeys) {
+        traceKey(primaryKey, "Hit writeRIToState function primary key " + primaryKey);
+
         Preconditions.checkNotNull(primaryKey);
         if(foreignKeys == null || foreignKeys.size() == 0) {
             state.delete(reverseIndexName, primaryKey.getBytes());
@@ -275,6 +298,8 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
      * @param primaryKeys - The primary keys to record
      */
     protected void writeToState(ByteArray foreignKey, ByteArraySet primaryKeys) {
+        traceKey(foreignKey, "Hit writeToState function foreign key " + foreignKey);
+
         Preconditions.checkNotNull(foreignKey);
         if(primaryKeys == null || primaryKeys.size() == 0) {
             state.delete(indexName, foreignKey.getBytes());
@@ -326,8 +351,8 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
             for (ByteArray revIndexPrimaryKey : indexForeignKeySet.toArray()) {
                 ByteArraySet revIndexforeignKeySet = getForeignKeys(revIndexPrimaryKey);
 
-                if(revIndexforeignKeySet != null) {
-                    if(revIndexforeignKeySet.contains(indexPrimaryKey)) {
+                if (revIndexforeignKeySet != null) {
+                    if (revIndexforeignKeySet.contains(indexPrimaryKey)) {
                         continue;
                     }
                 }
@@ -335,5 +360,17 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
             }
         }
         return missingKeys;
+    }
+
+    private void traceKey(ByteArray key, String msg) {
+        List<String> keys = new ArrayList<String>() {{
+            add("5fdd");
+            add("2977d7");
+            add("026163");
+            add("292403");
+        }};
+        if (keys.contains(key.toString())) {
+            System.out.println(msg);
+        }
     }
 }
