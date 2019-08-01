@@ -403,7 +403,6 @@ public class Southpaw {
         for(Map.Entry<String, BaseTopic<byte[], DenormalizedRecord>> topic: outputTopics.entrySet()) {
             logger.info("Before flush topic: " + topic.getValue().getTopicName() + " offset: " + topic.getValue().getCurrentOffset());
             topic.getValue().flush();
-            logger.info("After flush topic: " + topic.getValue().getTopicName() + " offset: " + topic.getValue().getCurrentOffset());
         }
         for(Map.Entry<String, BaseIndex<BaseRecord, BaseRecord, Set<ByteArray>>> index: fkIndices.entrySet()) {
             index.getValue().flush();
@@ -415,7 +414,6 @@ public class Southpaw {
         for(Map.Entry<String, BaseTopic<BaseRecord, BaseRecord>> entry: inputTopics.entrySet()) {
             logger.info("Before flush topic: " + entry.getValue().getTopicName() + " offset: " + entry.getValue().getCurrentOffset());
             entry.getValue().commit();
-            logger.info("After flush topic: " + entry.getValue().getTopicName() + " offset: " + entry.getValue().getCurrentOffset());
         }
         state.flush();
         verifyState();
