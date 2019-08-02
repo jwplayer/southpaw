@@ -254,7 +254,6 @@ public class Southpaw {
             // Loop through each input topic and read a batch of records
 
             for (Map.Entry<String, BaseTopic<BaseRecord, BaseRecord>> entry : topics) {
-                logger.info("Processing topic: " + entry.getValue().getTopicName() + " from offset: " + entry.getValue().getCurrentOffset());
                 String entity = entry.getKey();
                 BaseTopic<BaseRecord, BaseRecord> inputTopic = entry.getValue();
 
