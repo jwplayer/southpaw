@@ -55,10 +55,11 @@ public class MultiIndexTest {
         config.put(RocksDBState.COMPACTION_READ_AHEAD_SIZE_CONFIG, 1048675);
         config.put(RocksDBState.MEMTABLE_SIZE, 1048675);
         config.put(RocksDBState.PARALLELISM_CONFIG, 4);
-        config.put(RocksDBState.PUT_BATCH_SIZE, 4);
+        config.put(RocksDBState.PUT_BATCH_SIZE, 1);
         config.put(RocksDBState.URI_CONFIG, dbFolder.getRoot().toURI().toString());
 
         state = new RocksDBState(config);
+        state.open();
 
         index = createEmptyIndex(state);
     }
@@ -77,7 +78,6 @@ public class MultiIndexTest {
         keySerde.configure(config, true);
         JsonSerde valueSerde = new JsonSerde();
         valueSerde.configure(config, true);
-        state.open();
         BaseTopic<BaseRecord, BaseRecord> indexedTopic = new InMemoryTopic<>(0);
         indexedTopic.configure(new TopicConfig<BaseRecord, BaseRecord>()
             .setShortName("IndexedTopic")
@@ -368,7 +368,7 @@ public class MultiIndexTest {
     }
 
     @Test
-    public void testMultiIndexConsistency() {
+    public void testMultiIndexAddConsistency() {
         //Populate a record only to the index
         ByteArraySet indexKeys = new ByteArraySet();
         indexKeys.add(new ByteArray(0L));
@@ -422,5 +422,91 @@ public class MultiIndexTest {
         assertNotNull(actualKeys);
         assertEquals(1, actualKeys.size());
         assertEquals(new ByteArray("B"), actualKeys.toArray(new ByteArray[1])[0]);
+    }
+
+    @Test
+    public void testMultiIndexRemoveReverseIndexConsistency() {
+        //Configuration assumes index batch size of 5 records to trigger writes to state
+        //Add 6 keys with less than 5 unique primary keys and 6 unique foreign keys in order to trigger only reverse index writes
+        index.add(new ByteArray("A"), new ByteArray(0L));
+        index.add(new ByteArray("B"), new ByteArray(1L));
+        index.add(new ByteArray("B"), new ByteArray(2L));
+        index.add(new ByteArray("B"), new ByteArray(3L));
+        index.add(new ByteArray("C"), new ByteArray(4L));
+        index.add(new ByteArray("C"), new ByteArray(5L));
+
+        //Flush RocksDB state
+        state.flush();
+
+        //Create a new MultiIndex object to simulate an unhealthy restart to wipe in memory, non-persisted data structures
+        index = createEmptyIndex(state);
+
+        //Ensure setup is correct and we have lossed data in our index
+        Set<ByteArray> actualKeys;
+        actualKeys = index.getIndexEntry(new ByteArray("A"));
+        assertNull(actualKeys);
+
+        //Ensure setup is correct and we can retrieve an expected foreign key from reverse index state
+        actualKeys = index.getForeignKeys(new ByteArray(0L));
+        assertNotNull(actualKeys);
+        assertEquals(1, actualKeys.size());
+        assertEquals(new ByteArray("A"), actualKeys.toArray(new ByteArray[1])[0]);
+
+        //Attempt to remove key
+        index.remove(new ByteArray("A"), new ByteArray(0L));
+
+        //Flush the index to persist all in memory data
+        index.flush();
+
+        //The primary key should still not exist
+        actualKeys = index.getIndexEntry(new ByteArray("A"));
+        assertNull(actualKeys);
+
+        //The foreign key should no longer exist
+        actualKeys = index.getForeignKeys(new ByteArray(0L));
+        assertNull(actualKeys);
+    }
+
+    @Test
+    public void testMultiIndexRemoveIndexConsistency() {
+        //Configuration assumes index batch size of 5 records to trigger writes to state
+        //Add 6 unique primary keys with 4 unique foreign keys in order to trigger only index writes
+        index.add(new ByteArray("A"), new ByteArray(0L));
+        index.add(new ByteArray("B"), new ByteArray(1L));
+        index.add(new ByteArray("C"), new ByteArray(2L));
+        index.add(new ByteArray("D"), new ByteArray(3L));
+        index.add(new ByteArray("E"), new ByteArray(1L));
+        index.add(new ByteArray("F"), new ByteArray(3L));
+
+        //Flush RocksDB state
+        state.flush();
+
+        //Create a new MultiIndex object to simulate an unhealthy restart to wipe in memory, non-persisted data structures
+        index = createEmptyIndex(state);
+
+        //Ensure setup is correct and we can retrieve an expected primary key from state
+        Set<ByteArray> actualKeys;
+        actualKeys = index.getIndexEntry(new ByteArray("A"));
+        assertNotNull(actualKeys);
+        assertEquals(1, actualKeys.size());
+        assertEquals(new ByteArray(0L), actualKeys.toArray(new ByteArray[1])[0]);
+
+        //Ensure setup is correct and we have lossed data in our reverse index
+        actualKeys = index.getForeignKeys(new ByteArray(0L));
+        assertNull(actualKeys);
+
+        //Attempt to remove key
+        index.remove(new ByteArray("A"), new ByteArray(0L));
+
+        //Flush the index to persist all in memory data
+        index.flush();
+
+        //The key should not exist in our index anymore
+        actualKeys = index.getIndexEntry(new ByteArray("A"));
+        assertNull(actualKeys);
+
+        //The foreign key should still not exist
+        actualKeys = index.getForeignKeys(new ByteArray(0L));
+        assertNull(actualKeys);
     }
 }

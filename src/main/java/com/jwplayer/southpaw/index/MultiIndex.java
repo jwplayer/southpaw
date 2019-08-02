@@ -235,9 +235,9 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
     @Override
     public boolean remove(ByteArray foreignKey, ByteArray primaryKey) {
         Preconditions.checkNotNull(foreignKey);
+        removeRI(foreignKey, primaryKey);
         ByteArraySet primaryKeys = getIndexEntry(foreignKey);
         if(primaryKeys != null) {
-            removeRI(foreignKey, primaryKey);
             if(primaryKeys.remove(primaryKey)) {
                 if(primaryKeys.size() == 0) {
                     state.delete(indexName, foreignKey.getBytes());
