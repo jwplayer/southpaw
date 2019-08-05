@@ -310,6 +310,8 @@ public class Southpaw {
                             }
                             int size = dePrimaryKeys.size();
                             if(size > config.createRecordsTrigger) {
+                                state.put(METADATA_KEYSPACE, createDePKEntryName(root).getBytes(), dePrimaryKeys.serialize());
+                                state.flush(METADATA_KEYSPACE);
                                 createDenormalizedRecords(root, dePrimaryKeys);
                                 dePrimaryKeys.clear();
                             }
