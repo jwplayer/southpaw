@@ -23,6 +23,7 @@ import com.jwplayer.southpaw.record.MapRecord;
 import com.jwplayer.southpaw.state.RocksDBState;
 import com.jwplayer.southpaw.topic.BaseTopic;
 import com.jwplayer.southpaw.util.ByteArray;
+import com.jwplayer.southpaw.util.ByteArraySet;
 import com.jwplayer.southpaw.util.FileHelper;
 import org.junit.*;
 import org.junit.rules.TemporaryFolder;
@@ -99,7 +100,7 @@ public class SouthpawTest {
 
     @Test
     public void testFkIndices() {
-        Map<String, BaseIndex<BaseRecord, BaseRecord, Set<ByteArray>>> indices = southpaw.getFkIndices();
+        Map<String, BaseIndex<BaseRecord, BaseRecord, ByteArraySet>> indices = southpaw.getFkIndices();
 
         assertEquals(10, indices.size());
         // Join Key Indices
