@@ -153,7 +153,7 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
 
     @Override
     public ByteArraySet getIndexEntry(ByteArray foreignKey) {
-        traceKey(foreignKey, "Hit getForeignKeys foreign key: " + foreignKey);
+        traceKey(foreignKey, "Hit getIndexEntry foreign key: " + foreignKey);
         Preconditions.checkNotNull(foreignKey);
         if(entryCache.containsKey(foreignKey)) {
             traceKey(foreignKey, "Hit entryRICache in getIndexEntry function foreign key " + foreignKey);
