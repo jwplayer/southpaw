@@ -1,5 +1,11 @@
 # Change log
 
+## 0.5.1
+August 22nd, 2019
+
+### New Features
+* Added new 'time.since.last.backup' metric for a non-sparse backup metric to monitor [#51](https://github.com/jwplayer/southpaw/pull/51)
+
 ## 0.5.0
 August 9th, 2019
 
