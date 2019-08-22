@@ -33,6 +33,7 @@ public class Metrics {
     public static final String RECORDS_CONSUMED = "records.consumed";
     public static final String STATE_COMMITTED = "states.committed";
     public static final String STATES_DELETED = "states.deleted";
+    public static final String TIME_SINCE_LAST_BACKUP = "time.since.last.backup";
     public static final String TOPIC_LAG = "topic.lag";
 
     /**
@@ -92,6 +93,10 @@ public class Metrics {
      */
     public StaticGauge<Long> topicLag = new StaticGauge<>();
     /**
+     * Time since the last backup
+     */
+    public StaticGauge<Long> timeSinceLastBackup;
+    /**
      * The number of records yet to be consumed by topic
      */
     public final Map<String, StaticGauge<Long>> topicLagByTopic = new HashMap<>();
@@ -102,6 +107,12 @@ public class Metrics {
     @SuppressWarnings("unchecked")
     public Metrics() {
         reporter.start();
+        if(!registry.getMetrics().containsKey(TIME_SINCE_LAST_BACKUP)) {
+            timeSinceLastBackup = new StaticGauge<>();
+            registry.register(TIME_SINCE_LAST_BACKUP, timeSinceLastBackup);
+        } else {
+            timeSinceLastBackup = (StaticGauge<Long>) registry.getMetrics().get(TIME_SINCE_LAST_BACKUP);
+        }
         if(!registry.getMetrics().containsKey(TOPIC_LAG)) {
             registry.register(TOPIC_LAG, topicLag);
         } else {

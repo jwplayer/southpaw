@@ -319,6 +319,7 @@ public class Southpaw {
                         metrics.recordsConsumedByTopic.get(entity).mark(1);
                     }
 
+                    metrics.timeSinceLastBackup.update(backupWatch.getTime());
                     topicLag = inputTopic.getLag();
                     metrics.topicLagByTopic.get(entity).update(topicLag);
                     reportRecordsToCreate();

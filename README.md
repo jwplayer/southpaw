@@ -388,6 +388,7 @@ Southpaw exposes basic metrics about its operation and performance through JMX u
 * s3.uploads (Timer) - The count and time taken for state uploads to S3
 * state.committed (Timer) - The count and time taken for committing the state
 * states.deleted (Meter) - The count and rate of state deletion
+* time.since.last.backup (Gauge) - The time (ms) since the last backup. Useful since backups.created can be a very sparse metric. Note that this will only start measuring when Southpaw starts. It doesn't measure since any previous instances of Southpaw.
 * topic.lag (Gauge) - Snapshots of the overall lag (end offset - current offset) for the input topics
 * topic.lag.[ENTITY_NAME] (Gauge) - Similar to topic.lag, but broken down by the specific normalized entity
 
