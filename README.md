@@ -28,7 +28,6 @@ Southpaw accepts command line arguments and has a help option:
     --build                Builds denormalized records using an
                              existing state.
     * --config             Path to the Southpaw config file
-    --debug                Sets logging to DEBUG.
     --delete-backup        Deletes existing backups specified in
                              the config file. BE VERY CAREFUL
                              WITH THIS!!!
@@ -147,7 +146,6 @@ The config is broken up into multiple sections:
 
 ### Generic Config
 
-* log.level - The level to log at (e.g. INFO or DEBUG). In the future should just be replaced with a properties file.
 * backup.time.s - The amount of time in seconds between backups
 * commit.time.s - The amount of time in seconds between full state commits
 * create.records.trigger - Number of denormalized record create actions to queue before creating denormalized records. Only queues creation of records when lagging. 
@@ -202,8 +200,6 @@ Similar to the state, Southpaw is built around Kafka for the log store. The topi
 * value.serde.class - The full name of the serde class for the record value
 
 ### Example
-
-    log.level: "INFO"
 
     backup.time.s: 600
     commit.time.s: 120
@@ -391,6 +387,10 @@ Southpaw exposes basic metrics about its operation and performance through JMX u
 * time.since.last.backup (Gauge) - The time (ms) since the last backup. Useful since backups.created can be a very sparse metric. Note that this will only start measuring when Southpaw starts. It doesn't measure since any previous instances of Southpaw.
 * topic.lag (Gauge) - Snapshots of the overall lag (end offset - current offset) for the input topics
 * topic.lag.[ENTITY_NAME] (Gauge) - Similar to topic.lag, but broken down by the specific normalized entity
+
+## Logging
+
+Southpaw makes use of [log4j2](https://logging.apache.org/log4j/2.x/) for logging. Refer to log4j2 documentation for how to easily configure logging to fit your needs.
 
 ## Known Issues
 

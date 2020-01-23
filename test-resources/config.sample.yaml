@@ -1,5 +1,3 @@
-log.level: "DEBUG"
-
 backup.time.s: 600
 backup.on.shutdown: false
 commit.time.s: 60
