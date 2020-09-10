@@ -19,6 +19,18 @@ While robust tools like Flink or Kafka Streams support joins, they are extremely
 
 Southpaw maintains a state of all records it sees, keeping the latest version of each record. In addition to this, it builds two types of indices. The first type is the parent index. This index tells Southpaw which denormalized records it should create whenever it sees a new or updated child record. The second type of index is the join index. This tells Southpaw which child records to include in an denormalized record when it is being created. WIth these two types of indices, Southpaw can create and recreate the denormalized records as input records are streamed from the input topics.
 
+## Install With Maven:
+
+Add this dependency to your project's POM:
+
+```xml
+<dependency>
+  <groupId>com.jwplayer</groupId>
+  <artifactId>southpaw</artifactId>
+  <version>0.5.2</version>
+</dependency>
+```
+
 ## Running Southpaw
 
 Southpaw accepts command line arguments and has a help option:

@@ -1,5 +1,13 @@
 # Change log
 
+## 0.5.2
+December 10th, 2019
+
+### New Features
+* POM updates to push to Maven Central. Travis yaml update. [#54](https://github.com/jwplayer/southpaw/pull/54)
+* Bump jackson-databind from 2.9.10 to 2.9.10.1  [#54](https://github.com/jwplayer/southpaw/pull/53)
+* Update jackson-databind  [#54](https://github.com/jwplayer/southpaw/pull/52)
+
 ## 0.5.1
 August 22nd, 2019
 
