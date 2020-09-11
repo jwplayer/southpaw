@@ -41,9 +41,8 @@ import org.apache.commons.lang.ObjectUtils;
 import org.apache.commons.lang.time.StopWatch;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.serialization.Serde;
-import org.apache.logging.log4j.Level;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
 
 import java.io.IOException;
@@ -87,7 +86,7 @@ public class Southpaw {
     /**
      * Le Logger
      */
-    private static final Logger logger = LogManager.getLogger(Southpaw.class);
+    private static final Logger logger =  LoggerFactory.getLogger(Southpaw.class);
     /**
      * Used for doing object <-> JSON mappings
      */
@@ -487,7 +486,7 @@ public class Southpaw {
                 BaseTopic<byte[], DenormalizedRecord> outputTopic = outputTopics.get(root.getDenormalizedName());
                 scrubParentIndices(root, root, dePrimaryKey);
                 DenormalizedRecord newDeRecord = createDenormalizedRecord(root, root, dePrimaryKey, dePrimaryKey);
-                if(logger.getLevel().equals(Level.DEBUG)) {
+                if(logger.isDebugEnabled()) {
                     try {
                         logger.debug(
                                 String.format(
