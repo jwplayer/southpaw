@@ -50,7 +50,7 @@
         <version.cobertura.plugin>2.7</version.cobertura.plugin>
         <version.enforcer.plugin>3.0.0-M3</version.enforcer.plugin>
         <version.jsonschema2pojo.plugin>1.0.0</version.jsonschema2pojo.plugin>
-        <version.shade.plugin>2.3</version.shade.plugin>
+        <version.shade.plugin>3.2.4</version.shade.plugin>
         <version.surefire.plugin>3.0.0-M5</version.surefire.plugin>
 
 
