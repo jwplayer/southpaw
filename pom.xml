@@ -50,6 +50,7 @@
         <version.cobertura.plugin>2.7</version.cobertura.plugin>
         <version.jsonschema2pojo.plugin>1.0.0</version.jsonschema2pojo.plugin>
         <version.shade.plugin>2.3</version.shade.plugin>
+        <version.surefire.plugin>3.0.0-M5</version.surefire.plugin>
 
 
     </properties>
@@ -192,6 +193,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
+                <version>${version.surefire.plugin}</version>
                 <configuration>
                     <argLine>-Xmx1024m</argLine>
                 </configuration>
