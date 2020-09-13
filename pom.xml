@@ -21,8 +21,10 @@
         </repository>
     </repositories>
     <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.target>1.8</maven.compiler.target>
         <maven.compiler.source>1.8</maven.compiler.source>
+        <release>8</release>
 
         <version.amazonaws>1.11.292</version.amazonaws>
         <version.apache.commons>4.1</version.apache.commons>
@@ -39,6 +41,7 @@
         <version.logback>1.2.3</version.logback>
         <version.rocksdb>5.17.2</version.rocksdb>
         <version.snakeyaml>1.20</version.snakeyaml>
+        <version.xml.bind>2.3.1</version.xml.bind>
 
         <!-- Testing -->
         <version.curator>2.12.0</version.curator>
@@ -46,14 +49,15 @@
         <version.mockito>2.25.1</version.mockito>
         <version.s3mock>0.2.5</version.s3mock>
 
+        <modules.argline />
+
         <!-- Plugins -->
         <version.cobertura.plugin>2.7</version.cobertura.plugin>
+        <version.compiler.plugin>3.8.1</version.compiler.plugin>
         <version.enforcer.plugin>3.0.0-M3</version.enforcer.plugin>
         <version.jsonschema2pojo.plugin>1.0.0</version.jsonschema2pojo.plugin>
         <version.shade.plugin>3.2.4</version.shade.plugin>
         <version.surefire.plugin>3.0.0-M5</version.surefire.plugin>
-
-
     </properties>
     <dependencies>
         <dependency>
@@ -172,12 +176,27 @@
             <version>${version.mockito}</version>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>javax.xml.bind</groupId>
+            <artifactId>jaxb-api</artifactId>
+            <version>${version.xml.bind}</version>
+        </dependency>
     </dependencies>
     <build>
         <sourceDirectory>src/main/java</sourceDirectory>
         <testSourceDirectory>src/test/java</testSourceDirectory>
         <finalName>southpaw</finalName>
         <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>${version.compiler.plugin}</version>
+                <configuration>
+                    <source>${maven.compiler.source}</source>
+                    <target>${maven.compiler.target}</target>
+                    <encoding>${project.build.sourceEncoding}</encoding>
+                </configuration>
+            </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-enforcer-plugin</artifactId>
@@ -216,7 +235,7 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>${version.surefire.plugin}</version>
                 <configuration>
-                    <argLine>-Xmx1024m</argLine>
+                    <argLine>-Djava.awt.headless=true ${modules.argline}</argLine>
                 </configuration>
             </plugin>
             <plugin>
@@ -257,4 +276,18 @@
             </plugin>
         </plugins>
     </build>
+    <profiles>
+        <profile>
+            <id>jdk11</id>
+            <activation>
+                <jdk>11</jdk>
+            </activation>
+            <properties>
+                <modules.argline>--illegal-access=permit</modules.argline>
+                <maven.compiler.source>11</maven.compiler.source>
+                <maven.compiler.target>11</maven.compiler.target>
+                <release>11</release>
+            </properties>
+        </profile>
+    </profiles>
 </project>
