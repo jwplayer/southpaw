@@ -23,8 +23,8 @@ import com.jwplayer.southpaw.util.FileHelper;
 import com.jwplayer.southpaw.util.S3Helper;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.codec.binary.Hex;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.rocksdb.*;
 
 import java.io.File;
@@ -39,7 +39,7 @@ import java.util.concurrent.ExecutionException;
  * Rocks DB implementation for the state
  */
 public class RocksDBState extends BaseState {
-    private static final Logger logger = LogManager.getLogger(RocksDBState.class);
+    private static final Logger logger = LoggerFactory.getLogger(RocksDBState.class);
     /**
      * URI to backup RocksDB to
      */

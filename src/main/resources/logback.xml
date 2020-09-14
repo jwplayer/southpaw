@@ -1,0 +1,10 @@
+<configuration>
+    <appender name="console" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder><pattern>%-30(%date [%thread]) %highlight(%-5level) %33(%logger{29}) %msg %marker %n%ex{full}</pattern></encoder>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="console" />
+    </root>
+
+</configuration>
