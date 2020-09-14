@@ -1,5 +1,11 @@
 # Change log
 
+## 0.5.3
+September 14th, 2020
+
+### New Features
+* slf4j/logback [#64](https://github.com/jwplayer/southpaw/pull/64)
+
 ## 0.5.2
 September 10th, 2020
 
