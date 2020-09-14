@@ -41,8 +41,9 @@ import org.apache.commons.lang.ObjectUtils;
 import org.apache.commons.lang.time.StopWatch;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.serialization.Serde;
-import org.apache.log4j.Level;
-import org.apache.log4j.Logger;
+import org.apache.logging.log4j.Level;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.yaml.snakeyaml.Yaml;
 
 import java.io.IOException;
@@ -86,7 +87,7 @@ public class Southpaw {
     /**
      * Le Logger
      */
-    private static final Logger logger = Logger.getLogger(Southpaw.class);
+    private static final Logger logger = LogManager.getLogger(Southpaw.class);
     /**
      * Used for doing object <-> JSON mappings
      */
@@ -142,9 +143,6 @@ public class Southpaw {
      * Base Southpaw config
      */
     protected static class Config {
-        public static final String BACKUP_ON_SHUTDOWN_CONFIG = "backup.on.shutdown";
-        public static final boolean BACKUP_ON_SHUTDOWN_DEFAULT = false;
-        public static final String BACKUP_ON_SHUTDOWN_DOC = "Instructs Southpaw to backup on shutdown (or not)";
         public static final String BACKUP_TIME_S_CONFIG = "backup.time.s";
         public static final int BACKUP_TIME_S_DEFAULT = 1800;
         public static final String BACKUP_TIME_S_DOC = "Time interval (roughly) between backups";
@@ -156,28 +154,21 @@ public class Southpaw {
         public static final String CREATE_RECORDS_TRIGGER_DOC =
                 "Config for when to create denormalized records once the number of records to create has exceeded " +
                         "a certain amount";
-        public static final String LOG_LEVEL_CONFIG = "log.level";
-        public static final String LOG_LEVEL_DEFAULT = "INFO";
-        public static final String LOG_LEVEL_DOC = "Log level config for log4j";
         public static final String TOPIC_LAG_TRIGGER_CONFIG = "topic.lag.trigger";
         public static final String TOPIC_LAG_TRIGGER_DEFAULT = "1000";
         public static final String TOPIC_LAG_TRIGGER_DOC =
                 "Config for when to switch from one topic to the next (or to stop processing a topic entirely), " +
                         "when lag drops below this value.";
 
-        public boolean backupOnShutdown;
         public int backupTimeS;
         public int commitTimeS;
         public int createRecordsTrigger;
-        public String logLevel;
         public int topicLagTrigger;
 
         public Config(Map<String, Object> rawConfig) throws ClassNotFoundException {
-            this.backupOnShutdown = (boolean) rawConfig.getOrDefault(BACKUP_ON_SHUTDOWN_CONFIG, BACKUP_ON_SHUTDOWN_DEFAULT);
             this.backupTimeS = (int) rawConfig.getOrDefault(BACKUP_TIME_S_CONFIG, BACKUP_TIME_S_DEFAULT);
             this.commitTimeS = (int) rawConfig.getOrDefault(COMMIT_TIME_S_CONFIG, COMMIT_TIME_S_DEFAULT);
             this.createRecordsTrigger = (int) rawConfig.getOrDefault(CREATE_RECORDS_TRIGGER_CONFIG, CREATE_RECORDS_TRIGGER_DEFAULT);
-            this.logLevel = rawConfig.getOrDefault(LOG_LEVEL_CONFIG, LOG_LEVEL_DEFAULT).toString();
             this.topicLagTrigger = (int) rawConfig.getOrDefault(TOPIC_LAG_TRIGGER_CONFIG, TOPIC_LAG_TRIGGER_DEFAULT);
         }
     }
@@ -206,7 +197,6 @@ public class Southpaw {
 
         this.rawConfig = Preconditions.checkNotNull(rawConfig);
         this.config = new Config(rawConfig);
-        logger.setLevel(Level.toLevel(config.logLevel, Level.INFO));
         this.relations = Preconditions.checkNotNull(relations);
         this.state = new RocksDBState(rawConfig);
         this.state.open();
@@ -321,6 +311,7 @@ public class Southpaw {
                         metrics.recordsConsumedByTopic.get(entity).mark(1);
                     }
 
+                    metrics.timeSinceLastBackup.update(backupWatch.getTime());
                     topicLag = inputTopic.getLag();
                     metrics.topicLagByTopic.get(entity).update(topicLag);
                     reportRecordsToCreate();
@@ -791,7 +782,6 @@ public class Southpaw {
                 accepts(DELETE_BACKUP, "Deletes existing backups specified in the config file. BE VERY CAREFUL WITH THIS!!!");
                 accepts(DELETE_STATE, "Deletes the existing state specified in the config file. BE VERY CAREFUL WITH THIS!!!");
                 accepts(RESTORE, "Restores the state from existing backups.");
-                accepts(DEBUG, "Sets logging to DEBUG.").withOptionalArg();
                 accepts(HELP, "Since you are seeing this, you probably know what this is for. :)").forHelp();
                 accepts(VERIFY_STATE, "Verifies that the Southpaw state indices and reverse indices are in sync");
             }
@@ -802,7 +792,6 @@ public class Southpaw {
             parser.printHelpOn(System.out);
             System.exit(0);
         }
-        if(options.has(DEBUG)) Logger.getRootLogger().setLevel(Level.DEBUG);
 
         Yaml yaml = new Yaml();
         Map<String, Object> config = yaml.load(FileHelper.getInputStream(new URI(options.valueOf(CONFIG).toString())));

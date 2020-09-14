@@ -1,5 +1,32 @@
 # Change log
 
+## 0.5.2
+September 10th, 2020
+
+### New Features
+* log4j-core updates [#62](https://github.com/jwplayer/southpaw/pull/62)
+* Jackson/Guava updates [#61](https://github.com/jwplayer/southpaw/pull/61)
+* Upgrade to log4j2 [#56](https://github.com/jwplayer/southpaw/pull/56)
+* Use https for maven central [#55](https://github.com/jwplayer/southpaw/pull/55)
+
+## 0.5.1
+August 22nd, 2019
+
+### New Features
+* Added new 'time.since.last.backup' metric for a non-sparse backup metric to monitor [#51](https://github.com/jwplayer/southpaw/pull/51)
+
+## 0.5.0
+August 9th, 2019
+
+### New Features
+* Add --verify-state CLI command for checking integrity of the RocksDB join indices [#45](https://github.com/jwplayer/southpaw/pull/45)
+
+### Bug Fixes
+* Update jackson-databind version to fix CVE-2019-12086 [#44](https://github.com/jwplayer/southpaw/pull/44)
+* Incrementally flush column families to ensure data integrity [#46](https://github.com/jwplayer/southpaw/pull/46)
+* Ensure RocksDB join index and reverse index are idempotent [#47](https://github.com/jwplayer/southpaw/pull/47)
+* Add tests for multi-index consistency [#48](https://github.com/jwplayer/southpaw/pull/48)
+
 ## 0.4.1
 May 14th, 2019
 
