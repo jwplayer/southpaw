@@ -37,7 +37,6 @@
         <version.jackson>2.11.1</version.jackson>
         <version.jopt.simple>4.9</version.jopt.simple>
         <version.kafka>1.0.0</version.kafka>
-        <version.kafka>2.0.0</version.kafka>
         <version.logback>1.2.3</version.logback>
         <version.rocksdb>5.17.2</version.rocksdb>
         <version.snakeyaml>1.20</version.snakeyaml>
@@ -52,7 +51,6 @@
         <modules.argline />
 
         <!-- Plugins -->
-        <version.cobertura.plugin>2.7</version.cobertura.plugin>
         <version.compiler.plugin>3.8.1</version.compiler.plugin>
         <version.enforcer.plugin>3.0.0-M3</version.enforcer.plugin>
         <version.jsonschema2pojo.plugin>1.0.0</version.jsonschema2pojo.plugin>
@@ -253,23 +251,6 @@
                     <execution>
                         <goals>
                             <goal>generate</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
-            <plugin>
-                <groupId>org.codehaus.mojo</groupId>
-                <artifactId>cobertura-maven-plugin</artifactId>
-                <version>${version.cobertura.plugin}</version>
-                <configuration>
-                    <check>
-                    </check>
-                </configuration>
-                <executions>
-                    <execution>
-                        <goals>
-                            <goal>clean</goal>
-                            <goal>check</goal>
                         </goals>
                     </execution>
                 </executions>
