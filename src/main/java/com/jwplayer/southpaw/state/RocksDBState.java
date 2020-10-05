@@ -252,24 +252,20 @@ public class RocksDBState extends BaseState {
     public void backup() {
         logger.info("Backing up RocksDB state");
         try {
-            backup(backupPath);
-
-            if(s3Helper != null) {
-                s3Helper.syncToS3(new URI(backupPath), backupURI);
-            }
-        } catch(InterruptedException | ExecutionException | URISyntaxException | RocksDBException ex) {
+            backupEngine.createNewBackup(rocksDB, true);
+            backupEngine.purgeOldBackups(backupsToKeep);
+        } catch(RocksDBException ex) {
             throw new RuntimeException(ex);
         }
-        logger.info("RocksDB state backup complete");
-    }
 
-    /**
-     * Backups the DB to a local path.
-     * @param backupPath - The local backup path
-     */
-    protected void backup(String backupPath) throws RocksDBException {
-        backupEngine.createNewBackup(rocksDB, true);
-        backupEngine.purgeOldBackups(backupsToKeep);
+        if(s3Helper != null) {
+            try {
+                s3Helper.syncToS3(new URI(backupPath), backupURI);
+            } catch(InterruptedException | ExecutionException | URISyntaxException ex) {
+                throw new RuntimeException(ex);
+            }
+        }
+        logger.info("RocksDB state backup complete");
     }
 
     @Override
