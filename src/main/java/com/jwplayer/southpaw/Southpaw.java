@@ -723,6 +723,7 @@ public class Southpaw {
     public static void deleteBackups(Map<String, Object> config) {
         BaseState state =  new RocksDBState(config);
         state.deleteBackups();
+        state.close();
     }
 
     /**
