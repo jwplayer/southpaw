@@ -132,6 +132,9 @@ public class Metrics {
         reporter.close();
     }
 
+    public StaticGauge<Long> registerOrGet(String name) {
+        return (StaticGauge<Long>) registry.getMetrics().getOrDefault(name, new StaticGauge<Long>());
+    }
     /**
      * Register an input topic for per topic metrics.
      * @param shortName - The topic short name to register the metric under

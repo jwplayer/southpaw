@@ -18,6 +18,7 @@ package com.jwplayer.southpaw.state;
 import com.codahale.metrics.Timer;
 import com.google.common.base.Preconditions;
 import com.jwplayer.southpaw.metric.Metrics;
+import com.jwplayer.southpaw.metric.StaticGauge;
 import com.jwplayer.southpaw.util.ByteArray;
 import com.jwplayer.southpaw.util.FileHelper;
 import com.jwplayer.southpaw.util.S3Helper;
@@ -342,6 +343,25 @@ public class RocksDBState extends BaseState {
         }
     }
 
+    private StatisticsCollectorCallback statsCallback = new StatisticsCollectorCallback() {
+        private String tickerTypeMetricName(TickerType tickerType) {
+            return String.format("rocksdb.%s", String.join(".", tickerType.name().toLowerCase().split("_")));
+        }
+
+        @Override
+        public void tickerCallback(TickerType tickerType, long l) {
+            String metricName = tickerTypeMetricName(tickerType);
+            StaticGauge<Long> metric = metrics.registerOrGet(metricName);
+            metric.update(l);
+            logger.debug("Metric {}, Value {}", metricName, l);
+        }
+
+        @Override
+        public void histogramCallback(HistogramType histogramType, HistogramData histogramData) {
+
+        }
+    };
+
     @Override
     public void open() {
         if(isOpen()){
@@ -457,64 +477,11 @@ public class RocksDBState extends BaseState {
                 cfHandles.put(new ByteArray(handle.getName()), handle);
             }
 
-            StatisticsCollectorCallback callback = new StatisticsCollectorCallback() {
-                @Override
-                public void tickerCallback(TickerType tickerType, long l) {
-                    if (tickerType == TickerType.NUMBER_KEYS_WRITTEN) {
-//                        logger.info("Keys written: " + l);
-                        try {
-                            logger.info(rocksDB.getProperty("rocksdb.dbstats"));
-                        } catch (RocksDBException e){
-                            logger.warn("Failed to get db stats", e);
-                        }
-//                    } else if (tickerType == TickerType.BLOOM_FILTER_USEFUL) {
-//                        logger.info("Bloom filter useful: " + l);
-//                    } else if (tickerType == TickerType.BLOOM_FILTER_PREFIX_CHECKED) {
-//                        logger.info("Bloom filter checked: " + l);
-//                    } else if (tickerType == TickerType.BLOOM_FILTER_PREFIX_USEFUL) {
-//                        logger.info("Bloom filter prefix useful: " + l);
-//                    } else if (tickerType == TickerType.BLOCK_CACHE_MISS) {
-//                        logger.info("Block cache miss: " + l);
-//                    } else if (tickerType == TickerType.BLOCK_CACHE_HIT) {
-//                        logger.info("Block cache hit: " + l);
-//                    }  else if (tickerType == TickerType.BLOCK_CACHE_INDEX_ADD) {
-//                        logger.info("Block cache index add: " + l);
-//                    }  else if (tickerType == TickerType.BLOCK_CACHE_INDEX_HIT) {
-//                        logger.info("Block cache index hit: " + l);
-//                    }  else if (tickerType == TickerType.BLOCK_CACHE_INDEX_MISS) {
-//                        logger.info("Block cache index miss: " + l);
-//                    } else if (tickerType == TickerType.BLOCK_CACHE_FILTER_ADD) {
-//                        logger.info("Block cache filter add: " + l);
-//                    } else if (tickerType == TickerType.BLOCK_CACHE_FILTER_HIT) {
-//                        logger.info("Block cache filter hit: " + l);
-//                    } else if (tickerType == TickerType.BLOCK_CACHE_FILTER_MISS) {
-//                        logger.info("Block cache filter miss: " + l);
-//                    } else if (tickerType == TickerType.MEMTABLE_MISS) {
-//                        logger.info("memtable miss: " + l);
-//                    } else if (tickerType == TickerType.MEMTABLE_HIT) {
-//                        logger.info("memtable hit: " + l);
-//                    } else if (tickerType == TickerType.GET_HIT_L0) {
-//                        logger.info("L0 hit: " + l);
-//                    } else if (tickerType == TickerType.GET_HIT_L1) {
-//                        logger.info("L1 hit: " + l);
-//                    } else if (tickerType == TickerType.GET_HIT_L2_AND_UP) {
-//                        logger.info("L2+ hit: " + l);
-//                    }  else if (tickerType == TickerType.BYTES_READ) {
-//                        logger.info("Bytes read: " + l);
-//                    }  else if (tickerType == TickerType.BYTES_WRITTEN) {
-//                        logger.info("Bytes written: " + l);
-                    }
-                }
 
-                @Override
-                public void histogramCallback(HistogramType histogramType, HistogramData histogramData) {
-
-                }
-            };
-
-            StatsCollectorInput statsInput = new StatsCollectorInput(rocksDBOptions.statistics(), callback);
-
-            statisticsCollector = new StatisticsCollector(Collections.singletonList(statsInput), 1000);
+            statisticsCollector = new StatisticsCollector(
+                    Collections.singletonList(new StatsCollectorInput(rocksDBOptions.statistics(), statsCallback)),
+                    1000
+            );
             statisticsCollector.start();
 
 
