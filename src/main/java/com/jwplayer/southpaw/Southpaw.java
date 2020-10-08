@@ -144,20 +144,12 @@ public class Southpaw {
     protected static class Config {
         public static final String BACKUP_TIME_S_CONFIG = "backup.time.s";
         public static final int BACKUP_TIME_S_DEFAULT = 1800;
-        public static final String BACKUP_TIME_S_DOC = "Time interval (roughly) between backups";
         public static final String COMMIT_TIME_S_CONFIG = "commit.time.s";
         public static final int COMMIT_TIME_S_DEFAULT = 0;
-        public static final String COMMIT_TIME_S_DOC = "Time interval (roughly) between commits";
         public static final String CREATE_RECORDS_TRIGGER_CONFIG = "create.records.trigger";
         public static final int CREATE_RECORDS_TRIGGER_DEFAULT = 250000;
-        public static final String CREATE_RECORDS_TRIGGER_DOC =
-                "Config for when to create denormalized records once the number of records to create has exceeded " +
-                        "a certain amount";
         public static final String TOPIC_LAG_TRIGGER_CONFIG = "topic.lag.trigger";
         public static final String TOPIC_LAG_TRIGGER_DEFAULT = "1000";
-        public static final String TOPIC_LAG_TRIGGER_DOC =
-                "Config for when to switch from one topic to the next (or to stop processing a topic entirely), " +
-                        "when lag drops below this value.";
 
         public int backupTimeS;
         public int commitTimeS;
@@ -763,7 +755,6 @@ public class Southpaw {
     public static void main(String args[]) throws Exception {
         String BUILD = "build";
         String CONFIG = "config";
-        String DEBUG = "debug";
         String DELETE_BACKUP = "delete-backup";
         String DELETE_STATE = "delete-state";
         String HELP = "help";
