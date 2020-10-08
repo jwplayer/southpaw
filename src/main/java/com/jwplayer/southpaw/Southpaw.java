@@ -46,6 +46,7 @@ import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
 
 import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.*;
@@ -181,7 +182,7 @@ public class Southpaw {
      * @throws URISyntaxException -
      */
     public Southpaw(Map<String, Object> rawConfig, List<URI> relations)
-            throws ClassNotFoundException, IllegalAccessException, InstantiationException, IOException, URISyntaxException {
+            throws ClassNotFoundException, IllegalAccessException, InstantiationException, IOException, URISyntaxException, NoSuchMethodException, InvocationTargetException {
         this(rawConfig, loadRelations(Preconditions.checkNotNull(relations)));
     }
 
@@ -191,7 +192,7 @@ public class Southpaw {
      * @param relations - The top level relations that define the denormalized objects to construct
      */
     public Southpaw(Map<String, Object> rawConfig, Relation[] relations)
-            throws ClassNotFoundException, IllegalAccessException, InstantiationException {
+            throws ClassNotFoundException, IllegalAccessException, InstantiationException, NoSuchMethodException, InvocationTargetException {
         validateRootRelations(relations);
 
         this.rawConfig = Preconditions.checkNotNull(rawConfig);
@@ -578,7 +579,7 @@ public class Southpaw {
      * @return A map of topics
      */
     protected Map<String, BaseTopic<BaseRecord, BaseRecord>> createInputTopics(Relation relation)
-            throws ClassNotFoundException, IllegalAccessException, InstantiationException {
+            throws ClassNotFoundException, IllegalAccessException, InstantiationException, NoSuchMethodException, InvocationTargetException {
         Map<String, BaseTopic<BaseRecord, BaseRecord>> topics = new HashMap<>();
 
         topics.put(relation.getEntity(), createTopic(relation.getEntity()));
@@ -602,12 +603,12 @@ public class Southpaw {
      */
     @SuppressWarnings("unchecked")
     protected BaseTopic<byte[], DenormalizedRecord> createOutputTopic(String shortName)
-            throws ClassNotFoundException, IllegalAccessException, InstantiationException {
+            throws ClassNotFoundException, IllegalAccessException, InstantiationException, NoSuchMethodException, InvocationTargetException {
         Map<String, Object> topicConfig = createTopicConfig(shortName);
         Class keySerdeClass = Class.forName(Preconditions.checkNotNull(topicConfig.get(BaseTopic.KEY_SERDE_CLASS_CONFIG).toString()));
         Class valueSerdeClass = Class.forName(Preconditions.checkNotNull(topicConfig.get(BaseTopic.VALUE_SERDE_CLASS_CONFIG).toString()));
-        Serde<byte[]> keySerde = (Serde<byte[]>) keySerdeClass.newInstance();
-        Serde<DenormalizedRecord> valueSerde = (Serde<DenormalizedRecord>) valueSerdeClass.newInstance();
+        Serde<byte[]> keySerde = (Serde<byte[]>) keySerdeClass.getDeclaredConstructor().newInstance();
+        Serde<DenormalizedRecord> valueSerde = (Serde<DenormalizedRecord>) valueSerdeClass.getDeclaredConstructor().newInstance();
         return createTopic(
                 shortName,
                 topicConfig,
@@ -638,14 +639,14 @@ public class Southpaw {
      */
     @SuppressWarnings("unchecked")
     protected <K extends BaseRecord, V extends BaseRecord> BaseTopic<K, V> createTopic(String shortName)
-            throws ClassNotFoundException, IllegalAccessException, InstantiationException {
+            throws ClassNotFoundException, IllegalAccessException, InstantiationException, NoSuchMethodException, InvocationTargetException {
         Map<String, Object> topicConfig = createTopicConfig(shortName);
         Class keySerdeClass = Class.forName(Preconditions.checkNotNull(topicConfig.get(BaseTopic.KEY_SERDE_CLASS_CONFIG).toString()));
         Class valueSerdeClass = Class.forName(Preconditions.checkNotNull(topicConfig.get(BaseTopic.VALUE_SERDE_CLASS_CONFIG).toString()));
         Class filterClass = Class.forName(topicConfig.getOrDefault(BaseTopic.FILTER_CLASS_CONFIG, BaseTopic.FILTER_CLASS_DEFAULT).toString());
-        BaseSerde<K> keySerde = (BaseSerde<K>) keySerdeClass.newInstance();
-        BaseSerde<V> valueSerde = (BaseSerde<V>) valueSerdeClass.newInstance();
-        BaseFilter filter = (BaseFilter) filterClass.newInstance();
+        BaseSerde<K> keySerde = (BaseSerde<K>) keySerdeClass.getDeclaredConstructor().newInstance();
+        BaseSerde<V> valueSerde = (BaseSerde<V>) valueSerdeClass.getDeclaredConstructor().newInstance();
+        BaseFilter filter = (BaseFilter) filterClass.getDeclaredConstructor().newInstance();
         return createTopic(
                 shortName,
                 topicConfig,
@@ -674,9 +675,9 @@ public class Southpaw {
             Serde<K> keySerde,
             Serde<V> valueSerde,
             BaseFilter filter,
-            Metrics metrics) throws ClassNotFoundException, IllegalAccessException, InstantiationException {
+            Metrics metrics) throws ClassNotFoundException, IllegalAccessException, InstantiationException, NoSuchMethodException, InvocationTargetException {
         Class topicClass = Class.forName(Preconditions.checkNotNull(southpawConfig.get(BaseTopic.TOPIC_CLASS_CONFIG).toString()));
-        BaseTopic<K, V> topic = (BaseTopic<K, V>) topicClass.newInstance();
+        BaseTopic<K, V> topic = (BaseTopic<K, V>) topicClass.getDeclaredConstructor().newInstance();
         keySerde.configure(southpawConfig, true);
         valueSerde.configure(southpawConfig, false);
         filter.configure(southpawConfig);
