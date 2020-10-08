@@ -151,9 +151,24 @@ public class Southpaw {
         public static final String TOPIC_LAG_TRIGGER_CONFIG = "topic.lag.trigger";
         public static final String TOPIC_LAG_TRIGGER_DEFAULT = "1000";
 
+        /**
+         * Time interval (roughly) between backups
+         */
         public int backupTimeS;
+
+        /**
+         * Time interval (roughly) between commits
+         */
         public int commitTimeS;
+
+        /**
+         * Config for when to create denormalized records once the number of records to create has exceeded a certain amount
+         */
         public int createRecordsTrigger;
+
+        /**
+         * Config for when to switch from one topic to the next (or to stop processing a topic entirely), when lag drops below this value
+         */
         public int topicLagTrigger;
 
         public Config(Map<String, Object> rawConfig) throws ClassNotFoundException {
