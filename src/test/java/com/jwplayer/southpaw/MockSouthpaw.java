@@ -22,6 +22,7 @@ import com.jwplayer.southpaw.topic.BaseTopic;
 import com.jwplayer.southpaw.util.ByteArray;
 
 import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.AbstractMap;
@@ -35,7 +36,7 @@ import java.util.Set;
  */
 public class MockSouthpaw extends Southpaw {
     public MockSouthpaw(Map<String, Object> config, List<URI> uris)
-            throws ClassNotFoundException, IllegalAccessException, InstantiationException, IOException, URISyntaxException {
+            throws ClassNotFoundException, IllegalAccessException, InstantiationException, IOException, URISyntaxException, NoSuchMethodException, InvocationTargetException {
         super(config, uris);
     }
 
