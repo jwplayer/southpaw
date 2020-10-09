@@ -24,3 +24,6 @@ relations/
 # IntelliJ
 .idea/
 *.iml
+
+# jenv
+*.java-version
