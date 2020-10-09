@@ -143,6 +143,12 @@
             <artifactId>metrics-jmx</artifactId>
             <version>${version.dropwizard}</version>
         </dependency>
+        <dependency>
+            <groupId>javax.xml.bind</groupId>
+            <artifactId>jaxb-api</artifactId>
+            <version>${version.xml.bind}</version>
+        </dependency>
+        
         <!-- Test Dependencies -->
         <dependency>
             <groupId>junit</groupId>
@@ -173,11 +179,6 @@
             <artifactId>mockito-core</artifactId>
             <version>${version.mockito}</version>
             <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>javax.xml.bind</groupId>
-            <artifactId>jaxb-api</artifactId>
-            <version>${version.xml.bind}</version>
         </dependency>
     </dependencies>
     <build>
