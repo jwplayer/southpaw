@@ -390,7 +390,7 @@ Southpaw exposes basic metrics about its operation and performance through JMX u
 
 ## Logging
 
-Southpaw makes use of [log4j2](https://logging.apache.org/log4j/2.x/) for logging. Refer to log4j2 documentation for how to easily configure logging to fit your needs.
+Southpaw makes use of [logback](http://logback.qos.ch) for logging. Refer to logback documentation for how to easily configure logging to fit your needs.
 
 ## Known Issues
 
