@@ -227,6 +227,7 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
                 entryRICache.remove(primaryKey);
                 pendingRIWrites.remove(primaryKey);
             } else {
+                entryRICache.remove(primaryKey);
                 putRIToState(primaryKey, foreignKeys);
             }
         }
@@ -244,6 +245,7 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
                     entryCache.remove(foreignKey);
                     pendingWrites.remove(foreignKey);
                 } else {
+                    entryCache.remove(foreignKey);
                     putToState(foreignKey, primaryKeys);
                 }
                 return true;
@@ -296,7 +298,7 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
             AbstractMap.SimpleEntry<byte[], byte[]> pair = iter.next();
             ByteArray revIndexPrimaryKey = new ByteArray(pair.getKey());
             ByteArraySet revIndexForeignKeySet = ByteArraySet.deserialize(pair.getValue());
-            for (ByteArray indexPrimaryKey : revIndexForeignKeySet.toArray()) {
+            for (ByteArray indexPrimaryKey : revIndexForeignKeySet) {
                 ByteArraySet indexForeignKeySet = getIndexEntry(indexPrimaryKey);
 
                 if(indexForeignKeySet != null) {
@@ -323,7 +325,7 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
             AbstractMap.SimpleEntry<byte[], byte[]> pair = iter.next();
             ByteArray indexPrimaryKey = new ByteArray(pair.getKey());
             ByteArraySet indexForeignKeySet = ByteArraySet.deserialize(pair.getValue());
-            for (ByteArray revIndexPrimaryKey : indexForeignKeySet.toArray()) {
+            for (ByteArray revIndexPrimaryKey : indexForeignKeySet) {
                 ByteArraySet revIndexforeignKeySet = getForeignKeys(revIndexPrimaryKey);
 
                 if(revIndexforeignKeySet != null) {

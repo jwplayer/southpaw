@@ -88,6 +88,10 @@ public class Southpaw {
      */
     private static final Logger logger = Logger.getLogger(Southpaw.class);
     /**
+     * Whether to log debug statements to INFO
+     */
+    private Boolean logToInfo = false;
+    /**
      * Used for doing object <-> JSON mappings
      */
     private static final ObjectMapper mapper = new ObjectMapper();
@@ -267,15 +271,45 @@ public class Southpaw {
                     while (records.hasNext()) {
                         ConsumerRecord<BaseRecord, BaseRecord> newRecord = records.next();
                         ByteArray primaryKey = newRecord.key().toByteArray();
+
+                        // Whether to log debug statements to INFO
+                        logToInfo = entity.equals("user_custom_params") || entity.equals("media_custom_params");
+
+                        if (true || logToInfo) {
+                            logger.info("---------------------------------");
+                            logger.info(String.format("Processing %s record key: %s", entity, primaryKey.toString()));
+                        }
+
                         for (Relation root : relations) {
-                            Set<ByteArray> dePrimaryKeys = dePKsByType.get(root);
+
+                            if (logToInfo) {
+                                logger.info("------------------");
+                                logger.info(String.format("Processing relation: %s", root.getEntity()));
+                            }
+
+                            ByteArraySet dePrimaryKeys = dePKsByType.get(root);
                             if (root.getEntity().equals(entity)) {
+
+                                if (logToInfo) {
+                                    logger.info("Input record pertains to the top-level relation");
+                                }
+
                                 // The top level relation is the relation of the input record
                                 dePrimaryKeys.add(primaryKey);
                             } else {
+
+                                if (logToInfo) {
+                                    logger.info("Input record pertains to a child relation");
+                                }
+
                                 // Check the child relations instead
                                 AbstractMap.SimpleEntry<Relation, Relation> child = getRelation(root, entity);
                                 if (child != null && child.getValue() != null) {
+
+                                    if (logToInfo) {
+                                        logger.info(String.format("Found %s matching child relation", child.getValue().getEntity()));
+                                    }
+
                                     BaseIndex<BaseRecord, BaseRecord, Set<ByteArray>> parentIndex =
                                             fkIndices.get(createParentIndexName(root, child.getKey(), child.getValue()));
                                     ByteArray newParentKey = null;
@@ -287,36 +321,96 @@ public class Southpaw {
                                             fkIndices.get(createJoinIndexName(child.getValue()));
                                     oldParentKeys = ((Reversible) joinIndex).getForeignKeys(primaryKey);
 
+                                    if (logToInfo) {
+                                        if (newParentKey != null) {
+                                            logger.info(String.format("New parent key: %s", newParentKey.toString()));
+                                        } else {
+                                            logger.info("New parent key: null");
+                                        }
+                                    }
+
                                     // Create the denormalized records
                                     if (oldParentKeys != null) {
+
+                                        if (logToInfo) {
+                                            logger.info(String.format("Found %d old parent keys", oldParentKeys.size()));
+                                        }
+
                                         for (ByteArray oldParentKey : oldParentKeys) {
-                                            if (!ObjectUtils.equals(oldParentKey, newParentKey)) {
-                                                Set<ByteArray> primaryKeys = parentIndex.getIndexEntry(oldParentKey);
-                                                if (primaryKeys != null) {
-                                                    dePrimaryKeys.addAll(primaryKeys);
+                                            if (logToInfo) {
+                                                if (oldParentKey != null) {
+                                                    logger.info(String.format("Old parent key: %s", oldParentKey.toString()));
+                                                } else {
+                                                    logger.info("Old parent key: null");
                                                 }
                                             }
+                                            if (!ObjectUtils.equals(oldParentKey, newParentKey)) {
+                                                if (logToInfo) {
+                                                    logger.info("Old parent key does not match the new parent key");
+                                                }
+                                                Set<ByteArray> primaryKeys = parentIndex.getIndexEntry(oldParentKey);
+                                                if (primaryKeys != null) {
+                                                    if (logToInfo) {
+                                                        logger.info(String.format("Found %d matching primary keys in the parent index for the old parent key", primaryKeys.size()));
+                                                    }
+                                                    dePrimaryKeys.addAll(primaryKeys);
+                                                } else {
+                                                    if (logToInfo) {
+                                                        logger.info("Found no matching primary keys in the parent index for the old parent key");
+                                                    }
+                                                }
+                                            } else {
+                                                if (logToInfo) {
+                                                    logger.info("Old parent key matches the new parent key");
+                                                }
+                                            }
+                                        }
+                                    } else {
+                                        if (logToInfo) {
+                                            logger.info("Old parent keys: null");
                                         }
                                     }
                                     if (newParentKey != null) {
                                         Set<ByteArray> primaryKeys = parentIndex.getIndexEntry(newParentKey);
                                         if (primaryKeys != null) {
+                                            if (logToInfo) {
+                                                logger.info(String.format("Found %d matching primary keys in the parent index for the new parent key", primaryKeys.size()));
+                                            }
                                             dePrimaryKeys.addAll(primaryKeys);
+                                        } else {
+                                            if (logToInfo) {
+                                                logger.info("Found no matching primary keys in the parent index for the new parent key");
+                                            }
                                         }
+                                    }
+                                    if (logToInfo) {
+                                        logger.info(String.format("Found %d matching denormalized primary keys", dePrimaryKeys.size()));
                                     }
                                     // Update the join index
                                     updateJoinIndex(child.getValue(), primaryKey, newRecord);
+                                    if (logToInfo) {
+                                        logger.info(String.format("Updated join index, still processing %d matching denormalized primary keys", dePrimaryKeys.size()));
+                                    }
                                 }
                             }
                             int size = dePrimaryKeys.size();
                             if(size > config.createRecordsTrigger) {
+                                if (logToInfo) {
+                                    logger.info(String.format("Creating %s denormalized records for %d primary keys", root.getEntity(), size));
+                                }
                                 createDenormalizedRecords(root, dePrimaryKeys);
                                 dePrimaryKeys.clear();
+                            } else if (size > 0) {
+                                if (logToInfo) {
+                                    logger.info(String.format("Not yet creating %s denormalized records for %d primary keys", root.getEntity(), size));
+                                }
                             }
                             metrics.denormalizedRecordsToCreateByTopic.get(root.getDenormalizedName()).update((long) size);
                         }
                         metrics.recordsConsumed.mark(1);
                         metrics.recordsConsumedByTopic.get(entity).mark(1);
+
+                        logToInfo = false;
                     }
 
                     metrics.timeSinceLastBackup.update(backupWatch.getTime());
@@ -353,6 +447,9 @@ public class Southpaw {
 
             // Create the denormalized records that have been queued up
             for(Map.Entry<Relation, ByteArraySet> entry: dePKsByType.entrySet()) {
+                if (entry.getValue().size() > 0) {
+                    logger.info(String.format("Creating %s queued-up denormalized records for %d primary keys", entry.getKey().getEntity(), entry.getValue().size()));
+                }
                 createDenormalizedRecords(entry.getKey(), entry.getValue());
                 entry.getValue().clear();
             }
@@ -491,12 +588,28 @@ public class Southpaw {
      */
     protected void createDenormalizedRecords(
             Relation root,
-            Set<ByteArray> rootRecordPKs) {
+            ByteArraySet rootRecordPKs) {
+        int nbWrittenDenormalizedRecords = 0;
         for(ByteArray dePrimaryKey: rootRecordPKs) {
             if(dePrimaryKey != null) {
                 BaseTopic<byte[], DenormalizedRecord> outputTopic = outputTopics.get(root.getDenormalizedName());
                 scrubParentIndices(root, root, dePrimaryKey);
                 DenormalizedRecord newDeRecord = createDenormalizedRecord(root, root, dePrimaryKey, dePrimaryKey);
+
+                if (dePrimaryKey.toString().equals("37cc91") || dePrimaryKey.toString().equals("381be0")) {
+                    logger.info(
+                            String.format(
+                                    "Root Entity: %s / Primary Key: %s",
+                                    root.getEntity(), dePrimaryKey.toString()
+                            )
+                    );
+                    try {
+                        logger.info(mapper.writeValueAsString(newDeRecord));
+                    } catch (Exception ex) {
+                        // noop
+                    }
+                }
+
                 if(logger.getLevel().equals(Level.DEBUG)) {
                     try {
                         logger.debug(
@@ -515,12 +628,16 @@ public class Southpaw {
                         dePrimaryKey.getBytes(),
                         newDeRecord
                 );
+                nbWrittenDenormalizedRecords += 1;
             }
             metrics.denormalizedRecordsCreated.mark(1);
             metrics.denormalizedRecordsCreatedByTopic.get(root.getDenormalizedName()).mark(1);
             metrics.denormalizedRecordsToCreate.update(metrics.denormalizedRecordsToCreate.getValue() - 1);
             metrics.denormalizedRecordsToCreateByTopic.get(root.getDenormalizedName())
                     .update(metrics.denormalizedRecordsToCreateByTopic.get(root.getDenormalizedName()).getValue() - 1);
+        }
+        if (logToInfo) {
+            logger.info(String.format("Ordered the creation of %d %s denormalized records", nbWrittenDenormalizedRecords, root.getEntity()));
         }
     }
 

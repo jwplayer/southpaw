@@ -16,6 +16,7 @@
 package com.jwplayer.southpaw.util;
 
 import org.apache.commons.lang.NotImplementedException;
+import org.apache.commons.lang.RandomStringUtils;
 import org.junit.Test;
 
 import java.util.*;
@@ -44,6 +45,510 @@ public class ByteArraySetTest {
         Collections.shuffle(numbers);
         set.addAll(numbers);
         return set;
+    }
+
+    public List<ByteArray> getRandomByteArrays(int count) {
+        List<ByteArray> vals = new ArrayList<>();
+        while(vals.size() < count) {
+            String val = RandomStringUtils.randomAlphanumeric(6);
+            if (!vals.contains(val)) {
+                vals.add(new ByteArray(val));
+            }
+        }
+        Collections.shuffle(vals);
+        return vals;
+    }
+
+    public void testAdd(int size) {
+        ByteArraySet set = new ByteArraySet();
+
+        List<ByteArray> vals = getRandomByteArrays(size);
+
+        List<ByteArray> insertedVals = new ArrayList<>();
+        for (ByteArray val: vals) {
+            assertTrue(set.add(val));
+            assertTrue(set.contains(val));
+            insertedVals.add(val);
+            assertEquals(insertedVals.size(), set.size());
+        }
+
+        for (ByteArray val: vals) {
+            assertFalse(set.add(val));
+            assertTrue(set.contains(val));
+        }
+        assertEquals(size, set.size());
+
+        for (ByteArray val: vals) {
+            assertTrue(set.contains(val));
+        }
+    }
+
+    @Test
+    public void emptyAdd() {
+        testAdd(0);
+    }
+
+    @Test
+    public void reallySmallAdd() {
+        testAdd(1);
+    }
+
+    @Test
+    public void smallAdd() {
+        testAdd(2);
+    }
+
+    @Test
+    public void regularAdd() {
+        testAdd(150);
+    }
+
+    @Test
+    public void bigAdd() {
+        testAdd(750);
+    }
+
+    @Test
+    public void reallyBigAdd() {
+        testAdd(3567);
+    }
+
+    public void testAddAll(int size) {
+        ByteArraySet set = new ByteArraySet();
+
+        List<ByteArray> vals = getRandomByteArrays(size);
+
+        for (ByteArray val: vals) {
+            assertTrue(set.add(val));
+        }
+        assertEquals(size, set.size());
+
+        List<ByteArray> stagedVals = getRandomByteArrays(size);
+        Set<ByteArray> extraVals = new HashSet<ByteArray>();
+        while(extraVals.size() < size) {
+            if (stagedVals.size() == 0) {
+                stagedVals = getRandomByteArrays(size);
+            }
+            ByteArray val = stagedVals.get(0);
+            stagedVals.remove(0);
+            if (!vals.contains(val) && !extraVals.contains(val)) {
+                extraVals.add(val);
+            }
+        }
+
+        set.addAll(extraVals);
+        assertEquals(2 * size, set.size());
+
+        for (ByteArray val: vals) {
+            assertTrue(set.contains(val));
+        }
+        for (ByteArray val: extraVals) {
+            assertTrue(set.contains(val));
+        }
+        for (ByteArray val: set) {
+            assertTrue(vals.contains(val) || extraVals.contains(val));
+        }
+    }
+
+    @Test
+    public void emptyAddAll() {
+        testAddAll(0);
+    }
+
+    @Test
+    public void reallySmallAddAll() {
+        testAddAll(1);
+    }
+
+    @Test
+    public void smallAddAll() {
+        testAddAll(2);
+    }
+
+    @Test
+    public void regularAddAll() {
+        testAddAll(150);
+    }
+
+    @Test
+    public void bigAddAll() {
+        testAddAll(750);
+    }
+
+    @Test
+    public void reallyBigAddAll() {
+        testAddAll(3567);
+    }
+
+    public void testSimilarAdd(boolean forceMerger) {
+        ByteArraySet set = new ByteArraySet();
+
+        List<ByteArray> vals = new ArrayList<>();
+        vals.add(new ByteArray("bytear"));
+        vals.add(new ByteArray("ByteAr"));
+        vals.add(new ByteArray("bytea0"));
+        vals.add(new ByteArray("0ytear"));
+
+        List<ByteArray> insertedVals = new ArrayList<>();
+        for (ByteArray val: vals) {
+            if (forceMerger) {
+                set.serialize();
+            }
+            assertTrue(set.add(val));
+            assertTrue(set.contains(val));
+            insertedVals.add(val);
+            assertEquals(insertedVals.size(), set.size());
+        }
+
+        assertEquals(4, set.size());
+
+        for (ByteArray val: vals) {
+            assertTrue(set.contains(val));
+        }
+    }
+
+    @Test
+    public void testMergedSimilarAdd() {
+        testSimilarAdd(true);
+    }
+
+    @Test
+    public void testUnmergedSimilarAdd() {
+        testSimilarAdd(false);
+    }
+
+    public void testSerializeDeserialize(int size, byte leadingByte) {
+        ByteArraySet set = new ByteArraySet();
+
+        List<ByteArray> vals = getRandomByteArrays(size);
+
+        for (ByteArray val: vals) {
+            assertTrue(set.add(val));
+        }
+        if (size > 0) {
+            assertFalse(set.isEmpty());
+        } else {
+            assertTrue(set.isEmpty());
+        }
+        Collections.shuffle(vals);
+
+        byte[] bytes = set.serialize();
+        assertEquals(leadingByte, bytes[0]);
+        ByteArraySet deSet = ByteArraySet.deserialize(bytes);
+
+        for(ByteArray val: vals) {
+            assertTrue(deSet.contains(val));
+        }
+        assertEquals(size, deSet.size());
+
+        int count = 0;
+        for(ByteArray val: deSet) {
+            assertTrue(vals.contains(val));
+            count++;
+        }
+        assertEquals(size, count);
+    }
+
+    @Test
+    public void emptySerializeDeserialize() {
+        testSerializeDeserialize(0, (byte) 0);
+    }
+
+    @Test
+    public void reallySmallSerializeDeserialize() {
+        testSerializeDeserialize(1, (byte) 1);
+    }
+
+    @Test
+    public void smallSerializeDeserialize() {
+        testSerializeDeserialize(2, (byte) 2);
+    }
+
+    @Test
+    public void regularSerializeDeserialize() {
+        testSerializeDeserialize(150, (byte) 2);
+    }
+
+    @Test
+    public void bigSerializeDeserialize() {
+        testSerializeDeserialize(750, (byte) 3);
+    }
+
+    @Test
+    public void reallyBigSerializeDeserialize() {
+        testSerializeDeserialize(3567, (byte) 3);
+    }
+
+    public void testIterator(int size) {
+        ByteArraySet set = new ByteArraySet();
+
+        List<ByteArray> vals = getRandomByteArrays(size);
+
+        for (ByteArray val: vals) {
+            assertTrue(set.add(val));
+        }
+        if (size > 0) {
+            assertFalse(set.isEmpty());
+        } else {
+            assertTrue(set.isEmpty());
+        }
+        assertEquals(size, set.size());
+
+        Iterator<ByteArray> iter = set.iterator();
+        List<ByteArray> alreadySeenVals = new ArrayList<>();
+        int count = 0;
+        while(iter.hasNext()) {
+            ByteArray val = iter.next();
+            assertTrue(!alreadySeenVals.contains(val));
+            alreadySeenVals.add(val);
+            assertTrue(vals.contains(val));
+            count++;
+        }
+        assertEquals(size, count);
+    }
+
+    @Test
+    public void emptyIterator() {
+        testIterator(0);
+    }
+
+    @Test
+    public void reallySmallIterator() {
+        testIterator(1);
+    }
+
+    @Test
+    public void smallIterator() {
+        testIterator(2);
+    }
+
+    @Test
+    public void regularIterator() {
+        testIterator(150);
+    }
+
+    @Test
+    public void bigIterator() {
+        testIterator(750);
+    }
+
+    @Test
+    public void reallyBigIterator() {
+        testIterator(3567);
+    }
+
+    public void testRemove(int size) {
+        ByteArraySet set = new ByteArraySet();
+
+        List<ByteArray> vals = getRandomByteArrays(size);
+
+        for (ByteArray val: vals) {
+            assertTrue(set.add(val));
+        }
+        if (size > 0) {
+            assertFalse(set.isEmpty());
+        } else {
+            assertTrue(set.isEmpty());
+        }
+        Collections.shuffle(vals);
+
+        int count = 0;
+        for(ByteArray val: set) {
+            assertTrue(vals.contains(val));
+            count++;
+        }
+        assertEquals(size, count);
+
+        int currentSize = size;
+        for(ByteArray val: vals) {
+            assertTrue(set.remove(val));
+            assertFalse(set.contains(val));
+            currentSize -= 1;
+            assertEquals(currentSize, set.size());
+        }
+    }
+
+    @Test
+    public void emptyRemove() {
+        testRemove(0);
+    }
+
+    @Test
+    public void reallySmallRemove() {
+        testRemove(1);
+    }
+
+    @Test
+    public void smallRemove() {
+        testRemove(2);
+    }
+
+    @Test
+    public void regularRemove() {
+        testRemove(150);
+    }
+
+    @Test
+    public void bigRemove() {
+        testRemove(750);
+    }
+
+    @Test
+    public void reallyBigRemove() {
+        testRemove(3567);
+    }
+
+    public void testSimilarRemove(boolean forceMerger) {
+        ByteArraySet set = new ByteArraySet();
+
+        List<ByteArray> vals = new ArrayList<>();
+        vals.add(new ByteArray("bytear"));
+        vals.add(new ByteArray("ByteAr"));
+        vals.add(new ByteArray("bytea0"));
+        vals.add(new ByteArray("0ytear"));
+
+        for (ByteArray val: vals) {
+            assertTrue(set.add(val));
+        }
+        assertEquals(4, set.size());
+        Collections.shuffle(vals);
+
+        if (forceMerger) {
+            set.serialize();
+        }
+
+        List<ByteArray> deletedVals = new ArrayList<>();
+        for(ByteArray val: vals) {
+            assertTrue(set.remove(val));
+            assertFalse(set.contains(val));
+
+            deletedVals.add(val);
+            assertEquals(4, set.size() + deletedVals.size());
+        }
+    }
+
+    @Test
+    public void testMergedSimilarRemove() {
+        testSimilarRemove(true);
+    }
+
+    @Test
+    public void testUnmergedSimilarRemove() {
+        testSimilarRemove(false);
+    }
+
+    public void testToArray(int size) {
+        ByteArraySet set = new ByteArraySet();
+
+        List<ByteArray> vals = getRandomByteArrays(size);
+
+        for (ByteArray val: vals) {
+            assertTrue(set.add(val));
+        }
+        if (size > 0) {
+            assertFalse(set.isEmpty());
+        } else {
+            assertTrue(set.isEmpty());
+        }
+
+        List<ByteArray> alreadySeenVals = new ArrayList<>();
+        int seenCount = 0;
+        for(ByteArray val: set.toArray()) {
+            assertFalse(alreadySeenVals.contains(val));
+            alreadySeenVals.add(val);
+            assertTrue(vals.contains(val));
+            seenCount++;
+        }
+        assertEquals(size, seenCount);
+    }
+
+    @Test
+    public void emptyToArray() {
+        testToArray(0);
+    }
+
+    @Test
+    public void reallySmallToArray() {
+        testToArray(1);
+    }
+
+    @Test
+    public void smallToArray() {
+        testToArray(2);
+    }
+
+    @Test
+    public void regularToArray() {
+        testToArray(150);
+    }
+
+    @Test
+    public void bigToArray() {
+        testToArray(750);
+    }
+
+    @Test
+    public void reallyBigToArray() {
+        testToArray(3567);
+    }
+
+    public void testContains(int size) {
+        ByteArraySet set = new ByteArraySet();
+
+        List<ByteArray> vals = getRandomByteArrays(size);
+
+        for (ByteArray val: vals) {
+            assertTrue(set.add(val));
+        }
+        if (size > 0) {
+            assertFalse(set.isEmpty());
+        } else {
+            assertTrue(set.isEmpty());
+        }
+        Collections.shuffle(vals);
+
+        for(ByteArray val: vals) {
+            assertTrue(set.contains(val));
+        }
+
+        List<ByteArray> absentVals = getRandomByteArrays(10);
+        for(ByteArray val: absentVals) {
+            if (vals.contains(val)) {
+                assertTrue(set.contains(val));
+            } else {
+                assertFalse(set.contains(val));
+            }
+        }
+    }
+
+    @Test
+    public void emptyContains() {
+        testContains(0);
+    }
+
+    @Test
+    public void reallySmallContains() {
+        testContains(1);
+    }
+
+    @Test
+    public void smallContains() {
+        testContains(2);
+    }
+
+    @Test
+    public void regularContains() {
+        testContains(150);
+    }
+
+    @Test
+    public void bigContains() {
+        testContains(750);
+    }
+
+    @Test
+    public void reallyBigContains() {
+        testContains(3567);
     }
 
     @Test
