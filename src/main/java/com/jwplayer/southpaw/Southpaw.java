@@ -274,7 +274,7 @@ public class Southpaw {
                         ByteArray primaryKey = newRecord.key().toByteArray();
 
                         // Whether to log debug statements to INFO
-                        Boolean logToInfo = entity.equals("user_custom_params") || primaryKey.toString().equals("37cc91") || primaryKey.toString().equals("381be0");
+                        Boolean logToInfo = entity.equals("user_custom_params");
 
                         if (logToInfo) {
                             logger.info("---------------------------------");
@@ -574,14 +574,14 @@ public class Southpaw {
                 Boolean logToInfo = dePrimaryKey.toString().equals("37cc91") || dePrimaryKey.toString().equals("381be0");
 
                 if (logToInfo) {
-                    logger.debug(
+                    logger.info(
                             String.format(
                                     "Root Entity: %s / Primary Key: %s",
                                     root.getEntity(), dePrimaryKey.toString()
                             )
                     );
                     try {
-                        logger.debug(mapper.writeValueAsString(newDeRecord));
+                        logger.info(mapper.writeValueAsString(newDeRecord));
                     } catch (Exception ex) {
                         // noop
                     }
