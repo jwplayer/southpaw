@@ -256,10 +256,10 @@ public class Southpaw {
 
             for (Map.Entry<String, BaseTopic<BaseRecord, BaseRecord>> entry : topics) {
                 String entity = entry.getKey();
-                if (entity.equals("user_custom_params")) {
-                    logger.info("----------------------------------------------------------------");
-                    logger.info(String.format("Processing entity: %s", entity));
-                }
+                // if (entity.equals("user_custom_params")) {
+                //     logger.info("----------------------------------------------------------------");
+                //     logger.info(String.format("Processing entity: %s", entity));
+                // }
                 BaseTopic<BaseRecord, BaseRecord> inputTopic = entry.getValue();
 
                 long topicLag;
@@ -332,6 +332,11 @@ public class Southpaw {
 
                                     // Create the denormalized records
                                     if (oldParentKeys != null) {
+
+                                        if (logToInfo) {
+                                            logger.info(String.format("Found %d old parent keys", oldParentKeys.size()));
+                                        }
+
                                         for (ByteArray oldParentKey : oldParentKeys) {
                                             if (logToInfo) {
                                                 if (oldParentKey != null) {
