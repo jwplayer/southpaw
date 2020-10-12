@@ -378,11 +378,15 @@ public class Southpaw {
                             }
                             int size = dePrimaryKeys.size();
                             if(size > config.createRecordsTrigger) {
-                                logger.info(String.format("Creating %s denormalized records for %d primary keys", root.getEntity(), size));
+                                if (logToInfo) {
+                                    logger.info(String.format("Creating %s denormalized records for %d primary keys", root.getEntity(), size));
+                                }
                                 createDenormalizedRecords(root, dePrimaryKeys);
                                 dePrimaryKeys.clear();
                             } else if (size > 0) {
-                                logger.info(String.format("Not yet creating %s denormalized records for %d primary keys", root.getEntity(), size));
+                                if (logToInfo) {
+                                    logger.info(String.format("Not yet creating %s denormalized records for %d primary keys", root.getEntity(), size));
+                                }
                             }
                             metrics.denormalizedRecordsToCreateByTopic.get(root.getDenormalizedName()).update((long) size);
                         }
