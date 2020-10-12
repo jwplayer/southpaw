@@ -255,9 +255,11 @@ public class Southpaw {
             // Loop through each input topic and read a batch of records
 
             for (Map.Entry<String, BaseTopic<BaseRecord, BaseRecord>> entry : topics) {
-                logger.info("----------------------------------------------------------------");
                 String entity = entry.getKey();
-                logger.info(String.format("Processing entity: %s", entity));
+                if (entity.equals("user_custom_params")) {
+                    logger.info("----------------------------------------------------------------");
+                    logger.info(String.format("Processing entity: %s", entity));
+                }
                 BaseTopic<BaseRecord, BaseRecord> inputTopic = entry.getValue();
 
                 long topicLag;
@@ -272,7 +274,7 @@ public class Southpaw {
                         ByteArray primaryKey = newRecord.key().toByteArray();
 
                         // Whether to log debug statements to INFO
-                        Boolean logToInfo = primaryKey.toString().equals("37cc91") || primaryKey.toString().equals("381be0");
+                        Boolean logToInfo = entity.equals("user_custom_params") || primaryKey.toString().equals("37cc91") || primaryKey.toString().equals("381be0");
 
                         if (logToInfo) {
                             logger.info("---------------------------------");
