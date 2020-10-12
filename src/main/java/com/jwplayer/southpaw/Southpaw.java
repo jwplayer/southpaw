@@ -292,7 +292,7 @@ public class Southpaw {
                             if (root.getEntity().equals(entity)) {
 
                                 if (logToInfo) {
-                                    logger.info("Input record pertains to top-level relation");
+                                    logger.info("Input record pertains to the top-level relation");
                                 }
 
                                 // The top level relation is the relation of the input record
@@ -308,7 +308,7 @@ public class Southpaw {
                                 if (child != null && child.getValue() != null) {
 
                                     if (logToInfo) {
-                                        logger.info("Found the matching child relation");
+                                        logger.info(String.format("Found %s matching child relation", child.getValue().getEntity()));
                                     }
 
                                     BaseIndex<BaseRecord, BaseRecord, Set<ByteArray>> parentIndex =
@@ -347,7 +347,7 @@ public class Southpaw {
                                             }
                                             if (!ObjectUtils.equals(oldParentKey, newParentKey)) {
                                                 if (logToInfo) {
-                                                    logger.info("Old parent key does not match new parent key");
+                                                    logger.info("Old parent key does not match the new parent key");
                                                 }
                                                 Set<ByteArray> primaryKeys = parentIndex.getIndexEntry(oldParentKey);
                                                 if (primaryKeys != null) {
@@ -355,6 +355,14 @@ public class Southpaw {
                                                         logger.info(String.format("Found %d matching primary keys in the parent index for the old parent key", primaryKeys.size()));
                                                     }
                                                     dePrimaryKeys.addAll(primaryKeys);
+                                                } else {
+                                                    if (logToInfo) {
+                                                        logger.info("Found no matching primary keys in the parent index for the old parent key");
+                                                    }
+                                                }
+                                            } else {
+                                                if (logToInfo) {
+                                                    logger.info("Old parent key matches the new parent key");
                                                 }
                                             }
                                         }
@@ -370,6 +378,10 @@ public class Southpaw {
                                                 logger.info(String.format("Found %d matching primary keys in the parent index for the new parent key", primaryKeys.size()));
                                             }
                                             dePrimaryKeys.addAll(primaryKeys);
+                                        } else {
+                                            if (logToInfo) {
+                                                logger.info("Found no matching primary keys in the parent index for the new parent key");
+                                            }
                                         }
                                     }
                                     // Update the join index
