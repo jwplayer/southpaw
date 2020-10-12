@@ -381,7 +381,7 @@ public class Southpaw {
                                 logger.info(String.format("Creating %s denormalized records for %d primary keys", root.getEntity(), size));
                                 createDenormalizedRecords(root, dePrimaryKeys);
                                 dePrimaryKeys.clear();
-                            } else {
+                            } else if (size > 0) {
                                 logger.info(String.format("Not creating %s denormalized records (at least not yet)", root.getEntity()));
                             }
                             metrics.denormalizedRecordsToCreateByTopic.get(root.getDenormalizedName()).update((long) size);
