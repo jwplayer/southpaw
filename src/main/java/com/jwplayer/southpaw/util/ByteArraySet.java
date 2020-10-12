@@ -312,10 +312,16 @@ public class ByteArraySet implements Set<ByteArray> {
             int size = (int) currentChunk.bytes[currentOffset];
             if(size == 0) {
                 currentOffset += 1;
+                updateState();
                 return null;
             }
             byte[] retVal = Arrays.copyOfRange(currentChunk.bytes, currentOffset + 1, currentOffset + size + 1);
             currentOffset += 1 + size;
+            updateState();
+            return new ByteArray(retVal);
+        }
+
+        private void updateState() {
             if(currentOffset >= currentChunk.size) {
                 if(chunksIter.hasNext()) {
                     currentChunk = chunksIter.next();
@@ -324,7 +330,6 @@ public class ByteArraySet implements Set<ByteArray> {
                     currentChunk = null;
                 }
             }
-            return new ByteArray(retVal);
         }
     }
 
@@ -583,6 +588,23 @@ public class ByteArraySet implements Set<ByteArray> {
     @Override
     public boolean retainAll(Collection<?> c) {
         throw new NotImplementedException();
+    }
+
+    @Override
+    public boolean equals(Object object) {
+        if (object == null || !(object instanceof ByteArraySet)) {
+            return false;
+        }
+
+        if (size() != ((ByteArraySet) object).size()) {
+            return false;
+        }
+        for (ByteArray ba: (ByteArraySet) object) {
+            if (!contains(ba)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     @Override

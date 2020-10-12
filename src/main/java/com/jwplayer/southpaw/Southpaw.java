@@ -105,7 +105,7 @@ public class Southpaw {
      * records) and join indices (points at the child records). The key is the index name. Multiple offsets
      * can be stored per key.
      */
-    protected final Map<String, BaseIndex<BaseRecord, BaseRecord, Set<ByteArray>>> fkIndices = new HashMap<>();
+    protected final Map<String, BaseIndex<BaseRecord, BaseRecord, ByteArraySet>> fkIndices = new HashMap<>();
     /**
      * A map of all input topics needed by Southpaw. The key is the short name of the topic.
      */
@@ -267,8 +267,12 @@ public class Southpaw {
                     while (records.hasNext()) {
                         ConsumerRecord<BaseRecord, BaseRecord> newRecord = records.next();
                         ByteArray primaryKey = newRecord.key().toByteArray();
+
+                        logger.info("---------------------------------");
+                        logger.info(String.format("Processing %s record key: %s", entity, primaryKey.toString()));
+
                         for (Relation root : relations) {
-                            Set<ByteArray> dePrimaryKeys = dePKsByType.get(root);
+                            ByteArraySet dePrimaryKeys = dePKsByType.get(root);
                             if (root.getEntity().equals(entity)) {
                                 // The top level relation is the relation of the input record
                                 dePrimaryKeys.add(primaryKey);
@@ -276,14 +280,14 @@ public class Southpaw {
                                 // Check the child relations instead
                                 AbstractMap.SimpleEntry<Relation, Relation> child = getRelation(root, entity);
                                 if (child != null && child.getValue() != null) {
-                                    BaseIndex<BaseRecord, BaseRecord, Set<ByteArray>> parentIndex =
+                                    BaseIndex<BaseRecord, BaseRecord, ByteArraySet> parentIndex =
                                             fkIndices.get(createParentIndexName(root, child.getKey(), child.getValue()));
                                     ByteArray newParentKey = null;
-                                    Set<ByteArray> oldParentKeys;
+                                    ByteArraySet oldParentKeys;
                                     if (newRecord.value() != null) {
                                         newParentKey = ByteArray.toByteArray(newRecord.value().get(child.getValue().getJoinKey()));
                                     }
-                                    BaseIndex<BaseRecord, BaseRecord, Set<ByteArray>> joinIndex =
+                                    BaseIndex<BaseRecord, BaseRecord, ByteArraySet> joinIndex =
                                             fkIndices.get(createJoinIndexName(child.getValue()));
                                     oldParentKeys = ((Reversible) joinIndex).getForeignKeys(primaryKey);
 
@@ -291,7 +295,7 @@ public class Southpaw {
                                     if (oldParentKeys != null) {
                                         for (ByteArray oldParentKey : oldParentKeys) {
                                             if (!ObjectUtils.equals(oldParentKey, newParentKey)) {
-                                                Set<ByteArray> primaryKeys = parentIndex.getIndexEntry(oldParentKey);
+                                                ByteArraySet primaryKeys = parentIndex.getIndexEntry(oldParentKey);
                                                 if (primaryKeys != null) {
                                                     dePrimaryKeys.addAll(primaryKeys);
                                                 }
@@ -299,7 +303,7 @@ public class Southpaw {
                                         }
                                     }
                                     if (newParentKey != null) {
-                                        Set<ByteArray> primaryKeys = parentIndex.getIndexEntry(newParentKey);
+                                        ByteArraySet primaryKeys = parentIndex.getIndexEntry(newParentKey);
                                         if (primaryKeys != null) {
                                             dePrimaryKeys.addAll(primaryKeys);
                                         }
@@ -403,7 +407,7 @@ public class Southpaw {
         for(Map.Entry<String, BaseTopic<byte[], DenormalizedRecord>> topic: outputTopics.entrySet()) {
             topic.getValue().flush();
         }
-        for(Map.Entry<String, BaseIndex<BaseRecord, BaseRecord, Set<ByteArray>>> index: fkIndices.entrySet()) {
+        for(Map.Entry<String, BaseIndex<BaseRecord, BaseRecord, ByteArraySet>> index: fkIndices.entrySet()) {
             index.getValue().flush();
         }
         for(Map.Entry<Relation, ByteArraySet> entry: dePKsByType.entrySet()) {
@@ -468,8 +472,8 @@ public class Southpaw {
                 updateParentIndex(root, relation, child, rootPrimaryKey, newParentKey);
                 Map<ByteArray, DenormalizedRecord> records = new TreeMap<>();
                 if (newParentKey != null) {
-                    BaseIndex<BaseRecord, BaseRecord, Set<ByteArray>> joinIndex = fkIndices.get(createJoinIndexName(child));
-                    Set<ByteArray> childPKs = joinIndex.getIndexEntry(newParentKey);
+                    BaseIndex<BaseRecord, BaseRecord, ByteArraySet> joinIndex = fkIndices.get(createJoinIndexName(child));
+                    ByteArraySet childPKs = joinIndex.getIndexEntry(newParentKey);
                     if (childPKs != null) {
                         for (ByteArray childPK : childPKs) {
                             DenormalizedRecord deChildRecord = createDenormalizedRecord(root, child, rootPrimaryKey, childPK);
@@ -491,7 +495,8 @@ public class Southpaw {
      */
     protected void createDenormalizedRecords(
             Relation root,
-            Set<ByteArray> rootRecordPKs) {
+            ByteArraySet rootRecordPKs) {
+        int nbWrittenDenormalizedRecords = 0;
         for(ByteArray dePrimaryKey: rootRecordPKs) {
             if(dePrimaryKey != null) {
                 BaseTopic<byte[], DenormalizedRecord> outputTopic = outputTopics.get(root.getDenormalizedName());
@@ -515,6 +520,7 @@ public class Southpaw {
                         dePrimaryKey.getBytes(),
                         newDeRecord
                 );
+                nbWrittenDenormalizedRecords += 1;
             }
             metrics.denormalizedRecordsCreated.mark(1);
             metrics.denormalizedRecordsCreatedByTopic.get(root.getDenormalizedName()).mark(1);
@@ -522,6 +528,7 @@ public class Southpaw {
             metrics.denormalizedRecordsToCreateByTopic.get(root.getDenormalizedName())
                     .update(metrics.denormalizedRecordsToCreateByTopic.get(root.getDenormalizedName()).getValue() - 1);
         }
+        logger.info(String.format("Ordered the creation of %d %s denormalized records", nbWrittenDenormalizedRecords, root.getEntity()));
     }
 
     /**
@@ -538,7 +545,7 @@ public class Southpaw {
      * @param indexedTopicName - The name of the indexed topic
      * @return A brand new, shiny index
      */
-    protected BaseIndex<BaseRecord, BaseRecord, Set<ByteArray>> createFkIndex(
+    protected BaseIndex<BaseRecord, BaseRecord, ByteArraySet> createFkIndex(
             String indexName,
             String indexedTopicName) {
         MultiIndex<BaseRecord, BaseRecord> index = new MultiIndex<>();
@@ -899,9 +906,9 @@ public class Southpaw {
 
         if(parent.getChildren() != null && rootPrimaryKey != null) {
             for(Relation child: parent.getChildren()) {
-                BaseIndex<BaseRecord, BaseRecord, Set<ByteArray>> parentIndex =
+                BaseIndex<BaseRecord, BaseRecord, ByteArraySet> parentIndex =
                         fkIndices.get(createParentIndexName(root, parent, child));
-                Set<ByteArray> oldForeignKeys = ((Reversible) parentIndex).getForeignKeys(rootPrimaryKey);
+                ByteArraySet oldForeignKeys = ((Reversible) parentIndex).getForeignKeys(rootPrimaryKey);
                 if(oldForeignKeys != null) {
                     for(ByteArray oldForeignKey: ImmutableSet.copyOf(oldForeignKeys)) {
                         parentIndex.remove(oldForeignKey, rootPrimaryKey);
@@ -926,8 +933,8 @@ public class Southpaw {
             ConsumerRecord<BaseRecord, BaseRecord> newRecord) {
         Preconditions.checkNotNull(relation.getJoinKey());
         Preconditions.checkNotNull(newRecord);
-        BaseIndex<BaseRecord, BaseRecord, Set<ByteArray>> joinIndex = fkIndices.get(createJoinIndexName(relation));
-        Set<ByteArray> oldJoinKeys = ((Reversible) joinIndex).getForeignKeys(primaryKey);
+        BaseIndex<BaseRecord, BaseRecord, ByteArraySet> joinIndex = fkIndices.get(createJoinIndexName(relation));
+        ByteArraySet oldJoinKeys = ((Reversible) joinIndex).getForeignKeys(primaryKey);
         ByteArray newJoinKey = null;
         if(newRecord.value() != null) {
             newJoinKey = ByteArray.toByteArray(newRecord.value().get(relation.getJoinKey()));
@@ -964,7 +971,7 @@ public class Southpaw {
         Preconditions.checkNotNull(child);
         Preconditions.checkNotNull(rootPrimaryKey);
 
-        BaseIndex<BaseRecord, BaseRecord, Set<ByteArray>> parentIndex =
+        BaseIndex<BaseRecord, BaseRecord, ByteArraySet> parentIndex =
                 fkIndices.get(createParentIndexName(root, parent, child));
         if (newParentKey != null) parentIndex.add(newParentKey, rootPrimaryKey);
     }
@@ -1019,7 +1026,7 @@ public class Southpaw {
      * <b>Note: this requires a full scan of each index dataset. This could be an expensive operation on larger datasets</b>
      */
     protected void verifyState() {
-        for(Map.Entry<String, BaseIndex<BaseRecord, BaseRecord, Set<ByteArray>>> index: fkIndices.entrySet()) {
+        for(Map.Entry<String, BaseIndex<BaseRecord, BaseRecord, ByteArraySet>> index: fkIndices.entrySet()) {
             logger.info("Verifying index state integrity: " + index.getValue().getIndexedTopic().getShortName());
             Set<String> missingIndexKeys = ((MultiIndex)index.getValue()).verifyIndexState();
             if(missingIndexKeys.isEmpty()){
