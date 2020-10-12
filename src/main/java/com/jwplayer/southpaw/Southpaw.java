@@ -382,7 +382,7 @@ public class Southpaw {
                                 createDenormalizedRecords(root, dePrimaryKeys);
                                 dePrimaryKeys.clear();
                             } else if (size > 0) {
-                                logger.info(String.format("Not creating %s denormalized records (at least not yet)", root.getEntity()));
+                                logger.info(String.format("Not yet creating %s denormalized records for %d primary keys", root.getEntity(), size));
                             }
                             metrics.denormalizedRecordsToCreateByTopic.get(root.getDenormalizedName()).update((long) size);
                         }
@@ -424,7 +424,9 @@ public class Southpaw {
 
             // Create the denormalized records that have been queued up
             for(Map.Entry<Relation, ByteArraySet> entry: dePKsByType.entrySet()) {
-                logger.info(String.format("Creating %s queued-up denormalized records for %d primary keys", entry.getKey().getEntity(), entry.getValue().size()));
+                if (entry.getValue().size() > 0) {
+                    logger.info(String.format("Creating %s queued-up denormalized records for %d primary keys", entry.getKey().getEntity(), entry.getValue().size()));
+                }
                 createDenormalizedRecords(entry.getKey(), entry.getValue());
                 entry.getValue().clear();
             }
