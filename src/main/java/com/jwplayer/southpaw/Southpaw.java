@@ -256,10 +256,6 @@ public class Southpaw {
 
             for (Map.Entry<String, BaseTopic<BaseRecord, BaseRecord>> entry : topics) {
                 String entity = entry.getKey();
-                // if (entity.equals("user_custom_params")) {
-                //     logger.info("----------------------------------------------------------------");
-                //     logger.info(String.format("Processing entity: %s", entity));
-                // }
                 BaseTopic<BaseRecord, BaseRecord> inputTopic = entry.getValue();
 
                 long topicLag;
