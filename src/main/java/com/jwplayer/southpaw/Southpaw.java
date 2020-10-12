@@ -352,7 +352,7 @@ public class Southpaw {
                                                 Set<ByteArray> primaryKeys = parentIndex.getIndexEntry(oldParentKey);
                                                 if (primaryKeys != null) {
                                                     if (logToInfo) {
-                                                        logger.info("Found matching primary keys in the parent index for the old parent key");
+                                                        logger.info(String.format("Found %d matching primary keys in the parent index for the old parent key", primaryKeys.size()));
                                                     }
                                                     dePrimaryKeys.addAll(primaryKeys);
                                                 }
@@ -367,7 +367,7 @@ public class Southpaw {
                                         Set<ByteArray> primaryKeys = parentIndex.getIndexEntry(newParentKey);
                                         if (primaryKeys != null) {
                                             if (logToInfo) {
-                                                logger.info("Found matching primary keys in the parent index for the new parent key");
+                                                logger.info(String.format("Found %d matching primary keys in the parent index for the new parent key", primaryKeys.size()));
                                             }
                                             dePrimaryKeys.addAll(primaryKeys);
                                         }
@@ -378,8 +378,11 @@ public class Southpaw {
                             }
                             int size = dePrimaryKeys.size();
                             if(size > config.createRecordsTrigger) {
+                                logger.info(String.format("Creating %s denormalized records for %d primary keys", root.getEntity(), size));
                                 createDenormalizedRecords(root, dePrimaryKeys);
                                 dePrimaryKeys.clear();
+                            } else {
+                                logger.info(String.format("Not creating %s denormalized records (at least not yet)", root.getEntity()));
                             }
                             metrics.denormalizedRecordsToCreateByTopic.get(root.getDenormalizedName()).update((long) size);
                         }
@@ -421,6 +424,7 @@ public class Southpaw {
 
             // Create the denormalized records that have been queued up
             for(Map.Entry<Relation, ByteArraySet> entry: dePKsByType.entrySet()) {
+                logger.info(String.format("Creating %s queued-up denormalized records for %d primary keys", entry.getKey().getEntity(), entry.getValue().size()));
                 createDenormalizedRecords(entry.getKey(), entry.getValue());
                 entry.getValue().clear();
             }
