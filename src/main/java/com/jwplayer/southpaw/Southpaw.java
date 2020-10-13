@@ -586,6 +586,7 @@ public class Southpaw {
     protected void createDenormalizedRecords(
             Relation root,
             Set<ByteArray> rootRecordPKs) {
+        int nbWrittenDenormalizedRecords = 0;
         for(ByteArray dePrimaryKey: rootRecordPKs) {
             if(dePrimaryKey != null) {
                 BaseTopic<byte[], DenormalizedRecord> outputTopic = outputTopics.get(root.getDenormalizedName());
@@ -624,12 +625,16 @@ public class Southpaw {
                         dePrimaryKey.getBytes(),
                         newDeRecord
                 );
+                nbWrittenDenormalizedRecords += 1;
             }
             metrics.denormalizedRecordsCreated.mark(1);
             metrics.denormalizedRecordsCreatedByTopic.get(root.getDenormalizedName()).mark(1);
             metrics.denormalizedRecordsToCreate.update(metrics.denormalizedRecordsToCreate.getValue() - 1);
             metrics.denormalizedRecordsToCreateByTopic.get(root.getDenormalizedName())
                     .update(metrics.denormalizedRecordsToCreateByTopic.get(root.getDenormalizedName()).getValue() - 1);
+        }
+        if (logToInfo) {
+            logger.info(String.format("Ordered the creation of %d %s denormalized records", nbWrittenDenormalizedRecords, root.getEntity()));
         }
     }
 
