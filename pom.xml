@@ -45,7 +45,7 @@
 
         <!-- Testing -->
         <version.curator>2.12.0</version.curator>
-        <version.junit>4.11</version.junit>
+        <version.junit>4.13.1</version.junit>
         <version.mockito>2.25.1</version.mockito>
         <version.s3mock>0.2.5</version.s3mock>
 
