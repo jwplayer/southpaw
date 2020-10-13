@@ -165,6 +165,9 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
                     logger.info(String.format("State contains %d bytes with leading %s byte for %s foreign key", bytes.length, ((Byte) bytes[0]).toString(), foreignKey.toString()));
                 }
                 ByteArraySet set = ByteArraySet.deserialize(bytes);
+                if (logToInfo) {
+                    logger.info(String.format("State contains %d deserialized primary keys for %s foreign key", set.size(), foreignKey.toString()));
+                }
                 if(set.size() > LRU_CACHE_THRESHOLD) entryCache.put(foreignKey, set);
                 return set;
             }
