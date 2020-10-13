@@ -270,7 +270,7 @@ public class Southpaw {
                         ByteArray primaryKey = newRecord.key().toByteArray();
 
                         // Whether to log debug statements to INFO
-                        Boolean logToInfo = entity.equals("user_custom_params");
+                        Boolean logToInfo = entity.equals("user_custom_params") || entity.equals("media_custom_params");
 
                         if (logToInfo) {
                             logger.info("---------------------------------");
@@ -368,12 +368,12 @@ public class Southpaw {
                                         }
                                     }
                                     if (newParentKey != null) {
+                                        parentIndex.DefaultLogToInfo = true;
                                         Set<ByteArray> primaryKeys = parentIndex.getIndexEntry(newParentKey);
+                                        parentIndex.DefaultLogToInfo = false;
                                         if (primaryKeys != null) {
                                             if (logToInfo) {
-                                                parentIndex.DefaultLogToInfo = true;
                                                 logger.info(String.format("Found %d matching primary keys in the parent index for the new parent key", primaryKeys.size()));
-                                                parentIndex.DefaultLogToInfo = false;
                                             }
                                             dePrimaryKeys.addAll(primaryKeys);
                                         } else {
