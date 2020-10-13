@@ -592,10 +592,7 @@ public class Southpaw {
                 scrubParentIndices(root, root, dePrimaryKey);
                 DenormalizedRecord newDeRecord = createDenormalizedRecord(root, root, dePrimaryKey, dePrimaryKey);
 
-                // Whether to log debug statements to INFO
-                Boolean logToInfo = dePrimaryKey.toString().equals("37cc91") || dePrimaryKey.toString().equals("381be0");
-
-                if (logToInfo) {
+                if (dePrimaryKey.toString().equals("37cc91") || dePrimaryKey.toString().equals("381be0")) {
                     logger.info(
                             String.format(
                                     "Root Entity: %s / Primary Key: %s",

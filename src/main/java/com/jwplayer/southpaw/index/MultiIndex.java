@@ -243,6 +243,7 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
                 entryRICache.remove(primaryKey);
                 pendingRIWrites.remove(primaryKey);
             } else {
+                entryRICache.remove(primaryKey);
                 putRIToState(primaryKey, foreignKeys);
             }
         }
@@ -260,6 +261,7 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
                     entryCache.remove(foreignKey);
                     pendingWrites.remove(foreignKey);
                 } else {
+                    entryCache.remove(foreignKey);
                     putToState(foreignKey, primaryKeys);
                 }
                 return true;
