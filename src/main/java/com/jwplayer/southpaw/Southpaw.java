@@ -89,6 +89,10 @@ public class Southpaw {
      */
     private static final Logger logger = Logger.getLogger(Southpaw.class);
     /**
+     * Whether to log debug statements to INFO
+     */
+    private Boolean logToInfo = false;
+    /**
      * Used for doing object <-> JSON mappings
      */
     private static final ObjectMapper mapper = new ObjectMapper();
@@ -270,7 +274,7 @@ public class Southpaw {
                         ByteArray primaryKey = newRecord.key().toByteArray();
 
                         // Whether to log debug statements to INFO
-                        Boolean logToInfo = entity.equals("user_custom_params") || entity.equals("media_custom_params");
+                        logToInfo = entity.equals("user_custom_params") || entity.equals("media_custom_params");
 
                         if (logToInfo) {
                             logger.info("---------------------------------");
@@ -402,6 +406,8 @@ public class Southpaw {
                         }
                         metrics.recordsConsumed.mark(1);
                         metrics.recordsConsumedByTopic.get(entity).mark(1);
+
+                        logToInfo = false;
                     }
 
                     metrics.timeSinceLastBackup.update(backupWatch.getTime());
@@ -1009,8 +1015,17 @@ public class Southpaw {
                         fkIndices.get(createParentIndexName(root, parent, child));
                 Set<ByteArray> oldForeignKeys = ((Reversible) parentIndex).getForeignKeys(rootPrimaryKey);
                 if(oldForeignKeys != null) {
+                    if (logToInfo) {
+                        logger.info(String.format("Scrubbing %s parent index for %d old foreign keys", parent.getEntity(), oldForeignKeys.size()));
+                    }
                     for(ByteArray oldForeignKey: ImmutableSet.copyOf(oldForeignKeys)) {
+                        // parentIndex.DefaultLogToInfo = true;
                         parentIndex.remove(oldForeignKey, rootPrimaryKey);
+                        // parentIndex.DefaultLogToInfo = false;
+                    }
+                } else {
+                    if (logToInfo) {
+                        logger.info(String.format("Not scrubbing %s parent index as no old foreign keys were found", parent.getEntity()));
                     }
                 }
                 scrubParentIndices(root, child, rootPrimaryKey);
@@ -1039,14 +1054,32 @@ public class Southpaw {
             newJoinKey = ByteArray.toByteArray(newRecord.value().get(relation.getJoinKey()));
         }
         if (oldJoinKeys != null && oldJoinKeys.size() > 0) {
+
+            if (logToInfo) {
+                logger.info(String.format("Updating join index for %d old join keys", oldJoinKeys.size()));
+            }
+
             for(ByteArray oldJoinKey: oldJoinKeys) {
                 if(!oldJoinKey.equals(newJoinKey)) {
                     joinIndex.remove(oldJoinKey, primaryKey);
                 }
             }
+        } else {
+            if (logToInfo) {
+                logger.info("Not updating join index as no old join keys were found");
+            }
         }
         if (newJoinKey != null) {
+
+            if (logToInfo) {
+                logger.info(String.format("Updating join index for %s new join key", newJoinKey.toString()));
+            }
+
             joinIndex.add(newJoinKey, primaryKey);
+        } else {
+            if (logToInfo) {
+                logger.info("Not updating join index as new join key is null");
+            }
         }
     }
 
