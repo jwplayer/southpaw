@@ -162,7 +162,7 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
                 return null;
             } else {
                 if (logToInfo) {
-                    logger.info(String.format("State contains %d bytes for %s foreign key", bytes.length, foreignKey.toString()));
+                    logger.info(String.format("State contains %d bytes with leading %s byte for %s foreign key", bytes.length, ((Byte) bytes[0]).toString(), foreignKey.toString()));
                 }
                 ByteArraySet set = ByteArraySet.deserialize(bytes);
                 if(set.size() > LRU_CACHE_THRESHOLD) entryCache.put(foreignKey, set);
