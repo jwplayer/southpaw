@@ -53,6 +53,10 @@ public abstract class BaseIndex<K, V, O> {
      * Le Logger
      */
     protected static final Logger logger = Logger.getLogger(BaseIndex.class);
+    /**
+     * Whether to log debug statements to INFO
+     */
+    public Boolean DefaultLogToInfo = false;
 
     public BaseIndex() {
         logger.setLevel(Level.INFO);

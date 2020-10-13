@@ -140,7 +140,7 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
     public ByteArraySet getIndexEntry(ByteArray foreignKey) {
 
         // Whether to log debug statements to INFO
-        Boolean logToInfo = foreignKey.toString().equals("309f5c");
+        Boolean logToInfo = DefaultLogToInfo && foreignKey.toString().equals("309f5c");
 
         Preconditions.checkNotNull(foreignKey);
         if(entryCache.containsKey(foreignKey)) {
@@ -162,7 +162,7 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
                 return null;
             } else {
                 if (logToInfo) {
-                    logger.info(String.format("State contains %s value for %s foreign key", Arrays.toString(bytes), foreignKey.toString()));
+                    logger.info(String.format("State contains %d bytes for %s foreign key", bytes.length, foreignKey.toString()));
                 }
                 ByteArraySet set = ByteArraySet.deserialize(bytes);
                 if(set.size() > LRU_CACHE_THRESHOLD) entryCache.put(foreignKey, set);

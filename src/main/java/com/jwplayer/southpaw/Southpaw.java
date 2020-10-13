@@ -371,7 +371,9 @@ public class Southpaw {
                                         Set<ByteArray> primaryKeys = parentIndex.getIndexEntry(newParentKey);
                                         if (primaryKeys != null) {
                                             if (logToInfo) {
+                                                parentIndex.DefaultLogToInfo = true;
                                                 logger.info(String.format("Found %d matching primary keys in the parent index for the new parent key", primaryKeys.size()));
+                                                parentIndex.DefaultLogToInfo = false;
                                             }
                                             dePrimaryKeys.addAll(primaryKeys);
                                         } else {
