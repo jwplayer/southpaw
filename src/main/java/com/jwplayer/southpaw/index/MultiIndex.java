@@ -21,7 +21,6 @@ import com.jwplayer.southpaw.topic.BaseTopic;
 import com.jwplayer.southpaw.util.ByteArray;
 import com.jwplayer.southpaw.util.ByteArraySet;
 import org.apache.commons.collections4.map.LRUMap;
-import org.apache.log4j.Logger;
 
 import java.util.*;
 
@@ -47,10 +46,6 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
      */
     public static final int LRU_CACHE_THRESHOLD = 10;
 
-    /**
-     * Le Logger
-     */
-    private static final Logger logger = Logger.getLogger(MultiIndex.class);
     /**
      * Size of the LRU cache for storing the index entries containing more than one key
      */
@@ -166,11 +161,11 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
                 }
                 return null;
             } else {
+                if (logToInfo) {
+                    logger.info(String.format("State contains %s value for %s foreign key", Arrays.toString(bytes), foreignKey.toString()));
+                }
                 ByteArraySet set = ByteArraySet.deserialize(bytes);
                 if(set.size() > LRU_CACHE_THRESHOLD) entryCache.put(foreignKey, set);
-                if (logToInfo) {
-                    logger.info(String.format("State contains %s foreign key", foreignKey.toString()));
-                }
                 return set;
             }
         }
