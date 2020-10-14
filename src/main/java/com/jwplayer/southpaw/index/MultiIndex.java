@@ -69,7 +69,14 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
             pks = new ByteArraySet();
         }
         addRI(foreignKey, primaryKey);
+
+        // Whether to log debug statements to INFO
+        Boolean logToInfo = foreignKey.toString().equals("309f5c");
+
         if(pks.add(primaryKey)) {
+            if (logToInfo) {
+                logger.info(String.format("Adding %d primary keys to index for %s foreign key", pks.size(), foreignKey.toString()));
+            }
             putToState(foreignKey, pks);
         }
     }
