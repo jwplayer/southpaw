@@ -74,7 +74,7 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
         Boolean logToInfo = foreignKey.toString().equals("309f5c");
 
         if(pks.add(primaryKey)) {
-            if (logToInfo) {
+            if (logToInfo && (pks.size() == 10010 || pks.size() == 10558)) {
                 logger.info(String.format("Adding %d primary keys to index for %s foreign key", pks.size(), foreignKey.toString()));
             }
             putToState(foreignKey, pks);
@@ -288,7 +288,7 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
 
         if(primaryKeys != null) {
             if(primaryKeys.remove(primaryKey)) {
-                if (logToInfo) {
+                if (logToInfo && (primaryKeys.size() + 1 == 10010 || primaryKeys.size() + 1 == 10558)) {
                     logger.info(String.format("Removing one of the %d primary keys from index for %s foreign key", primaryKeys.size() + 1, foreignKey.toString()));
                 }
                 if(primaryKeys.size() == 0) {
