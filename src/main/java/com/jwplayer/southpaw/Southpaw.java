@@ -1070,13 +1070,13 @@ public class Southpaw {
             for(ByteArray oldJoinKey: oldJoinKeys) {
                 if(!oldJoinKey.equals(newJoinKey)) {
                     joinIndex.remove(oldJoinKey, primaryKey);
+                    if (newJoinKey != null && newJoinKey.toString().equals("309f5c")) {
+                        logger.info(String.format("Updated join index to remove primary key from %s old join key", oldJoinKey.toString()));
+                    }
                     nbRemovedOldJoinKeys += 1;
                 }
             }
             if (newJoinKey != null && newJoinKey.toString().equals("309f5c")) {
-                for(ByteArray oldJoinKey: oldJoinKeys) {
-                    logger.info(String.format("Updated join index to remove primary key from %s old join key", oldJoinKey.toString()));
-                }
                 logger.info(String.format("Updated join index to remove primary key from %d old join keys", nbRemovedOldJoinKeys));
             }
         } else {
