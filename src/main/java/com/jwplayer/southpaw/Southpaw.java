@@ -552,6 +552,9 @@ public class Southpaw {
         BaseTopic<BaseRecord, BaseRecord> relationTopic = inputTopics.get(relation.getEntity());
         BaseRecord relationRecord = relationTopic.readByPK(relationPrimaryKey);
 
+        // Whether to log debug statements to INFO
+        Boolean myLogToInfo = rootPrimaryKey != null && rootPrimaryKey.toString().equals("37cc91") || rootPrimaryKey.toString().equals("381be0");
+
         if(!(relationRecord == null || relationRecord.isEmpty())) {
             denormalizedRecord = new DenormalizedRecord();
             denormalizedRecord.setRecord(createInternalRecord(relationRecord));
@@ -563,10 +566,31 @@ public class Southpaw {
                 Map<ByteArray, DenormalizedRecord> records = new TreeMap<>();
                 if (newParentKey != null) {
                     BaseIndex<BaseRecord, BaseRecord, Set<ByteArray>> joinIndex = fkIndices.get(createJoinIndexName(child));
+
+                    if (myLogToInfo && child.getEntity().equals("user_custom_params")) {
+                        joinIndex.DefaultLogToInfo = true;
+                        logger.info(String.format("Fetching %s child primary keys for %s primary key", child.getEntity(), newParentKey.toString()));
+                    }
+
                     Set<ByteArray> childPKs = joinIndex.getIndexEntry(newParentKey);
+                    joinIndex.DefaultLogToInfo = false;
+
+                    if (myLogToInfo && child.getEntity().equals("user_custom_params") && childPKs != null) {
+                        logger.info(String.format("Fetched %d %s child primary keys for %s primary key", childPKs.size(), child.getEntity(), newParentKey.toString()));
+                    } else if (myLogToInfo && child.getEntity().equals("user_custom_params")) {
+                        logger.info(String.format("Fetched no %s child primary keys for %s primary key", child.getEntity(), newParentKey.toString()));
+                    }
+
                     if (childPKs != null) {
                         for (ByteArray childPK : childPKs) {
                             DenormalizedRecord deChildRecord = createDenormalizedRecord(root, child, rootPrimaryKey, childPK);
+                            if (myLogToInfo && child.getEntity().equals("user_custom_params")) {
+                                if (deChildRecord != null) {
+                                    logger.info(String.format("Attaching non-null %s child denormalized record for %s primary key", child.getEntity(), newParentKey.toString()));
+                                } else {
+                                    logger.info(String.format("Not attaching null %s child denormalized record for %s primary key", child.getEntity(), newParentKey.toString()));
+                                }
+                            }
                             if (deChildRecord != null) records.put(childPK, deChildRecord);
                         }
                     }
@@ -1130,6 +1154,13 @@ public class Southpaw {
 
         BaseIndex<BaseRecord, BaseRecord, Set<ByteArray>> parentIndex =
                 fkIndices.get(createParentIndexName(root, parent, child));
+
+        if (child.getEntity().equals("user_custom_params") && rootPrimaryKey != null && rootPrimaryKey.toString().equals("37cc91") || rootPrimaryKey.toString().equals("381be0")) {
+            if (newParentKey != null) {
+                logger.info(String.format("Updating parent index to include %s child primary key for %s parent primary key", rootPrimaryKey.toString(), newParentKey.toString()));
+            }
+        }
+
         if (newParentKey != null) parentIndex.add(newParentKey, rootPrimaryKey);
     }
 
