@@ -133,32 +133,32 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
 
         if(entryRICache.containsKey(primaryKey)) {
             if (logToInfo) {
-                logger.info(String.format("Entry cache contains %s primary key", primaryKey.toString()));
+                logger.info(String.format("RI entry cache contains %s primary key", primaryKey.toString()));
             }
             return entryRICache.get(primaryKey);
         } else if(pendingRIWrites.containsKey(primaryKey)) {
             if (logToInfo) {
-                logger.info(String.format("Pending writes contain %s primary key", primaryKey.toString()));
+                logger.info(String.format("RI pending writes contain %s primary key", primaryKey.toString()));
             }
             return pendingRIWrites.get(primaryKey);
         } else {
             byte[] bytes = state.get(reverseIndexName, primaryKey.getBytes());
             if (bytes == null) {
                 if (logToInfo) {
-                    logger.info(String.format("State does not contain %s primary key", primaryKey.toString()));
+                    logger.info(String.format("RI state does not contain %s primary key", primaryKey.toString()));
                 }
                 return null;
             } else {
-                if (logToInfo) {
-                    logger.info(String.format("State contains %d bytes with leading %s byte for %s primary key", bytes.length, ((Byte) bytes[0]).toString(), primaryKey.toString()));
-                }
+                // if (logToInfo) {
+                //     logger.info(String.format("RI state contains %d bytes with leading %s byte for %s primary key", bytes.length, ((Byte) bytes[0]).toString(), primaryKey.toString()));
+                // }
                 ByteArraySet set = ByteArraySet.deserialize(bytes);
                 if (logToInfo) {
-                    logger.info(String.format("State contains %d deserialized foreign keys for %s primary key", set.size(), primaryKey.toString()));
+                    logger.info(String.format("RI state contains %d deserialized foreign keys for %s primary key", set.size(), primaryKey.toString()));
                 }
                 if(set.size() > LRU_CACHE_THRESHOLD) entryRICache.put(primaryKey, set);
                 if (logToInfo && set.size() > LRU_CACHE_THRESHOLD) {
-                    logger.info(String.format("Entry cache received %d deserialized foreign keys for %s primary key", entryCache.get(primaryKey).size(), primaryKey.toString()));
+                    logger.info(String.format("RI entry cache received %d deserialized foreign keys for %s primary key", entryCache.get(primaryKey).size(), primaryKey.toString()));
                 }
                 return set;
             }

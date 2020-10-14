@@ -1062,8 +1062,11 @@ public class Southpaw {
         joinIndex.DefaultLogToInfo = false;
         if (oldJoinKeys != null && oldJoinKeys.size() > 0) {
 
-            if (logToInfo || (newJoinKey != null && newJoinKey.toString().equals("309f5c"))) {
+            if (newJoinKey != null && newJoinKey.toString().equals("309f5c")) {
                 logger.info(String.format("Updating join index for %d old join keys and the %s new join key", oldJoinKeys.size(), newJoinKey.toString()));
+            }
+            if (logToInfo) {
+                logger.info(String.format("Updating join index for %d old join keys", oldJoinKeys.size()));
             }
 
             int nbRemovedOldJoinKeys = 0;
