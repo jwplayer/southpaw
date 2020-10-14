@@ -1062,17 +1062,22 @@ public class Southpaw {
         joinIndex.DefaultLogToInfo = false;
         if (oldJoinKeys != null && oldJoinKeys.size() > 0) {
 
-            if (newJoinKey != null && newJoinKey.toString().equals("309f5c")) {
+            if (logToInfo || (newJoinKey != null && newJoinKey.toString().equals("309f5c"))) {
                 logger.info(String.format("Updating join index for %d old join keys and the %s new join key", oldJoinKeys.size(), newJoinKey.toString()));
             }
-            if (logToInfo) {
-                logger.info(String.format("Updating join index for %d old join keys", oldJoinKeys.size()));
-            }
 
+            int nbRemovedOldJoinKeys = 0;
             for(ByteArray oldJoinKey: oldJoinKeys) {
                 if(!oldJoinKey.equals(newJoinKey)) {
                     joinIndex.remove(oldJoinKey, primaryKey);
+                    nbRemovedOldJoinKeys += 1;
                 }
+            }
+            if (newJoinKey != null && newJoinKey.toString().equals("309f5c")) {
+                for(ByteArray oldJoinKey: oldJoinKeys) {
+                    logger.info(String.format("Updated join index to remove primary key from %s old join key", oldJoinKey.toString()));
+                }
+                logger.info(String.format("Updated join index to remove primary key from %d old join keys", nbRemovedOldJoinKeys));
             }
         } else {
             if (logToInfo) {

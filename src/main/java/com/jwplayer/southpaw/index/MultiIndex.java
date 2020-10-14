@@ -129,7 +129,7 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
     public ByteArraySet getForeignKeys(ByteArray primaryKey) {
 
         // Whether to log debug statements to INFO
-        Boolean logToInfo = DefaultLogToInfo && primaryKey.toString().equals("309f5c");
+        Boolean logToInfo = DefaultLogToInfo;
 
         if(entryRICache.containsKey(primaryKey)) {
             if (logToInfo) {
