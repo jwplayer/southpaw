@@ -71,7 +71,7 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
         addRI(foreignKey, primaryKey);
 
         // Whether to log debug statements to INFO
-        Boolean logToInfo = foreignKey.toString().equals("309f5c");
+        Boolean logToInfo = DefaultLogToInfo && foreignKey.toString().equals("309f5c");
 
         if(pks.add(primaryKey)) {
             if (logToInfo && (pks.size() == 10010 || pks.size() == 10558)) {
@@ -127,17 +127,39 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
 
     @Override
     public ByteArraySet getForeignKeys(ByteArray primaryKey) {
+
+        // Whether to log debug statements to INFO
+        Boolean logToInfo = DefaultLogToInfo && primaryKey.toString().equals("309f5c");
+
         if(entryRICache.containsKey(primaryKey)) {
+            if (logToInfo) {
+                logger.info(String.format("Entry cache contains %s primary key", primaryKey.toString()));
+            }
             return entryRICache.get(primaryKey);
         } else if(pendingRIWrites.containsKey(primaryKey)) {
+            if (logToInfo) {
+                logger.info(String.format("Pending writes contain %s primary key", primaryKey.toString()));
+            }
             return pendingRIWrites.get(primaryKey);
         } else {
             byte[] bytes = state.get(reverseIndexName, primaryKey.getBytes());
             if (bytes == null) {
+                if (logToInfo) {
+                    logger.info(String.format("State does not contain %s primary key", primaryKey.toString()));
+                }
                 return null;
             } else {
+                if (logToInfo) {
+                    logger.info(String.format("State contains %d bytes with leading %s byte for %s primary key", bytes.length, ((Byte) bytes[0]).toString(), primaryKey.toString()));
+                }
                 ByteArraySet set = ByteArraySet.deserialize(bytes);
+                if (logToInfo) {
+                    logger.info(String.format("State contains %d deserialized foreign keys for %s primary key", set.size(), primaryKey.toString()));
+                }
                 if(set.size() > LRU_CACHE_THRESHOLD) entryRICache.put(primaryKey, set);
+                if (logToInfo && set.size() > LRU_CACHE_THRESHOLD) {
+                    logger.info(String.format("Entry cache received %d deserialized foreign keys for %s primary key", entryCache.get(primaryKey).size(), primaryKey.toString()));
+                }
                 return set;
             }
         }
@@ -241,7 +263,7 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
         ByteArraySet primaryKeys = getIndexEntry(foreignKey);
 
         // Whether to log debug statements to INFO
-        Boolean logToInfo = foreignKey.toString().equals("309f5c");
+        Boolean logToInfo = DefaultLogToInfo && foreignKey.toString().equals("309f5c");
 
         if(primaryKeys != null) {
             if (logToInfo) {
@@ -284,7 +306,7 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
         ByteArraySet primaryKeys = getIndexEntry(foreignKey);
 
         // Whether to log debug statements to INFO
-        Boolean logToInfo = foreignKey.toString().equals("309f5c");
+        Boolean logToInfo = DefaultLogToInfo && foreignKey.toString().equals("309f5c");
 
         if(primaryKeys != null) {
             if(primaryKeys.remove(primaryKey)) {
