@@ -232,7 +232,14 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
     public ByteArraySet remove(ByteArray foreignKey) {
         Preconditions.checkNotNull(foreignKey);
         ByteArraySet primaryKeys = getIndexEntry(foreignKey);
+
+        // Whether to log debug statements to INFO
+        Boolean logToInfo = foreignKey.toString().equals("309f5c");
+
         if(primaryKeys != null) {
+            if (logToInfo) {
+                logger.info(String.format("Removing %d primary keys from index for %s foreign key", primaryKeys.size(), foreignKey.toString()));
+            }
             state.delete(indexName, foreignKey.getBytes());
             entryCache.remove(foreignKey);
             pendingWrites.remove(foreignKey);
@@ -268,8 +275,15 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
         Preconditions.checkNotNull(foreignKey);
         removeRI(foreignKey, primaryKey);
         ByteArraySet primaryKeys = getIndexEntry(foreignKey);
+
+        // Whether to log debug statements to INFO
+        Boolean logToInfo = foreignKey.toString().equals("309f5c");
+
         if(primaryKeys != null) {
             if(primaryKeys.remove(primaryKey)) {
+                if (logToInfo) {
+                    logger.info(String.format("Removing one of the %d primary keys from index for %s foreign key", primaryKeys.size() + 1, foreignKey.toString()));
+                }
                 if(primaryKeys.size() == 0) {
                     state.delete(indexName, foreignKey.getBytes());
                     entryCache.remove(foreignKey);
