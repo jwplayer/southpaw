@@ -140,12 +140,12 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
         // Whether to log debug statements to INFO
         Boolean logToInfo = DefaultLogToInfo;
 
-        if(false && entryRICache.containsKey(primaryKey)) {
+        if(entryRICache.containsKey(primaryKey)) {
             if (logToInfo) {
                 logger.info(String.format("RI entry cache contains %s primary key", primaryKey.toString()));
             }
             return entryRICache.get(primaryKey);
-        } else if(false && pendingRIWrites.containsKey(primaryKey)) {
+        } else if(pendingRIWrites.containsKey(primaryKey)) {
             if (logToInfo) {
                 logger.info(String.format("RI pending writes contain %s primary key", primaryKey.toString()));
             }
@@ -158,9 +158,9 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
                 }
                 return null;
             } else {
-                // if (logToInfo) {
-                //     logger.info(String.format("RI state contains %d bytes with leading %s byte for %s primary key", bytes.length, ((Byte) bytes[0]).toString(), primaryKey.toString()));
-                // }
+                if (logToInfo) {
+                    logger.info(String.format("RI state contains %d bytes with leading %s byte for %s primary key", bytes.length, ((Byte) bytes[0]).toString(), primaryKey.toString()));
+                }
                 ByteArraySet set = ByteArraySet.deserialize(bytes);
                 if (logToInfo) {
                     logger.info(String.format("RI state contains %d deserialized foreign keys for %s primary key", set.size(), primaryKey.toString()));
@@ -181,12 +181,12 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
         Boolean logToInfo = DefaultLogToInfo && foreignKey.toString().equals("309f5c");
 
         Preconditions.checkNotNull(foreignKey);
-        if(false && entryCache.containsKey(foreignKey)) {
+        if((!foreignKey.toString().equals("309f5c")) && entryCache.containsKey(foreignKey)) {
             if (logToInfo) {
                 logger.info(String.format("Entry cache contains %s foreign key", foreignKey.toString()));
             }
             return entryCache.get(foreignKey);
-        } else if(false && pendingWrites.containsKey(foreignKey)) {
+        } else if((!foreignKey.toString().equals("309f5c")) && pendingWrites.containsKey(foreignKey)) {
             if (logToInfo) {
                 logger.info(String.format("Pending writes contain %s foreign key", foreignKey.toString()));
             }
@@ -225,7 +225,7 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
             entryCache.remove(key);
         }
         pendingWrites.put(key, value);
-        if(true || pendingWrites.size() > indexWriteBatchSize) {
+        if(key.toString().equals("309f5c") || pendingWrites.size() > indexWriteBatchSize) {
             for(Map.Entry<ByteArray, ByteArraySet> entry: pendingWrites.entrySet()) {
                 writeToState(entry.getKey(), entry.getValue());
             }
@@ -243,7 +243,7 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
             entryRICache.remove(key);
         }
         pendingRIWrites.put(key, value);
-        if(true || pendingRIWrites.size() > indexWriteBatchSize) {
+        if(pendingRIWrites.size() > indexWriteBatchSize) {
             for (Map.Entry<ByteArray, ByteArraySet> entry : pendingRIWrites.entrySet()) {
                 writeRIToState(entry.getKey(), entry.getValue());
             }
