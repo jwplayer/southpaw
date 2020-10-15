@@ -1063,9 +1063,9 @@ public class Southpaw {
                             nbRemovedOldForeignKeys309f5c += 1;
                         }
                     }
-                    //if (nbRemovedOldForeignKeys309f5c > 0) {
-                    //    logger.info(String.format("Scrubbed %s parent index for %s child relation to remove a primary key from 309f5c old join key", parent.getEntity(), child.getEntity(), nbRemovedOldForeignKeys309f5c));
-                    //}
+                    // if (nbRemovedOldForeignKeys309f5c > 0) {
+                    //     logger.info(String.format("Scrubbed %s parent index for %s child relation to remove a primary key from 309f5c old join key", parent.getEntity(), child.getEntity(), nbRemovedOldForeignKeys309f5c));
+                    // }
                     if (rootPrimaryKey != null && rootPrimaryKey.toString().equals("309f5c")) {
                         logger.info(String.format("Scrubbed %s parent index for %d old foreign keys", parent.getEntity(), nbRemovedOldForeignKeys));
                     }
