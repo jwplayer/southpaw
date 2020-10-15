@@ -1059,13 +1059,13 @@ public class Southpaw {
                     for(ByteArray oldForeignKey: ImmutableSet.copyOf(oldForeignKeys)) {
                         parentIndex.remove(oldForeignKey, rootPrimaryKey);
                         nbRemovedOldForeignKeys += 1;
-                        if (oldForeignKey != null && oldForeignKey.toString().equals("309f5c")) {
+                        if (child != null && child.getEntity().equals("user_custom_params") && oldForeignKey != null && oldForeignKey.toString().equals("309f5c")) {
                             nbRemovedOldForeignKeys309f5c += 1;
                         }
                     }
-                    if (nbRemovedOldForeignKeys309f5c > 0) {
-                        logger.info(String.format("Scrubbed %s parent index to remove a primary key from 309f5c old join key", parent.getEntity(), nbRemovedOldForeignKeys309f5c));
-                    }
+                    //if (nbRemovedOldForeignKeys309f5c > 0) {
+                    //    logger.info(String.format("Scrubbed %s parent index for %s child relation to remove a primary key from 309f5c old join key", parent.getEntity(), child.getEntity(), nbRemovedOldForeignKeys309f5c));
+                    //}
                     if (rootPrimaryKey != null && rootPrimaryKey.toString().equals("309f5c")) {
                         logger.info(String.format("Scrubbed %s parent index for %d old foreign keys", parent.getEntity(), nbRemovedOldForeignKeys));
                     }
@@ -1114,7 +1114,7 @@ public class Southpaw {
             for(ByteArray oldJoinKey: oldJoinKeys) {
                 if(!oldJoinKey.equals(newJoinKey)) {
                     joinIndex.remove(oldJoinKey, primaryKey);
-                    if (oldJoinKey != null && oldJoinKey.toString().equals("309f5c")) {
+                    if (relation != null && relation.getEntity().equals("user_custom_params") && oldJoinKey != null && oldJoinKey.toString().equals("309f5c")) {
                         nbRemovedOldJoinKeys309f5c += 1;
                     }
                     if (newJoinKey != null && newJoinKey.toString().equals("309f5c") && oldJoinKey != null) {
@@ -1129,7 +1129,7 @@ public class Southpaw {
                 logger.info(String.format("Updated join index to remove primary key from %d old join keys", nbRemovedOldJoinKeys));
             }
             if (nbRemovedOldJoinKeys309f5c > 0) {
-                logger.info(String.format("Updated join index to remove a primary key from 309f5c old join key", nbRemovedOldJoinKeys309f5c));
+                logger.info(String.format("Updated %s join index to remove a primary key from 309f5c old join key", relation.getEntity(), nbRemovedOldJoinKeys309f5c));
             }
         } else {
             if (logToInfo) {
