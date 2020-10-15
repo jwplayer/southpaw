@@ -498,7 +498,11 @@ public class Southpaw {
             topic.getValue().flush();
         }
         for(Map.Entry<String, BaseIndex<BaseRecord, BaseRecord, Set<ByteArray>>> index: fkIndices.entrySet()) {
+            if (logToInfo) {
+                index.getValue().DefaultLogToInfo = true;
+            }
             index.getValue().flush();
+            index.getValue().DefaultLogToInfo = false;
         }
         for(Map.Entry<Relation, ByteArraySet> entry: dePKsByType.entrySet()) {
             state.put(METADATA_KEYSPACE, createDePKEntryName(entry.getKey()).getBytes(), entry.getValue().serialize());
