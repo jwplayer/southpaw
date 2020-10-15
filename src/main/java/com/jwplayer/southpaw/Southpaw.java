@@ -553,7 +553,7 @@ public class Southpaw {
         BaseRecord relationRecord = relationTopic.readByPK(relationPrimaryKey);
 
         // Whether to log debug statements to INFO
-        Boolean myLogToInfo = rootPrimaryKey != null && rootPrimaryKey.toString().equals("37cc91") || rootPrimaryKey.toString().equals("381be0");
+        Boolean myCreateLogToInfo = rootPrimaryKey != null && (rootPrimaryKey.toString().equals("37cc91") || rootPrimaryKey.toString().equals("381be0"));
 
         if(!(relationRecord == null || relationRecord.isEmpty())) {
             denormalizedRecord = new DenormalizedRecord();
@@ -567,7 +567,7 @@ public class Southpaw {
                 if (newParentKey != null) {
                     BaseIndex<BaseRecord, BaseRecord, Set<ByteArray>> joinIndex = fkIndices.get(createJoinIndexName(child));
 
-                    if (myLogToInfo && child.getEntity().equals("user_custom_params")) {
+                    if (myCreateLogToInfo && child.getEntity().equals("user_custom_params")) {
                         joinIndex.DefaultLogToInfo = true;
                         logger.info(String.format("Fetching %s child primary keys for %s primary key", child.getEntity(), newParentKey.toString()));
                     }
@@ -575,16 +575,16 @@ public class Southpaw {
                     Set<ByteArray> childPKs = joinIndex.getIndexEntry(newParentKey);
                     joinIndex.DefaultLogToInfo = false;
 
-                    if (myLogToInfo && child.getEntity().equals("user_custom_params") && childPKs != null) {
+                    if (myCreateLogToInfo && child.getEntity().equals("user_custom_params") && childPKs != null) {
                         logger.info(String.format("Fetched %d %s child primary keys for %s primary key", childPKs.size(), child.getEntity(), newParentKey.toString()));
-                    } else if (myLogToInfo && child.getEntity().equals("user_custom_params")) {
+                    } else if (myCreateLogToInfo && child.getEntity().equals("user_custom_params")) {
                         logger.info(String.format("Fetched no %s child primary keys for %s primary key", child.getEntity(), newParentKey.toString()));
                     }
 
                     if (childPKs != null) {
                         for (ByteArray childPK : childPKs) {
                             DenormalizedRecord deChildRecord = createDenormalizedRecord(root, child, rootPrimaryKey, childPK);
-                            if (myLogToInfo && child.getEntity().equals("user_custom_params")) {
+                            if (myCreateLogToInfo && child.getEntity().equals("user_custom_params")) {
                                 if (deChildRecord != null) {
                                     logger.info(String.format("Attaching non-null %s child denormalized record for %s primary key", child.getEntity(), newParentKey.toString()));
                                 } else {
@@ -597,6 +597,8 @@ public class Southpaw {
                     childRecords.setAdditionalProperty(child.getEntity(), new ArrayList<>(records.values()));
                 }
             }
+        } else if (myCreateLogToInfo) {
+            logger.info(String.format("Not creating denormalized record as the relation record is either null or empty for %s primary key", rootPrimaryKey.toString()));
         }
 
         return denormalizedRecord;
@@ -1155,7 +1157,10 @@ public class Southpaw {
         BaseIndex<BaseRecord, BaseRecord, Set<ByteArray>> parentIndex =
                 fkIndices.get(createParentIndexName(root, parent, child));
 
-        if (child.getEntity().equals("user_custom_params") && rootPrimaryKey != null && rootPrimaryKey.toString().equals("37cc91") || rootPrimaryKey.toString().equals("381be0")) {
+        // Whether to log debug statements to INFO
+        Boolean myUpdateLogToInfo = rootPrimaryKey != null && (rootPrimaryKey.toString().equals("37cc91") || rootPrimaryKey.toString().equals("381be0"));
+
+        if (myUpdateLogToInfo && child.getEntity().equals("user_custom_params")) {
             if (newParentKey != null) {
                 logger.info(String.format("Updating parent index to include %s child primary key for %s parent primary key", rootPrimaryKey.toString(), newParentKey.toString()));
             }
