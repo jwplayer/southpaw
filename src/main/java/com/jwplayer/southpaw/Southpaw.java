@@ -668,7 +668,9 @@ public class Southpaw {
             metrics.denormalizedRecordsToCreateByTopic.get(root.getDenormalizedName())
                     .update(metrics.denormalizedRecordsToCreateByTopic.get(root.getDenormalizedName()).getValue() - 1);
         }
-        logger.info(String.format("Scrubbed %d 309f5c old foreign keys for user_custom_params child relation in %s parent relation", nbRemovedOldForeignKeys309f5c, root.getEntity()));
+        if (nbRemovedOldForeignKeys309f5c > 0) {
+            logger.info(String.format("Scrubbed %d 309f5c old foreign keys for user_custom_params child relation in %s parent relation", nbRemovedOldForeignKeys309f5c, root.getEntity()));
+        }
         if (logToInfo) {
             logger.info(String.format("Ordered the creation of %d %s denormalized records", nbWrittenDenormalizedRecords, root.getEntity()));
         }
