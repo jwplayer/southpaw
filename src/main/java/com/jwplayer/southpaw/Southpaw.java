@@ -142,6 +142,10 @@ public class Southpaw {
      * State for Southpaw
      */
     protected BaseState state;
+    /**
+     * Nb of 309f5c old foreign keys scrubbed when cleaning parent indices
+     */
+    protected int nbRemovedOldForeignKeys309f5c;
 
     /**
      * Base Southpaw config
@@ -617,6 +621,7 @@ public class Southpaw {
             Relation root,
             Set<ByteArray> rootRecordPKs) {
         int nbWrittenDenormalizedRecords = 0;
+        nbRemovedOldForeignKeys309f5c = 0;
         for(ByteArray dePrimaryKey: rootRecordPKs) {
             if(dePrimaryKey != null) {
                 BaseTopic<byte[], DenormalizedRecord> outputTopic = outputTopics.get(root.getDenormalizedName());
@@ -663,9 +668,11 @@ public class Southpaw {
             metrics.denormalizedRecordsToCreateByTopic.get(root.getDenormalizedName())
                     .update(metrics.denormalizedRecordsToCreateByTopic.get(root.getDenormalizedName()).getValue() - 1);
         }
+        logger.info(String.format("Scrubbed %d 309f5c old foreign keys for user_custom_params child relation in %s parent relation", nbRemovedOldForeignKeys309f5c, root.getEntity()));
         if (logToInfo) {
             logger.info(String.format("Ordered the creation of %d %s denormalized records", nbWrittenDenormalizedRecords, root.getEntity()));
         }
+        nbRemovedOldForeignKeys309f5c = 0;
     }
 
     /**
@@ -1055,7 +1062,6 @@ public class Southpaw {
                         logger.info(String.format("Scrubbing %s parent index for %d old foreign keys", parent.getEntity(), oldForeignKeys.size()));
                     }
                     int nbRemovedOldForeignKeys = 0;
-                    int nbRemovedOldForeignKeys309f5c = 0;
                     for(ByteArray oldForeignKey: ImmutableSet.copyOf(oldForeignKeys)) {
                         parentIndex.remove(oldForeignKey, rootPrimaryKey);
                         nbRemovedOldForeignKeys += 1;
@@ -1063,9 +1069,6 @@ public class Southpaw {
                             nbRemovedOldForeignKeys309f5c += 1;
                         }
                     }
-                    // if (nbRemovedOldForeignKeys309f5c > 0) {
-                    //     logger.info(String.format("Scrubbed %s parent index for %s child relation to remove a primary key from 309f5c old join key", parent.getEntity(), child.getEntity(), nbRemovedOldForeignKeys309f5c));
-                    // }
                     if (rootPrimaryKey != null && rootPrimaryKey.toString().equals("309f5c")) {
                         logger.info(String.format("Scrubbed %s parent index for %d old foreign keys", parent.getEntity(), nbRemovedOldForeignKeys));
                     }
