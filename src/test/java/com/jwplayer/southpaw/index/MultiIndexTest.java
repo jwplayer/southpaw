@@ -444,8 +444,8 @@ public class MultiIndexTest {
         //Ensure setup is correct and we have lossed data in our index
         Set<ByteArray> actualKeys;
         actualKeys = index.getIndexEntry(new ByteArray("A"));
-        assertNotNull(actualKeys);
-        // assertNull(actualKeys);
+        // assertNotNull(actualKeys);
+        assertNull(actualKeys);
 
         //Ensure setup is correct and we can retrieve an expected foreign key from reverse index state
         actualKeys = index.getForeignKeys(new ByteArray(0L));
@@ -494,8 +494,8 @@ public class MultiIndexTest {
 
         //Ensure setup is correct and we have lossed data in our reverse index
         actualKeys = index.getForeignKeys(new ByteArray(0L));
-        assertNotNull(actualKeys);
-        //assertNull(actualKeys);
+        // assertNotNull(actualKeys);
+        assertNull(actualKeys);
 
         //Attempt to remove key
         index.remove(new ByteArray("A"), new ByteArray(0L));
