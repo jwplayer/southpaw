@@ -280,7 +280,7 @@ public class Southpaw {
                         // Whether to log debug statements to INFO
                         logToInfo = entity.equals("user_custom_params") || entity.equals("media_custom_params");
 
-                        if (logToInfo) {
+                        if (true || logToInfo) {
                             logger.info("---------------------------------");
                             logger.info(String.format("Processing %s record key: %s", entity, primaryKey.toString()));
                         }
