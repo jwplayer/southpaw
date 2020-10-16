@@ -71,11 +71,11 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
         addRI(foreignKey, primaryKey);
 
         // Whether to log debug statements to INFO
-        Boolean logToInfo = DefaultLogToInfo && foreignKey.toString().equals("309f5c");
+        Boolean logToInfo = DefaultLogToInfo && (foreignKey.toString().equals("309f5c") || primaryKey.toString().equals("309f5c"));
 
         if(pks.add(primaryKey)) {
-            if (logToInfo && (pks.size() == 10010 || pks.size() == 10558)) {
-                logger.info(String.format("Adding %d primary keys to index for %s foreign key", pks.size(), foreignKey.toString()));
+            if (logToInfo) {
+                logger.info(String.format("Adding %d primary keys (including %s) to index for %s foreign key", pks.size(), primaryKey.toString(), foreignKey.toString()));
             }
             putToState(foreignKey, pks);
         }
@@ -315,12 +315,12 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
         ByteArraySet primaryKeys = getIndexEntry(foreignKey);
 
         // Whether to log debug statements to INFO
-        Boolean logToInfo = DefaultLogToInfo && foreignKey.toString().equals("309f5c");
+        Boolean logToInfo = DefaultLogToInfo && (foreignKey.toString().equals("309f5c") || primaryKey.toString().equals("309f5c"));
 
         if(primaryKeys != null) {
             if(primaryKeys.remove(primaryKey)) {
-                if (logToInfo && (primaryKeys.size() + 1 == 10010 || primaryKeys.size() + 1 == 10558)) {
-                    logger.info(String.format("Removing one of the %d primary keys from index for %s foreign key", primaryKeys.size() + 1, foreignKey.toString()));
+                if (logToInfo) {
+                    logger.info(String.format("Removing one (%s) of the %d primary keys from index for %s foreign key", primaryKey.toString(), primaryKeys.size() + 1, foreignKey.toString()));
                 }
                 if(primaryKeys.size() == 0) {
                     state.delete(indexName, foreignKey.getBytes());
