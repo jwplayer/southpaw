@@ -71,7 +71,8 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
         addRI(foreignKey, primaryKey);
 
         // Whether to log debug statements to INFO
-        Boolean logToInfo = DefaultLogToInfo && (foreignKey.toString().equals("309f5c") || primaryKey.toString().equals("309f5c"));
+        Boolean logToInfo = DefaultLogToInfo && (foreignKey.toString().equals("309f5c") || foreignKey.toString().equals("1b96ad") ||
+                                                 primaryKey.toString().equals("309f5c") || primaryKey.toString().equals("1b96ad"));
 
         if(pks.add(primaryKey)) {
             if (logToInfo) {
@@ -114,16 +115,14 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
     @Override
     public void flush() {
 
-        Boolean riLogToInfo = false;
         for(Map.Entry<ByteArray, ByteArraySet> entry: pendingWrites.entrySet()) {
-            if (DefaultLogToInfo && entry.getKey().toString().equals("309f5c")) {
-                riLogToInfo = true;
+            if (DefaultLogToInfo && ( entry.getKey().toString().equals("309f5c") || entry.getKey().toString().equals("1b96ad") )) {
                 logger.info(String.format("Writing %d primary keys to state for %s foreign key", entry.getValue().size(), entry.getKey().toString()));
             }
             writeToState(entry.getKey(), entry.getValue());
         }
         for(Map.Entry<ByteArray, ByteArraySet> entry: pendingRIWrites.entrySet()) {
-            if (DefaultLogToInfo && riLogToInfo) {
+        	if (DefaultLogToInfo && ( entry.getKey().toString().equals("309f5c") || entry.getKey().toString().equals("1b96ad") )) {
                 logger.info(String.format("Writing %d foreign keys to RI state for %s primary key", entry.getValue().size(), entry.getKey().toString()));
             }
             writeRIToState(entry.getKey(), entry.getValue());
@@ -138,7 +137,7 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
     public ByteArraySet getForeignKeys(ByteArray primaryKey) {
 
         // Whether to log debug statements to INFO
-        Boolean logToInfo = DefaultLogToInfo;
+        Boolean logToInfo = DefaultLogToInfo && (primaryKey.toString().equals("309f5c") || primaryKey.toString().equals("1b96ad"));
 
         if(entryRICache.containsKey(primaryKey)) {
             if (logToInfo) {
@@ -178,7 +177,7 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
     public ByteArraySet getIndexEntry(ByteArray foreignKey) {
 
         // Whether to log debug statements to INFO
-        Boolean logToInfo = DefaultLogToInfo && foreignKey.toString().equals("309f5c");
+        Boolean logToInfo = DefaultLogToInfo && (foreignKey.toString().equals("309f5c") || foreignKey.toString().equals("1b96ad"));
 
         Preconditions.checkNotNull(foreignKey);
         if(entryCache.containsKey(foreignKey)) {
@@ -272,7 +271,7 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
         ByteArraySet primaryKeys = getIndexEntry(foreignKey);
 
         // Whether to log debug statements to INFO
-        Boolean logToInfo = DefaultLogToInfo && foreignKey.toString().equals("309f5c");
+        Boolean logToInfo = DefaultLogToInfo && (foreignKey.toString().equals("309f5c") || foreignKey.toString().equals("1b96ad"));
 
         if(primaryKeys != null) {
             if (logToInfo) {
@@ -315,7 +314,8 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
         ByteArraySet primaryKeys = getIndexEntry(foreignKey);
 
         // Whether to log debug statements to INFO
-        Boolean logToInfo = DefaultLogToInfo && (foreignKey.toString().equals("309f5c") || primaryKey.toString().equals("309f5c"));
+        Boolean logToInfo = DefaultLogToInfo && (foreignKey.toString().equals("309f5c") || foreignKey.toString().equals("1b96ad") ||
+                                                 primaryKey.toString().equals("309f5c") || primaryKey.toString().equals("1b96ad"));
 
         if(primaryKeys != null) {
             if(primaryKeys.remove(primaryKey)) {
