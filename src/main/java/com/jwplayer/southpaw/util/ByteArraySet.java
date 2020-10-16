@@ -74,7 +74,7 @@ public class ByteArraySet implements Set<ByteArray> {
         /**
          * The max size of the byte array in a chunk. Chunk byte arrays may be smaller than this length.
          */
-        public static final int MAX_CHUNK_SIZE = 10096;
+        public static final int MAX_CHUNK_SIZE = 4096;
         /**
          * The representation of the chunk as a byte array
          */
