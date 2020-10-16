@@ -1144,7 +1144,7 @@ public class Southpaw {
         if (newJoinKey != null) {
 
             if (logToInfo || newJoinKey.toString().equals("309f5c")) {
-                logger.info(String.format("Updating join index to add &s primary key to %s new join key", primaryKey.toString(), newJoinKey.toString()));
+                logger.info(String.format("Updating join index to add %s primary key to %s new join key", primaryKey.toString(), newJoinKey.toString()));
                 joinIndex.DefaultLogToInfo = true;
             }
 
