@@ -62,7 +62,7 @@ public class ByteArraySet implements Set<ByteArray> {
     /**
      * Force a max size on the fronting set to prevent uncontrolled growth and OOM errors
      */
-    public static final int MAX_FRONTING_SET_SIZE = 15000;
+    public static final int MAX_FRONTING_SET_SIZE = 15000; // 100;
 
     /**
      * A chunk contains a sorted set of ByteArrays within a single byte array. The set values are formatted such that
@@ -74,7 +74,7 @@ public class ByteArraySet implements Set<ByteArray> {
         /**
          * The max size of the byte array in a chunk. Chunk byte arrays may be smaller than this length.
          */
-        public static final int MAX_CHUNK_SIZE = 4096;
+        public static final int MAX_CHUNK_SIZE = 4096; // 2750;
         /**
          * The representation of the chunk as a byte array
          */
@@ -304,6 +304,7 @@ public class ByteArraySet implements Set<ByteArray> {
 
         @Override
         public boolean hasNext() {
+            // return (currentChunk != null && currentOffset < currentChunk.size) || chunksIter.hasNext();
             return currentChunk != null && currentOffset < currentChunk.size;
         }
 
@@ -314,7 +315,7 @@ public class ByteArraySet implements Set<ByteArray> {
                 currentOffset += 1;
                 return null;
             }
-            byte[] retVal = Arrays.copyOfRange(currentChunk.bytes, currentOffset + 1, currentOffset + size + 1);
+            byte[] retVal = Arrays.copyOfRange(currentChunk.bytes, currentOffset + 1, currentOffset + size + 1); // CHECK HERE: WHY size + 1 ?
             currentOffset += 1 + size;
             if(currentOffset >= currentChunk.size) {
                 if(chunksIter.hasNext()) {
@@ -430,7 +431,7 @@ public class ByteArraySet implements Set<ByteArray> {
                 break;
             case MULTI_CHUNK:
                 int index = bytes.length - 1;
-                while(index > 0) {
+                while(index > 0) { // CHECK HERE: WHY NOT >= ?
                     int size = Ints.fromBytes(bytes[index - 3], bytes[index - 2], bytes[index - 1], bytes[index]);
                     chunk = Chunk.deserialize(bytes, index - size + 1, index);
                     set.chunks.add(chunk);
@@ -463,13 +464,18 @@ public class ByteArraySet implements Set<ByteArray> {
         Iterator<ByteArray> frontIter = frontingSet.iterator();
         ChunksIterator chunksIter = new ChunksIterator();
         newChunks.add(chunk);
+
         ByteArray frontBA = null;
         ByteArray chunksBA = null;
 
         while(frontBA != null || frontIter.hasNext() || chunksBA != null || chunksIter.hasNext()) {
+
             if(frontBA == null && frontIter.hasNext()) frontBA = frontIter.next();
+
             while(chunksBA == null && chunksIter.hasNext()) chunksBA = chunksIter.next();
+
             if(frontBA != null && chunksBA != null) {
+
                 if (frontBA.compareTo(chunksBA) < 0) {
                     if (chunk.size + 1 + frontBA.size() > Chunk.MAX_CHUNK_SIZE) {
                         chunk = new Chunk(Chunk.MAX_CHUNK_SIZE);
@@ -477,6 +483,7 @@ public class ByteArraySet implements Set<ByteArray> {
                     }
                     chunk.add(frontBA);
                     frontBA = null;
+
                 } else {
                     if (chunk.size + 1 + chunksBA.size() > Chunk.MAX_CHUNK_SIZE) {
                         chunk = new Chunk(Chunk.MAX_CHUNK_SIZE);
@@ -485,13 +492,16 @@ public class ByteArraySet implements Set<ByteArray> {
                     chunk.add(chunksBA);
                     chunksBA = null;
                 }
+
             } else if(frontBA != null) {
+
                 if (chunk.size + 1 + frontBA.size() > Chunk.MAX_CHUNK_SIZE) {
                     chunk = new Chunk(Chunk.MAX_CHUNK_SIZE);
                     newChunks.add(chunk);
                 }
                 chunk.add(frontBA);
                 frontBA = null;
+
             } else if(chunksBA != null) {
                 if (chunk.size + 1 + chunksBA.size() > Chunk.MAX_CHUNK_SIZE) {
                     chunk = new Chunk(Chunk.MAX_CHUNK_SIZE);
