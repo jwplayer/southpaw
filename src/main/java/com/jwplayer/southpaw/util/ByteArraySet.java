@@ -148,7 +148,7 @@ public class ByteArraySet implements Set<ByteArray> {
         public boolean contains(ByteArray byteArray) {
             if(entries == 0) return false;
             if(byteArray == null || byteArray.size() == 0) return false;
-            if(min.compareTo(byteArray) > 0 || max.compareTo(byteArray) < 0) return false;
+            // if(min.compareTo(byteArray) > 0 || max.compareTo(byteArray) < 0) return false;
             int index = 0;
             // byte[] baBytes = byteArray.getBytes();
             while(index < size) {
