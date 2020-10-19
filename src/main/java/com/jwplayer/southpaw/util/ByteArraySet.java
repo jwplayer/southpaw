@@ -62,7 +62,7 @@ public class ByteArraySet implements Set<ByteArray> {
     /**
      * Force a max size on the fronting set to prevent uncontrolled growth and OOM errors
      */
-    public static final int MAX_FRONTING_SET_SIZE = 100; // 15000; or 100;
+    public static final int MAX_FRONTING_SET_SIZE = 0; // 15000; or 100;
 
     /**
      * A chunk contains a sorted set of ByteArrays within a single byte array. The set values are formatted such that
