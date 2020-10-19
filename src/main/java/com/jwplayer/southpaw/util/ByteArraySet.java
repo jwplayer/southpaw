@@ -62,7 +62,7 @@ public class ByteArraySet implements Set<ByteArray> {
     /**
      * Force a max size on the fronting set to prevent uncontrolled growth and OOM errors
      */
-    public static final int MAX_FRONTING_SET_SIZE = 15000; // 100;
+    public static final int MAX_FRONTING_SET_SIZE = 1000; // 15000; or 100;
 
     /**
      * A chunk contains a sorted set of ByteArrays within a single byte array. The set values are formatted such that
@@ -74,7 +74,7 @@ public class ByteArraySet implements Set<ByteArray> {
         /**
          * The max size of the byte array in a chunk. Chunk byte arrays may be smaller than this length.
          */
-        public static final int MAX_CHUNK_SIZE = 4096; // 2750;
+        public static final int MAX_CHUNK_SIZE = 4096; // 4096; or 2750;
         /**
          * The representation of the chunk as a byte array
          */
@@ -150,17 +150,20 @@ public class ByteArraySet implements Set<ByteArray> {
             if(byteArray == null || byteArray.size() == 0) return false;
             if(min.compareTo(byteArray) > 0 || max.compareTo(byteArray) < 0) return false;
             int index = 0;
-            byte[] baBytes = byteArray.getBytes();
+            // byte[] baBytes = byteArray.getBytes();
             while(index < size) {
                 int baSize = (int) bytes[index];
-                int i;
+                // int i;
                 index++;
-                if(baSize == baBytes.length) {
-                    for(i = 0; i < baSize; i++) {
-                        if(baBytes[i] != bytes[index + i]) break;
-                    }
-                    if(i == baSize) return true;
-                }
+                // if(baSize == baBytes.length) {
+                byte[] chunkBytes = Arrays.copyOfRange(bytes, index, index + baSize); // );
+                ByteArray chunkBA = new ByteArray(chunkBytes);
+                if (byteArray.equals(chunkBA)) return true;
+                    // for(i = 0; i < baSize; i++) {
+                    //     if(baBytes[i] != bytes[index + i]) break;
+                    // }
+                    // if(i == baSize) return true;
+                // }
                 index += baSize;
             }
             return false;
