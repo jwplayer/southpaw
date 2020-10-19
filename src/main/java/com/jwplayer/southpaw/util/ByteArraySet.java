@@ -431,7 +431,7 @@ public class ByteArraySet implements Set<ByteArray> {
                 break;
             case MULTI_CHUNK:
                 int index = bytes.length - 1;
-                while(index > 0) { // CHECK HERE: WHY NOT >= ?
+                while(index > 0) {
                     int size = Ints.fromBytes(bytes[index - 3], bytes[index - 2], bytes[index - 1], bytes[index]);
                     chunk = Chunk.deserialize(bytes, index - size + 1, index);
                     set.chunks.add(chunk);
