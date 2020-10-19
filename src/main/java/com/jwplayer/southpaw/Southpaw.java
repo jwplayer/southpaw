@@ -292,7 +292,7 @@ public class Southpaw {
                                 logger.info(String.format("Processing relation: %s", root.getEntity()));
                             }
 
-                            Set<ByteArray> dePrimaryKeys = dePKsByType.get(root);
+                            ByteArraySet dePrimaryKeys = dePKsByType.get(root);
                             if (root.getEntity().equals(entity)) {
 
                                 if (logToInfo) {
@@ -619,7 +619,7 @@ public class Southpaw {
      */
     protected void createDenormalizedRecords(
             Relation root,
-            Set<ByteArray> rootRecordPKs) {
+            ByteArraySet rootRecordPKs) {
         int nbWrittenDenormalizedRecords = 0;
         nbRemovedOldForeignKeys309f5c = 0;
         for(ByteArray dePrimaryKey: rootRecordPKs) {

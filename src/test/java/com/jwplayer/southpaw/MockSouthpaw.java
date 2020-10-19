@@ -21,6 +21,7 @@ import com.jwplayer.southpaw.json.Record;
 import com.jwplayer.southpaw.record.BaseRecord;
 import com.jwplayer.southpaw.topic.BaseTopic;
 import com.jwplayer.southpaw.util.ByteArray;
+import com.jwplayer.southpaw.util.ByteArraySet;
 
 import java.io.IOException;
 import java.net.URI;
@@ -42,7 +43,7 @@ public class MockSouthpaw extends Southpaw {
 
     public void createDenormalizedRecords(
             Relation root,
-            Set<ByteArray> rootRecordPKs) {
+            ByteArraySet rootRecordPKs) {
         super.createDenormalizedRecords(root, rootRecordPKs);
     }
 

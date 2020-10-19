@@ -380,7 +380,7 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
             AbstractMap.SimpleEntry<byte[], byte[]> pair = iter.next();
             ByteArray revIndexPrimaryKey = new ByteArray(pair.getKey());
             ByteArraySet revIndexForeignKeySet = ByteArraySet.deserialize(pair.getValue());
-            for (ByteArray indexPrimaryKey : revIndexForeignKeySet.toArray()) {
+            for (ByteArray indexPrimaryKey : revIndexForeignKeySet) {
                 ByteArraySet indexForeignKeySet = getIndexEntry(indexPrimaryKey);
 
                 if(indexForeignKeySet != null) {
@@ -407,7 +407,7 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
             AbstractMap.SimpleEntry<byte[], byte[]> pair = iter.next();
             ByteArray indexPrimaryKey = new ByteArray(pair.getKey());
             ByteArraySet indexForeignKeySet = ByteArraySet.deserialize(pair.getValue());
-            for (ByteArray revIndexPrimaryKey : indexForeignKeySet.toArray()) {
+            for (ByteArray revIndexPrimaryKey : indexForeignKeySet) {
                 ByteArraySet revIndexforeignKeySet = getForeignKeys(revIndexPrimaryKey);
 
                 if(revIndexforeignKeySet != null) {
