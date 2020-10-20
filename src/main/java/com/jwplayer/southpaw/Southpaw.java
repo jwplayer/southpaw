@@ -721,9 +721,15 @@ public class Southpaw {
      * require creating a new instance to continue processing.
      */
     public static void deleteBackups(Map<String, Object> config) {
-        BaseState state =  new RocksDBState(config);
-        state.deleteBackups();
-        state.close();
+        BaseState state = null;
+        try {
+            state =  new RocksDBState(config);
+            state.deleteBackups();
+        } finally {
+            if (state != null) {
+                state.close();
+            }
+        }
     }
 
     /**
