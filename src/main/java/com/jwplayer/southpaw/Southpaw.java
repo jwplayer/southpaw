@@ -549,9 +549,6 @@ public class Southpaw {
         BaseTopic<BaseRecord, BaseRecord> relationTopic = inputTopics.get(relation.getEntity());
         BaseRecord relationRecord = relationTopic.readByPK(relationPrimaryKey);
 
-        // Whether to log debug statements to INFO
-        Boolean myCreateLogToInfo = rootPrimaryKey != null && (rootPrimaryKey.toString().equals("37cc91") || rootPrimaryKey.toString().equals("381be0"));
-
         if(!(relationRecord == null || relationRecord.isEmpty())) {
             denormalizedRecord = new DenormalizedRecord();
             denormalizedRecord.setRecord(createInternalRecord(relationRecord));
@@ -563,37 +560,16 @@ public class Southpaw {
                 Map<ByteArray, DenormalizedRecord> records = new TreeMap<>();
                 if (newParentKey != null) {
                     BaseIndex<BaseRecord, BaseRecord, Set<ByteArray>> joinIndex = fkIndices.get(createJoinIndexName(child));
-
-                    if (myCreateLogToInfo && child.getEntity().equals("user_custom_params")) {
-                        logger.info(String.format("Fetching %s child primary keys for %s primary key", child.getEntity(), newParentKey.toString()));
-                    }
-
                     Set<ByteArray> childPKs = joinIndex.getIndexEntry(newParentKey);
-
-                    if (myCreateLogToInfo && child.getEntity().equals("user_custom_params") && childPKs != null) {
-                        logger.info(String.format("Fetched %d %s child primary keys for %s primary key", childPKs.size(), child.getEntity(), newParentKey.toString()));
-                    } else if (myCreateLogToInfo && child.getEntity().equals("user_custom_params")) {
-                        logger.info(String.format("Fetched no %s child primary keys for %s primary key", child.getEntity(), newParentKey.toString()));
-                    }
-
                     if (childPKs != null) {
                         for (ByteArray childPK : childPKs) {
                             DenormalizedRecord deChildRecord = createDenormalizedRecord(root, child, rootPrimaryKey, childPK);
-                            if (myCreateLogToInfo && child.getEntity().equals("user_custom_params")) {
-                                if (deChildRecord != null) {
-                                    logger.info(String.format("Attaching non-null %s child denormalized record for %s primary key", child.getEntity(), newParentKey.toString()));
-                                } else {
-                                    logger.info(String.format("Not attaching null %s child denormalized record for %s primary key", child.getEntity(), newParentKey.toString()));
-                                }
-                            }
                             if (deChildRecord != null) records.put(childPK, deChildRecord);
                         }
                     }
                     childRecords.setAdditionalProperty(child.getEntity(), new ArrayList<>(records.values()));
                 }
             }
-        } else if (myCreateLogToInfo) {
-            logger.info(String.format("Not creating denormalized record as the relation record is either null or empty for %s primary key", rootPrimaryKey.toString()));
         }
 
         return denormalizedRecord;
