@@ -22,9 +22,6 @@ import com.jwplayer.southpaw.util.ByteArray;
 
 import java.util.*;
 
-import org.apache.log4j.Level;
-import org.apache.log4j.Logger;
-
 
 /**
  * This class indexes entities stored in topics. These indexes are always a key (as a byte array, which can be
@@ -49,18 +46,8 @@ public abstract class BaseIndex<K, V, O> {
      * State for storing the indices and other data
      */
     protected BaseState state;
-    /**
-     * Le Logger
-     */
-    protected static final Logger logger = Logger.getLogger(BaseIndex.class);
-    /**
-     * Whether to log debug statements to INFO
-     */
-    public Boolean DefaultLogToInfo = false;
 
-    public BaseIndex() {
-        logger.setLevel(Level.INFO);
-    }
+    public BaseIndex() { }
 
     /**
      * Adds or updates an index entry for the given foreign key with the given record PK to the indexed topic.
