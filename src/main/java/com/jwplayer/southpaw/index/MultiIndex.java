@@ -159,11 +159,7 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
      * Method for keeping pending writes manageable by auto-flushing once it reaches a certain size.
      */
     public void putToState(ByteArray key, ByteArraySet value) {
-        if(value.size() > LRU_CACHE_THRESHOLD) {
-            entryCache.put(key, value);
-        } else {
-            entryCache.remove(key);
-        }
+        if(value.size() > LRU_CACHE_THRESHOLD) entryCache.put(key, value);
         pendingWrites.put(key, value);
         if(pendingWrites.size() > indexWriteBatchSize) {
             for(Map.Entry<ByteArray, ByteArraySet> entry: pendingWrites.entrySet()) {
@@ -177,11 +173,7 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
      * Method for keeping RI pending writes manageable by auto-flushing once it reaches a certain size.
      */
     public void putRIToState(ByteArray key, ByteArraySet value) {
-        if(value.size() > LRU_CACHE_THRESHOLD) {
-            entryRICache.put(key, value);
-        } else {
-            entryRICache.remove(key);
-        }
+        if(value.size() > LRU_CACHE_THRESHOLD) entryRICache.put(key, value);
         pendingRIWrites.put(key, value);
         if(pendingRIWrites.size() > indexWriteBatchSize) {
             for (Map.Entry<ByteArray, ByteArraySet> entry : pendingRIWrites.entrySet()) {
