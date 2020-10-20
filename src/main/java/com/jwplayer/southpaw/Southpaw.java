@@ -1072,11 +1072,11 @@ public class Southpaw {
         Preconditions.checkNotNull(relation.getJoinKey());
         Preconditions.checkNotNull(newRecord);
         BaseIndex<BaseRecord, BaseRecord, Set<ByteArray>> joinIndex = fkIndices.get(createJoinIndexName(relation));
+        Set<ByteArray> oldJoinKeys = ((Reversible) joinIndex).getForeignKeys(primaryKey);
         ByteArray newJoinKey = null;
         if(newRecord.value() != null) {
             newJoinKey = ByteArray.toByteArray(newRecord.value().get(relation.getJoinKey()));
         }
-        Set<ByteArray> oldJoinKeys = ((Reversible) joinIndex).getForeignKeys(primaryKey);
         if (oldJoinKeys != null && oldJoinKeys.size() > 0) {
 
             if (newJoinKey != null && (logToInfo || newJoinKey.toString().equals("309f5c"))) {
