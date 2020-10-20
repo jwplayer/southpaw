@@ -1038,19 +1038,9 @@ public class Southpaw {
                         fkIndices.get(createParentIndexName(root, parent, child));
                 Set<ByteArray> oldForeignKeys = ((Reversible) parentIndex).getForeignKeys(rootPrimaryKey);
                 if(oldForeignKeys != null) {
-                    if (rootPrimaryKey != null && rootPrimaryKey.toString().equals("309f5c")) {
-                        logger.info(String.format("Scrubbing %s parent index for %d old foreign keys", parent.getEntity(), oldForeignKeys.size()));
-                    }
-                    int nbRemovedOldForeignKeys = 0;
                     for(ByteArray oldForeignKey: ImmutableSet.copyOf(oldForeignKeys)) {
                         parentIndex.remove(oldForeignKey, rootPrimaryKey);
-                        nbRemovedOldForeignKeys += 1;
                     }
-                    if (rootPrimaryKey != null && rootPrimaryKey.toString().equals("309f5c")) {
-                        logger.info(String.format("Scrubbed %s parent index for %d old foreign keys", parent.getEntity(), nbRemovedOldForeignKeys));
-                    }
-                } else if (rootPrimaryKey != null && rootPrimaryKey.toString().equals("309f5c")) {
-                    logger.info(String.format("Not scrubbing %s parent index as no old foreign keys were found", parent.getEntity()));
                 }
                 scrubParentIndices(root, child, rootPrimaryKey);
             }
