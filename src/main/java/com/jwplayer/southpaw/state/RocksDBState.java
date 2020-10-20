@@ -305,8 +305,10 @@ public class RocksDBState extends BaseState {
 
     private void closeBackupEngine() {
         logger.info("Closing RocksDB backup engine");
-        backupOptions.close();
-        backupEngine.close();
+        if (backupEngine != null) {
+            backupOptions.close();
+            backupEngine.close();
+        }
 
         backupOptions = null;
         backupEngine = null;
