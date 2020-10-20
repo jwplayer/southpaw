@@ -252,6 +252,7 @@ public class RocksDBState extends BaseState {
     public void backup() {
         logger.info("Backing up RocksDB state");
         try {
+            openBackupEngine();
             backupEngine.createNewBackup(rocksDB, true);
             backupEngine.purgeOldBackups(backupsToKeep);
         } catch(RocksDBException ex) {
@@ -304,8 +305,8 @@ public class RocksDBState extends BaseState {
     }
 
     private void closeBackupEngine() {
-        logger.info("Closing RocksDB backup engine");
         if (backupEngine != null) {
+            logger.info("Closing RocksDB backup engine");
             backupOptions.close();
             backupEngine.close();
         }
@@ -453,8 +454,6 @@ public class RocksDBState extends BaseState {
             for(ColumnFamilyHandle handle: handles) {
                 cfHandles.put(new ByteArray(handle.getName()), handle);
             }
-
-            openBackupEngine();
         } catch(Exception ex) {
             throw new RuntimeException(ex);
         }
