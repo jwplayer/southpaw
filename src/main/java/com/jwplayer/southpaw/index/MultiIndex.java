@@ -106,7 +106,6 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
 
     @Override
     public void flush() {
-
         for(Map.Entry<ByteArray, ByteArraySet> entry: pendingWrites.entrySet()) {
             writeToState(entry.getKey(), entry.getValue());
         }
