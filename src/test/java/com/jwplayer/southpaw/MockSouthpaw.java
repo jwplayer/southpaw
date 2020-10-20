@@ -17,7 +17,6 @@ package com.jwplayer.southpaw;
 
 import com.jwplayer.southpaw.index.BaseIndex;
 import com.jwplayer.southpaw.json.*;
-import com.jwplayer.southpaw.json.Record;
 import com.jwplayer.southpaw.record.BaseRecord;
 import com.jwplayer.southpaw.topic.BaseTopic;
 import com.jwplayer.southpaw.util.ByteArray;
