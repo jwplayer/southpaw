@@ -376,9 +376,7 @@ public class Southpaw {
                                         }
                                     }
                                     if (newParentKey != null) {
-                                        parentIndex.DefaultLogToInfo = true;
                                         Set<ByteArray> primaryKeys = parentIndex.getIndexEntry(newParentKey);
-                                        parentIndex.DefaultLogToInfo = false;
                                         if (primaryKeys != null) {
                                             if (logToInfo) {
                                                 logger.info(String.format("Found %d matching primary keys in the parent index for the new parent key", primaryKeys.size()));
@@ -502,11 +500,7 @@ public class Southpaw {
             topic.getValue().flush();
         }
         for(Map.Entry<String, BaseIndex<BaseRecord, BaseRecord, Set<ByteArray>>> index: fkIndices.entrySet()) {
-            if (logToInfo) {
-                index.getValue().DefaultLogToInfo = true;
-            }
             index.getValue().flush();
-            index.getValue().DefaultLogToInfo = false;
         }
         for(Map.Entry<Relation, ByteArraySet> entry: dePKsByType.entrySet()) {
             state.put(METADATA_KEYSPACE, createDePKEntryName(entry.getKey()).getBytes(), entry.getValue().serialize());
@@ -576,12 +570,10 @@ public class Southpaw {
                     BaseIndex<BaseRecord, BaseRecord, Set<ByteArray>> joinIndex = fkIndices.get(createJoinIndexName(child));
 
                     if (myCreateLogToInfo && child.getEntity().equals("user_custom_params")) {
-                        joinIndex.DefaultLogToInfo = true;
                         logger.info(String.format("Fetching %s child primary keys for %s primary key", child.getEntity(), newParentKey.toString()));
                     }
 
                     Set<ByteArray> childPKs = joinIndex.getIndexEntry(newParentKey);
-                    joinIndex.DefaultLogToInfo = false;
 
                     if (myCreateLogToInfo && child.getEntity().equals("user_custom_params") && childPKs != null) {
                         logger.info(String.format("Fetched %d %s child primary keys for %s primary key", childPKs.size(), child.getEntity(), newParentKey.toString()));
@@ -1054,11 +1046,7 @@ public class Southpaw {
             for(Relation child: parent.getChildren()) {
                 BaseIndex<BaseRecord, BaseRecord, Set<ByteArray>> parentIndex =
                         fkIndices.get(createParentIndexName(root, parent, child));
-                if (rootPrimaryKey != null && rootPrimaryKey.toString().equals("309f5c")) {
-                    parentIndex.DefaultLogToInfo = true;
-                }
                 Set<ByteArray> oldForeignKeys = ((Reversible) parentIndex).getForeignKeys(rootPrimaryKey);
-                parentIndex.DefaultLogToInfo = false;
                 if(oldForeignKeys != null) {
                     if (rootPrimaryKey != null && rootPrimaryKey.toString().equals("309f5c")) {
                         logger.info(String.format("Scrubbing %s parent index for %d old foreign keys", parent.getEntity(), oldForeignKeys.size()));
@@ -1101,11 +1089,7 @@ public class Southpaw {
         if(newRecord.value() != null) {
             newJoinKey = ByteArray.toByteArray(newRecord.value().get(relation.getJoinKey()));
         }
-        if (logToInfo || (newJoinKey != null && newJoinKey.toString().equals("309f5c"))) {
-            joinIndex.DefaultLogToInfo = true;
-        }
         Set<ByteArray> oldJoinKeys = ((Reversible) joinIndex).getForeignKeys(primaryKey);
-        joinIndex.DefaultLogToInfo = false;
         if (oldJoinKeys != null && oldJoinKeys.size() > 0) {
 
             if (newJoinKey != null && (logToInfo || newJoinKey.toString().equals("309f5c"))) {
@@ -1145,11 +1129,9 @@ public class Southpaw {
 
             if (logToInfo || newJoinKey.toString().equals("309f5c")) {
                 logger.info(String.format("Updating join index to add %s primary key to %s new join key", primaryKey.toString(), newJoinKey.toString()));
-                joinIndex.DefaultLogToInfo = true;
             }
 
             joinIndex.add(newJoinKey, primaryKey);
-            joinIndex.DefaultLogToInfo = false;
         } else {
             if (logToInfo) {
                 logger.info("Not updating join index as new join key is null");
