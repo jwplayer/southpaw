@@ -274,8 +274,8 @@ public class RocksDBState extends BaseState {
         if(!isOpen()) {
             return;
         }
-        super.close();
         logger.info("Closing RocksDB state");
+        super.close();
 
         for (Iterator iterator : iterators) {
             iterator.close();
@@ -302,6 +302,7 @@ public class RocksDBState extends BaseState {
             s3Helper.close();
             s3Helper = null;
         }
+        logger.info("RocksDB state closed");
     }
 
     private void closeBackupEngine() {
@@ -309,6 +310,7 @@ public class RocksDBState extends BaseState {
             logger.info("Closing RocksDB backup engine");
             backupOptions.close();
             backupEngine.close();
+            logger.info("RocksDB backup engine closed");
         }
 
         backupOptions = null;
@@ -344,7 +346,7 @@ public class RocksDBState extends BaseState {
             File file = new File(backupPath);
             if (!file.exists()) {
                 boolean created = file.mkdir();
-                logger.info("Created directory: " + created);
+                logger.info("Created RocksDB backup directory: " + created);
             }
             backupPath = file.getPath();
 
@@ -358,6 +360,7 @@ public class RocksDBState extends BaseState {
         if(isOpen()){
             throw new RuntimeException("RocksDB is already open!");
         }
+        logger.info("Opening RocksDB state");
         try {
             // Create the backing DB
             sstFileManager = new SstFileManager(Env.getDefault());
@@ -458,6 +461,7 @@ public class RocksDBState extends BaseState {
             throw new RuntimeException(ex);
         }
         super.open();
+        logger.info("Finished opening RocksDB state");
     }
 
     private void openBackupEngine() throws RocksDBException{
