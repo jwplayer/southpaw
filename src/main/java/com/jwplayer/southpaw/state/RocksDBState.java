@@ -521,6 +521,7 @@ public class RocksDBState extends BaseState {
 
     @Override
     public void flush() {
+        logger.info("Flushing RocksDB state");
         try {
             for(Map.Entry<ByteArray, Map<ByteArray, byte[]>> entry: dataBatches.entrySet()) {
                 putBatch(entry.getKey());
@@ -535,6 +536,7 @@ public class RocksDBState extends BaseState {
     public void flush(String keySpace) {
         Preconditions.checkNotNull(keySpace);
         ByteArray byteArray = new ByteArray(keySpace);
+        logger.info(String.format("Flushing (%s, %s) RocksDB state", keySpace, byteArray.toString()));
         try {
             putBatch(byteArray);
             rocksDB.flush(flushOptions, cfHandles.get(byteArray));
@@ -547,6 +549,7 @@ public class RocksDBState extends BaseState {
     public byte[] get(String keySpace, byte[] key) {
         ByteArray handleName = new ByteArray(keySpace);
         Preconditions.checkNotNull(cfHandles.get(handleName));
+        logger.info(String.format("Getting %s key from (%s, %s) RocksDB state", key.toString(), keySpace, handleName.toString()));
         try {
             byte[] retVal = dataBatches.get(new ByteArray(keySpace)).get(new ByteArray(key));
             if(retVal == null) {
@@ -588,6 +591,7 @@ public class RocksDBState extends BaseState {
     public void put(String keySpace, byte[] key, byte[] value) {
         Preconditions.checkNotNull(key);
         ByteArray byteArray = new ByteArray(keySpace);
+        logger.info(String.format("Putting %s key within (%s, %s) RocksDB state", key.toString(), keySpace, byteArray.toString()));
         Map<ByteArray, byte[]> dataBatch = Preconditions.checkNotNull(dataBatches.get(byteArray));
         dataBatch.put(new ByteArray(key), value);
         if(dataBatch.size() >= putBatchSize) {
