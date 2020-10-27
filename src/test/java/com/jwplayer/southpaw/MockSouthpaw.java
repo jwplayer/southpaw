@@ -62,7 +62,7 @@ public class MockSouthpaw extends Southpaw {
      * Accessor for the FK indices used by Southpaw
      * @return Southpaw's FK indices
      */
-    public Map<String, BaseIndex<BaseRecord, BaseRecord, Set<ByteArray>>> getFkIndices() {
+    public Map<String, BaseIndex<BaseRecord, BaseRecord, ByteArraySet>> getFkIndices() {
         return fkIndices;
     }
 

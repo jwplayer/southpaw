@@ -113,7 +113,7 @@ public class ByteArraySetTest {
         testAdd(3567);
     }
 
-    public void testAddAll(int size) {
+    public void testAddAll(int size, boolean forceByteArraySet) {
         ByteArraySet set = new ByteArraySet();
 
         List<ByteArray> vals = getRandomByteArrays(size);
@@ -124,7 +124,12 @@ public class ByteArraySetTest {
         assertEquals(size, set.size());
 
         List<ByteArray> stagedVals = getRandomByteArrays(size);
-        Set<ByteArray> extraVals = new HashSet<ByteArray>();
+        Set<ByteArray> extraVals;
+        if (forceByteArraySet) {
+            extraVals = new ByteArraySet();
+        } else {
+            extraVals = new HashSet<ByteArray>();
+        }
         while(extraVals.size() < size) {
             if (stagedVals.size() == 0) {
                 stagedVals = getRandomByteArrays(size);
@@ -152,32 +157,38 @@ public class ByteArraySetTest {
 
     @Test
     public void emptyAddAll() {
-        testAddAll(0);
+        testAddAll(0, false);
+        testAddAll(0, true);
     }
 
     @Test
     public void reallySmallAddAll() {
-        testAddAll(1);
+        testAddAll(1, false);
+        testAddAll(1, true);
     }
 
     @Test
     public void smallAddAll() {
-        testAddAll(2);
+        testAddAll(2, false);
+        testAddAll(2, true);
     }
 
     @Test
     public void regularAddAll() {
-        testAddAll(150);
+        testAddAll(150, false);
+        testAddAll(150, true);
     }
 
     @Test
     public void bigAddAll() {
-        testAddAll(750);
+        testAddAll(750, false);
+        testAddAll(750, true);
     }
 
     @Test
     public void reallyBigAddAll() {
-        testAddAll(3567);
+        testAddAll(3567, false);
+        testAddAll(3567, true);
     }
 
     public void testSimilarAdd(boolean forceMerger) {

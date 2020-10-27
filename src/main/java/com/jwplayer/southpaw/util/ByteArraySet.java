@@ -587,7 +587,24 @@ public class ByteArraySet implements Set<ByteArray> {
 
     @Override
     public boolean equals(Object object) {
-        return object != null && object instanceof ByteArraySet && serialize().equals(((ByteArraySet) object).serialize());
+        if (object == null || !(object instanceof ByteArraySet)) {
+            return false;
+        }
+
+        if (size() != ((ByteArraySet) object).size()) {
+            return false;
+        }
+        for (ByteArray ba: this) {
+            if (!(((ByteArraySet) object).contains(ba))) {
+                return false;
+            }
+        }
+        for (ByteArray ba: (ByteArraySet) object) {
+            if (!contains(ba)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     @Override
