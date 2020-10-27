@@ -593,9 +593,9 @@ public class RocksDBState extends BaseState {
         Preconditions.checkNotNull(key);
         ByteArray byteArray = new ByteArray(keySpace);
         try {
-            logger.info(String.format("Putting %s key within (%s, %s) RocksDB state with %d value(s)", key.toString(), keySpace, byteArray.toString(), ByteArraySet.deserialize(value).size()));
+            logger.info(String.format("Putting %s key within %s RocksDB state with %d value(s)", key.toString(), keySpace, ByteArraySet.deserialize(value).size()));
         } catch(Exception e) {
-            logger.info(String.format("Putting %s key within (%s, %s) RocksDB state", key.toString(), keySpace, byteArray.toString()));
+            logger.info(String.format("Putting %s key within %s RocksDB state", key.toString(), keySpace));
         }
         Map<ByteArray, byte[]> dataBatch = Preconditions.checkNotNull(dataBatches.get(byteArray));
         dataBatch.put(new ByteArray(key), value);
