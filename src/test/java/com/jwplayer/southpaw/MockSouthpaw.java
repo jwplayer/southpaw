@@ -19,7 +19,6 @@ import com.jwplayer.southpaw.index.BaseIndex;
 import com.jwplayer.southpaw.json.*;
 import com.jwplayer.southpaw.record.BaseRecord;
 import com.jwplayer.southpaw.topic.BaseTopic;
-import com.jwplayer.southpaw.util.ByteArray;
 import com.jwplayer.southpaw.util.ByteArraySet;
 
 import java.io.IOException;
@@ -29,7 +28,6 @@ import java.net.URISyntaxException;
 import java.util.AbstractMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 
 /**
