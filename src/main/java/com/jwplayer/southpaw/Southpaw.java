@@ -267,10 +267,6 @@ public class Southpaw {
                     while (records.hasNext()) {
                         ConsumerRecord<BaseRecord, BaseRecord> newRecord = records.next();
                         ByteArray primaryKey = newRecord.key().toByteArray();
-
-                        logger.info("---------------------------------");
-                        logger.info(String.format("Processing %s record key: %s", entity, primaryKey.toString()));
-
                         for (Relation root : relations) {
                             ByteArraySet dePrimaryKeys = dePKsByType.get(root);
                             if (root.getEntity().equals(entity)) {
@@ -496,7 +492,6 @@ public class Southpaw {
     protected void createDenormalizedRecords(
             Relation root,
             ByteArraySet rootRecordPKs) {
-        int nbWrittenDenormalizedRecords = 0;
         for(ByteArray dePrimaryKey: rootRecordPKs) {
             if(dePrimaryKey != null) {
                 BaseTopic<byte[], DenormalizedRecord> outputTopic = outputTopics.get(root.getDenormalizedName());
@@ -520,7 +515,6 @@ public class Southpaw {
                         dePrimaryKey.getBytes(),
                         newDeRecord
                 );
-                nbWrittenDenormalizedRecords += 1;
             }
             metrics.denormalizedRecordsCreated.mark(1);
             metrics.denormalizedRecordsCreatedByTopic.get(root.getDenormalizedName()).mark(1);
@@ -528,7 +522,6 @@ public class Southpaw {
             metrics.denormalizedRecordsToCreateByTopic.get(root.getDenormalizedName())
                     .update(metrics.denormalizedRecordsToCreateByTopic.get(root.getDenormalizedName()).getValue() - 1);
         }
-        logger.info(String.format("Ordered the creation of %d %s denormalized records", nbWrittenDenormalizedRecords, root.getEntity()));
     }
 
     /**
