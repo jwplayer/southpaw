@@ -222,9 +222,9 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, ByteArraySet> implements R
         ByteArraySet foreignKeys = getForeignKeys(primaryKey);
         if(foreignKeys != null) {
             foreignKeys.remove(foreignKey);
+            entryRICache.remove(primaryKey);
             if(foreignKeys.size() == 0) {
                 state.delete(reverseIndexName, primaryKey.getBytes());
-                entryRICache.remove(primaryKey);
                 pendingRIWrites.remove(primaryKey);
             } else {
                 putRIToState(primaryKey, foreignKeys);
@@ -239,9 +239,9 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, ByteArraySet> implements R
         ByteArraySet primaryKeys = getIndexEntry(foreignKey);
         if(primaryKeys != null) {
             if(primaryKeys.remove(primaryKey)) {
+                entryCache.remove(foreignKey);
                 if(primaryKeys.size() == 0) {
                     state.delete(indexName, foreignKey.getBytes());
-                    entryCache.remove(foreignKey);
                     pendingWrites.remove(foreignKey);
                 } else {
                     putToState(foreignKey, primaryKeys);
@@ -296,7 +296,7 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, ByteArraySet> implements R
             AbstractMap.SimpleEntry<byte[], byte[]> pair = iter.next();
             ByteArray revIndexPrimaryKey = new ByteArray(pair.getKey());
             ByteArraySet revIndexForeignKeySet = ByteArraySet.deserialize(pair.getValue());
-            for (ByteArray indexPrimaryKey : revIndexForeignKeySet.toArray()) {
+            for (ByteArray indexPrimaryKey : revIndexForeignKeySet) {
                 ByteArraySet indexForeignKeySet = getIndexEntry(indexPrimaryKey);
 
                 if(indexForeignKeySet != null) {
@@ -323,7 +323,7 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, ByteArraySet> implements R
             AbstractMap.SimpleEntry<byte[], byte[]> pair = iter.next();
             ByteArray indexPrimaryKey = new ByteArray(pair.getKey());
             ByteArraySet indexForeignKeySet = ByteArraySet.deserialize(pair.getValue());
-            for (ByteArray revIndexPrimaryKey : indexForeignKeySet.toArray()) {
+            for (ByteArray revIndexPrimaryKey : indexForeignKeySet) {
                 ByteArraySet revIndexforeignKeySet = getForeignKeys(revIndexPrimaryKey);
 
                 if(revIndexforeignKeySet != null) {
