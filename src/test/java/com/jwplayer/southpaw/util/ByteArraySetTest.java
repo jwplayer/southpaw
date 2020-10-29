@@ -637,6 +637,18 @@ public class ByteArraySetTest {
     }
 
     @Test
+    public void testNullEquals() {
+        ByteArraySet set = new ByteArraySet();
+
+        List<ByteArray> vals = getRandomByteArrays(3);
+
+        for (ByteArray val: vals) {
+            assertTrue(set.add(val));
+        }
+        assertNotEquals(null, set);
+    }
+
+    @Test
     public void testEmptyLastValueChunkIteratorBug() {
         ByteArraySet set = new ByteArraySet();
 
