@@ -15,28 +15,21 @@
  */
 package com.jwplayer.southpaw;
 
-import com.codahale.metrics.Timer;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableSet;
-import com.jwplayer.southpaw.filter.BaseFilter;
-import com.jwplayer.southpaw.index.BaseIndex;
-import com.jwplayer.southpaw.index.MultiIndex;
-import com.jwplayer.southpaw.index.Reversible;
-import com.jwplayer.southpaw.json.*;
-import com.jwplayer.southpaw.record.BaseRecord;
-import com.jwplayer.southpaw.serde.BaseSerde;
-import com.jwplayer.southpaw.state.BaseState;
-import com.jwplayer.southpaw.state.RocksDBState;
-import com.jwplayer.southpaw.topic.BaseTopic;
-import com.jwplayer.southpaw.util.ByteArray;
-import com.jwplayer.southpaw.util.ByteArraySet;
-import com.jwplayer.southpaw.util.FileHelper;
-import com.jwplayer.southpaw.metric.Metrics;
-import com.jwplayer.southpaw.metric.StaticGauge;
-import com.jwplayer.southpaw.topic.TopicConfig;
-import joptsimple.OptionParser;
-import joptsimple.OptionSet;
+import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.util.AbstractMap;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.stream.Collectors;
+
 import org.apache.commons.lang.ObjectUtils;
 import org.apache.commons.lang.time.StopWatch;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -45,12 +38,32 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
 
-import java.io.IOException;
-import java.lang.reflect.InvocationTargetException;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.util.*;
-import java.util.stream.Collectors;
+import com.codahale.metrics.Timer;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableSet;
+import com.jwplayer.southpaw.filter.BaseFilter;
+import com.jwplayer.southpaw.index.BaseIndex;
+import com.jwplayer.southpaw.index.MultiIndex;
+import com.jwplayer.southpaw.index.Reversible;
+import com.jwplayer.southpaw.json.ChildRecords;
+import com.jwplayer.southpaw.json.DenormalizedRecord;
+import com.jwplayer.southpaw.json.Record;
+import com.jwplayer.southpaw.json.Relation;
+import com.jwplayer.southpaw.metric.Metrics;
+import com.jwplayer.southpaw.metric.StaticGauge;
+import com.jwplayer.southpaw.record.BaseRecord;
+import com.jwplayer.southpaw.serde.BaseSerde;
+import com.jwplayer.southpaw.state.BaseState;
+import com.jwplayer.southpaw.state.RocksDBState;
+import com.jwplayer.southpaw.topic.BaseTopic;
+import com.jwplayer.southpaw.topic.TopicConfig;
+import com.jwplayer.southpaw.util.ByteArray;
+import com.jwplayer.southpaw.util.ByteArraySet;
+import com.jwplayer.southpaw.util.FileHelper;
+
+import joptsimple.OptionParser;
+import joptsimple.OptionSet;
 
 
 /**
@@ -489,6 +502,10 @@ public class Southpaw {
     protected void createDenormalizedRecords(
             Relation root,
             Set<ByteArray> rootRecordPKs) {
+        if (rootRecordPKs.isEmpty()) {
+            return;
+        }
+        logger.info("creating {} {}", rootRecordPKs.size(), root.getEntity());
         for(ByteArray dePrimaryKey: rootRecordPKs) {
             if(dePrimaryKey != null) {
                 BaseTopic<byte[], DenormalizedRecord> outputTopic = outputTopics.get(root.getDenormalizedName());
@@ -697,7 +714,7 @@ public class Southpaw {
             .setValueSerde(valueSerde)
             .setFilter(filter)
             .setMetrics(metrics));
-        
+
         return topic;
     }
 

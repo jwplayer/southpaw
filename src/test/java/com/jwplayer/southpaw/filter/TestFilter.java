@@ -15,6 +15,8 @@
  */
 package com.jwplayer.southpaw.filter;
 
+import java.util.function.Supplier;
+
 import com.jwplayer.southpaw.record.BaseRecord;
 
 public class TestFilter extends BaseFilter {
@@ -24,8 +26,9 @@ public class TestFilter extends BaseFilter {
 
     public TestFilter() {}
 
+
     @Override
-    public FilterMode customFilter(String entity, BaseRecord record, BaseRecord oldRecord) {
+    protected FilterMode customFilter(String entity, BaseRecord record, Supplier<BaseRecord> oldRecordSupplier) {
         FilterMode mode = FilterMode.UPDATE;
         switch(entity) {
             case "media":

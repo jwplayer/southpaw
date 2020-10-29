@@ -15,23 +15,33 @@
  */
 package com.jwplayer.southpaw.topic;
 
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.NoSuchElementException;
+import java.util.concurrent.atomic.AtomicLong;
+
+import org.apache.commons.lang.ObjectUtils;
+import org.apache.commons.lang.time.StopWatch;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.clients.producer.Callback;
+import org.apache.kafka.clients.producer.KafkaProducer;
+import org.apache.kafka.clients.producer.ProducerConfig;
+import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.clients.producer.RecordMetadata;
+import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.serialization.Serdes;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.google.common.collect.ImmutableList;
 import com.google.common.primitives.Ints;
 import com.google.common.primitives.Longs;
 import com.jwplayer.southpaw.filter.BaseFilter.FilterMode;
 import com.jwplayer.southpaw.record.BaseRecord;
 import com.jwplayer.southpaw.util.ByteArray;
-import org.apache.commons.lang.ObjectUtils;
-import org.apache.commons.lang.time.StopWatch;
-import org.apache.kafka.clients.consumer.*;
-import org.apache.kafka.clients.producer.*;
-import org.apache.kafka.common.TopicPartition;
-import org.apache.kafka.common.serialization.Serdes;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.util.*;
-import java.util.concurrent.atomic.AtomicLong;
 
 
 /**
@@ -53,17 +63,17 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
      * This allows us to capture the record and update our state when next() is called.
      */
     private static class KafkaTopicIterator<K, V> implements Iterator<ConsumerRecord<K, V>> {
-        
+
         protected Iterator<ConsumerRecord<byte[], byte[]>> iter;
         protected KafkaTopic<K, V> topic;
 
         /*
          * Information about the next valid record:
-         * 
+         *
          * The next record needs to be staged as we'll have consumed it in hasNext() by calling next()
          * nextRecord can be either (1) NULL or (2) not NULL:
-         * 
-         *  (1) When NULL this indicates we don't have a staged record available, 
+         *
+         *  (1) When NULL this indicates we don't have a staged record available,
          *     there might be another record available in the Kafka topic.
          *  (2) When not NULL, we have a staged record that has passed filtering already
          *      nextRecord is the what should be returned from next()
@@ -71,6 +81,7 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
         private ConsumerRecord<byte[], byte[]> nextRecord;
         private FilterMode nextRecordFilterMode;
         private ByteArray nextRecordPrimaryKey;
+        private V nextValue;
 
         /**
          * Constructor
@@ -80,12 +91,11 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
         private KafkaTopicIterator(Iterator<ConsumerRecord<byte[], byte[]>> iter, KafkaTopic<K, V> topic) {
             this.iter = iter;
             this.topic = topic;
-            this.resetStagedRecord();
         }
 
         /**
          * Internal helper to obtain and stage the next non-skipped record
-         * 
+         *
          * @return ConsumerRecord - The next non-skipped record
          */
         private ConsumerRecord<byte[], byte[]> getAndStageNextRecord() {
@@ -96,16 +106,15 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
             }
 
             ConsumerRecord<byte[], byte[]> record = null;
-            BaseRecord oldRec = null;
             FilterMode filterMode = FilterMode.SKIP;
             ByteArray primaryKey = null;
             K key;
-            V value, currState;
+            V value = null;
 
             // Obtain a record and stage it
             while(iter.hasNext() && filterMode == FilterMode.SKIP) {
                 record = iter.next();
-                // The current offset is one ahead of the last read one. 
+                // The current offset is one ahead of the last read one.
                 // This copies what Kafka would return as the current offset.
                 topic.setCurrentOffset(record.offset() + 1L);
 
@@ -118,15 +127,18 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
                     primaryKey = new ByteArray(record.key());
                 }
 
-                currState = topic.readByPK(primaryKey);
-                if (currState instanceof BaseRecord) {
-                    oldRec = (BaseRecord) currState;
-                }
-
                 // Non-BaseRecord value types will not be filtered
                 if (value instanceof BaseRecord) {
-                    filterMode = topic.getFilter().filter(topic.topicConfig.shortName, (BaseRecord) value, oldRec);
-                } else {
+                    final ByteArray pk = primaryKey;
+                    filterMode = topic.getFilter().filter(topic.topicConfig.shortName, (BaseRecord) value, ()->{
+                        BaseRecord oldRec = null;
+                        V currState = topic.readByPK(pk);
+                        if (currState instanceof BaseRecord) {
+                            oldRec = (BaseRecord) currState;
+                        }
+                        return oldRec;
+                    });
+                } else if (value != null) {
                     filterMode = FilterMode.UPDATE;
                 }
 
@@ -149,20 +161,22 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
                 this.nextRecord = record;
                 this.nextRecordFilterMode = filterMode;
                 this.nextRecordPrimaryKey = primaryKey;
+                this.nextValue = value;
             }
-            
+
             return this.nextRecord;
         }
 
         /**
          * Reset the staging variables referring to the next available record
-         * This function is intended to be called once the staged next 
+         * This function is intended to be called once the staged next
          * record is consumed (returned by the next function).
          */
         private void resetStagedRecord() {
             this.nextRecord = null;
             this.nextRecordFilterMode = null;
             this.nextRecordPrimaryKey = null;
+            this.nextValue = null;
         }
 
         @Override
@@ -183,8 +197,7 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
             }
 
             K key = topic.getKeySerde().deserializer().deserialize(record.topic(), record.key());
-            V value = topic.getValueSerde().deserializer().deserialize(record.topic(), record.value());
-
+            V value = nextValue;
             // update state
             switch (this.nextRecordFilterMode) {
                 case SKIP:
