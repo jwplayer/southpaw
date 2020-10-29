@@ -31,6 +31,7 @@ import java.util.*;
  * Wrapper class for byte arrays so we can use them as keys in maps.
  */
 public class ByteArray implements Comparable<ByteArray>, Serializable {
+    private static final long serialVersionUID = -6277178128299377659L;
     private static final Bytes.ByteArrayComparator comparator = Bytes.BYTES_LEXICO_COMPARATOR;
     private byte[] bytes;
 
