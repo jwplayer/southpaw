@@ -43,10 +43,10 @@ import static org.junit.Assert.*;
 
 
 public class SouthpawByteArraySetEndToEndTest {
-    private static final String CONFIG_PATH = "test-resources/ByteArraySetTest/config.yaml.tmpl";
-    private static final String RELATIONS_PATH = "test-resources/ByteArraySetTest/relation.json";
+    private static final String CONFIG_PATH = "src/test/resources/ByteArraySetTest/config.yaml.tmpl";
+    private static final String RELATIONS_PATH = "src/test/resources/ByteArraySetTest/relation.json";
     private static final String ROCKSDB_BASE_URI = "file:///tmp/RocksDB/ByteArraySetTest/";
-    private static final String TOPIC_DATA_PATH = "test-resources/ByteArraySetTest/topic/";
+    private static final String TOPIC_DATA_PATH = "src/test/resources/ByteArraySetTest/topic/";
 
     private KafkaTestServer kafkaServer;
 
