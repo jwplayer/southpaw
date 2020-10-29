@@ -597,7 +597,7 @@ public class ByteArraySet implements Set<ByteArray> {
 
     @Override
     public boolean equals(Object object) {
-        if (object == null || !(object instanceof ByteArraySet)) {
+        if (!(object instanceof ByteArraySet)) {
             return false;
         }
 
