@@ -108,9 +108,8 @@ public class ByteArray implements Comparable<ByteArray>, Serializable {
      * @param bytes - The bytes to convert
      * @return - A collection of ByteArrays
      */
-    @SuppressWarnings("unchecked")
-    public static Set<ByteArray> fromBytes(byte[] bytes) {
-        Set<ByteArray> set = new HashSet<>();
+    public static ByteArraySet fromBytes(byte[] bytes) {
+        ByteArraySet set = new ByteArraySet();
         int index = 0;
         while(index < bytes.length) {
             int size = Ints.fromBytes((byte) 0, (byte) 0, (byte) 0, bytes[index]);
