@@ -32,7 +32,8 @@ import com.codahale.metrics.Timer;
 import com.codahale.metrics.jmx.JmxReporter;
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang.StringUtils;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.net.URI;
@@ -105,7 +106,7 @@ public class S3Helper {
      * AWS secret key config
      */
     public static final String SECRET_KEY_CONFIG = "aws.s3.secret.key";
-    private static final Logger logger = Logger.getLogger(S3Helper.class);
+    private static final Logger logger = LoggerFactory.getLogger(S3Helper.class);
 
     private ExecutorService executor;
     protected boolean exceptionOnError;

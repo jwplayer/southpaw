@@ -41,11 +41,12 @@ import org.apache.commons.lang.ObjectUtils;
 import org.apache.commons.lang.time.StopWatch;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.serialization.Serde;
-import org.apache.log4j.Level;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
 
 import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.*;
@@ -86,7 +87,7 @@ public class Southpaw {
     /**
      * Le Logger
      */
-    private static final Logger logger = Logger.getLogger(Southpaw.class);
+    private static final Logger logger =  LoggerFactory.getLogger(Southpaw.class);
     /**
      * Used for doing object <-> JSON mappings
      */
@@ -142,42 +143,39 @@ public class Southpaw {
      * Base Southpaw config
      */
     protected static class Config {
-        public static final String BACKUP_ON_SHUTDOWN_CONFIG = "backup.on.shutdown";
-        public static final boolean BACKUP_ON_SHUTDOWN_DEFAULT = false;
-        public static final String BACKUP_ON_SHUTDOWN_DOC = "Instructs Southpaw to backup on shutdown (or not)";
         public static final String BACKUP_TIME_S_CONFIG = "backup.time.s";
         public static final int BACKUP_TIME_S_DEFAULT = 1800;
-        public static final String BACKUP_TIME_S_DOC = "Time interval (roughly) between backups";
         public static final String COMMIT_TIME_S_CONFIG = "commit.time.s";
         public static final int COMMIT_TIME_S_DEFAULT = 0;
-        public static final String COMMIT_TIME_S_DOC = "Time interval (roughly) between commits";
         public static final String CREATE_RECORDS_TRIGGER_CONFIG = "create.records.trigger";
         public static final int CREATE_RECORDS_TRIGGER_DEFAULT = 250000;
-        public static final String CREATE_RECORDS_TRIGGER_DOC =
-                "Config for when to create denormalized records once the number of records to create has exceeded " +
-                        "a certain amount";
-        public static final String LOG_LEVEL_CONFIG = "log.level";
-        public static final String LOG_LEVEL_DEFAULT = "INFO";
-        public static final String LOG_LEVEL_DOC = "Log level config for log4j";
         public static final String TOPIC_LAG_TRIGGER_CONFIG = "topic.lag.trigger";
         public static final String TOPIC_LAG_TRIGGER_DEFAULT = "1000";
-        public static final String TOPIC_LAG_TRIGGER_DOC =
-                "Config for when to switch from one topic to the next (or to stop processing a topic entirely), " +
-                        "when lag drops below this value.";
 
-        public boolean backupOnShutdown;
+        /**
+         * Time interval (roughly) between backups
+         */
         public int backupTimeS;
+
+        /**
+         * Time interval (roughly) between commits
+         */
         public int commitTimeS;
+
+        /**
+         * Config for when to create denormalized records once the number of records to create has exceeded a certain amount
+         */
         public int createRecordsTrigger;
-        public String logLevel;
+
+        /**
+         * Config for when to switch from one topic to the next (or to stop processing a topic entirely), when lag drops below this value
+         */
         public int topicLagTrigger;
 
         public Config(Map<String, Object> rawConfig) throws ClassNotFoundException {
-            this.backupOnShutdown = (boolean) rawConfig.getOrDefault(BACKUP_ON_SHUTDOWN_CONFIG, BACKUP_ON_SHUTDOWN_DEFAULT);
             this.backupTimeS = (int) rawConfig.getOrDefault(BACKUP_TIME_S_CONFIG, BACKUP_TIME_S_DEFAULT);
             this.commitTimeS = (int) rawConfig.getOrDefault(COMMIT_TIME_S_CONFIG, COMMIT_TIME_S_DEFAULT);
             this.createRecordsTrigger = (int) rawConfig.getOrDefault(CREATE_RECORDS_TRIGGER_CONFIG, CREATE_RECORDS_TRIGGER_DEFAULT);
-            this.logLevel = rawConfig.getOrDefault(LOG_LEVEL_CONFIG, LOG_LEVEL_DEFAULT).toString();
             this.topicLagTrigger = (int) rawConfig.getOrDefault(TOPIC_LAG_TRIGGER_CONFIG, TOPIC_LAG_TRIGGER_DEFAULT);
         }
     }
@@ -191,7 +189,7 @@ public class Southpaw {
      * @throws URISyntaxException -
      */
     public Southpaw(Map<String, Object> rawConfig, List<URI> relations)
-            throws ClassNotFoundException, IllegalAccessException, InstantiationException, IOException, URISyntaxException {
+            throws ClassNotFoundException, IllegalAccessException, InstantiationException, IOException, URISyntaxException, NoSuchMethodException, InvocationTargetException {
         this(rawConfig, loadRelations(Preconditions.checkNotNull(relations)));
     }
 
@@ -201,12 +199,11 @@ public class Southpaw {
      * @param relations - The top level relations that define the denormalized objects to construct
      */
     public Southpaw(Map<String, Object> rawConfig, Relation[] relations)
-            throws ClassNotFoundException, IllegalAccessException, InstantiationException {
+            throws ClassNotFoundException, IllegalAccessException, InstantiationException, NoSuchMethodException, InvocationTargetException {
         validateRootRelations(relations);
 
         this.rawConfig = Preconditions.checkNotNull(rawConfig);
         this.config = new Config(rawConfig);
-        logger.setLevel(Level.toLevel(config.logLevel, Level.INFO));
         this.relations = Preconditions.checkNotNull(relations);
         this.state = new RocksDBState(rawConfig);
         this.state.open();
@@ -497,7 +494,7 @@ public class Southpaw {
                 BaseTopic<byte[], DenormalizedRecord> outputTopic = outputTopics.get(root.getDenormalizedName());
                 scrubParentIndices(root, root, dePrimaryKey);
                 DenormalizedRecord newDeRecord = createDenormalizedRecord(root, root, dePrimaryKey, dePrimaryKey);
-                if(logger.getLevel().equals(Level.DEBUG)) {
+                if(logger.isDebugEnabled()) {
                     try {
                         logger.debug(
                                 String.format(
@@ -589,7 +586,7 @@ public class Southpaw {
      * @return A map of topics
      */
     protected Map<String, BaseTopic<BaseRecord, BaseRecord>> createInputTopics(Relation relation)
-            throws ClassNotFoundException, IllegalAccessException, InstantiationException {
+            throws ClassNotFoundException, IllegalAccessException, InstantiationException, NoSuchMethodException, InvocationTargetException {
         Map<String, BaseTopic<BaseRecord, BaseRecord>> topics = new HashMap<>();
 
         topics.put(relation.getEntity(), createTopic(relation.getEntity()));
@@ -613,12 +610,12 @@ public class Southpaw {
      */
     @SuppressWarnings("unchecked")
     protected BaseTopic<byte[], DenormalizedRecord> createOutputTopic(String shortName)
-            throws ClassNotFoundException, IllegalAccessException, InstantiationException {
+            throws ClassNotFoundException, IllegalAccessException, InstantiationException, NoSuchMethodException, InvocationTargetException {
         Map<String, Object> topicConfig = createTopicConfig(shortName);
         Class keySerdeClass = Class.forName(Preconditions.checkNotNull(topicConfig.get(BaseTopic.KEY_SERDE_CLASS_CONFIG).toString()));
         Class valueSerdeClass = Class.forName(Preconditions.checkNotNull(topicConfig.get(BaseTopic.VALUE_SERDE_CLASS_CONFIG).toString()));
-        Serde<byte[]> keySerde = (Serde<byte[]>) keySerdeClass.newInstance();
-        Serde<DenormalizedRecord> valueSerde = (Serde<DenormalizedRecord>) valueSerdeClass.newInstance();
+        Serde<byte[]> keySerde = (Serde<byte[]>) keySerdeClass.getDeclaredConstructor().newInstance();
+        Serde<DenormalizedRecord> valueSerde = (Serde<DenormalizedRecord>) valueSerdeClass.getDeclaredConstructor().newInstance();
         return createTopic(
                 shortName,
                 topicConfig,
@@ -649,14 +646,14 @@ public class Southpaw {
      */
     @SuppressWarnings("unchecked")
     protected <K extends BaseRecord, V extends BaseRecord> BaseTopic<K, V> createTopic(String shortName)
-            throws ClassNotFoundException, IllegalAccessException, InstantiationException {
+            throws ClassNotFoundException, IllegalAccessException, InstantiationException, NoSuchMethodException, InvocationTargetException {
         Map<String, Object> topicConfig = createTopicConfig(shortName);
         Class keySerdeClass = Class.forName(Preconditions.checkNotNull(topicConfig.get(BaseTopic.KEY_SERDE_CLASS_CONFIG).toString()));
         Class valueSerdeClass = Class.forName(Preconditions.checkNotNull(topicConfig.get(BaseTopic.VALUE_SERDE_CLASS_CONFIG).toString()));
         Class filterClass = Class.forName(topicConfig.getOrDefault(BaseTopic.FILTER_CLASS_CONFIG, BaseTopic.FILTER_CLASS_DEFAULT).toString());
-        BaseSerde<K> keySerde = (BaseSerde<K>) keySerdeClass.newInstance();
-        BaseSerde<V> valueSerde = (BaseSerde<V>) valueSerdeClass.newInstance();
-        BaseFilter filter = (BaseFilter) filterClass.newInstance();
+        BaseSerde<K> keySerde = (BaseSerde<K>) keySerdeClass.getDeclaredConstructor().newInstance();
+        BaseSerde<V> valueSerde = (BaseSerde<V>) valueSerdeClass.getDeclaredConstructor().newInstance();
+        BaseFilter filter = (BaseFilter) filterClass.getDeclaredConstructor().newInstance();
         return createTopic(
                 shortName,
                 topicConfig,
@@ -685,9 +682,9 @@ public class Southpaw {
             Serde<K> keySerde,
             Serde<V> valueSerde,
             BaseFilter filter,
-            Metrics metrics) throws ClassNotFoundException, IllegalAccessException, InstantiationException {
+            Metrics metrics) throws ClassNotFoundException, IllegalAccessException, InstantiationException, NoSuchMethodException, InvocationTargetException {
         Class topicClass = Class.forName(Preconditions.checkNotNull(southpawConfig.get(BaseTopic.TOPIC_CLASS_CONFIG).toString()));
-        BaseTopic<K, V> topic = (BaseTopic<K, V>) topicClass.newInstance();
+        BaseTopic<K, V> topic = (BaseTopic<K, V>) topicClass.getDeclaredConstructor().newInstance();
         keySerde.configure(southpawConfig, true);
         valueSerde.configure(southpawConfig, false);
         filter.configure(southpawConfig);
@@ -774,7 +771,6 @@ public class Southpaw {
     public static void main(String args[]) throws Exception {
         String BUILD = "build";
         String CONFIG = "config";
-        String DEBUG = "debug";
         String DELETE_BACKUP = "delete-backup";
         String DELETE_STATE = "delete-state";
         String HELP = "help";
@@ -790,7 +786,6 @@ public class Southpaw {
                 accepts(DELETE_BACKUP, "Deletes existing backups specified in the config file. BE VERY CAREFUL WITH THIS!!!");
                 accepts(DELETE_STATE, "Deletes the existing state specified in the config file. BE VERY CAREFUL WITH THIS!!!");
                 accepts(RESTORE, "Restores the state from existing backups.");
-                accepts(DEBUG, "Sets logging to DEBUG.").withOptionalArg();
                 accepts(HELP, "Since you are seeing this, you probably know what this is for. :)").forHelp();
                 accepts(VERIFY_STATE, "Verifies that the Southpaw state indices and reverse indices are in sync");
             }
@@ -801,7 +796,6 @@ public class Southpaw {
             parser.printHelpOn(System.out);
             System.exit(0);
         }
-        if(options.has(DEBUG)) Logger.getRootLogger().setLevel(Level.DEBUG);
 
         Yaml yaml = new Yaml();
         Map<String, Object> config = yaml.load(FileHelper.getInputStream(new URI(options.valueOf(CONFIG).toString())));

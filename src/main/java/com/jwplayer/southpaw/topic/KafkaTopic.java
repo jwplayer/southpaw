@@ -27,7 +27,8 @@ import org.apache.kafka.clients.consumer.*;
 import org.apache.kafka.clients.producer.*;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.serialization.Serdes;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicLong;
@@ -46,7 +47,7 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
     /**
      * Le Logger
      */
-    private static final Logger logger = Logger.getLogger(KafkaTopic.class);
+    private static final Logger logger = LoggerFactory.getLogger(KafkaTopic.class);
 
     /**
      * This allows us to capture the record and update our state when next() is called.
