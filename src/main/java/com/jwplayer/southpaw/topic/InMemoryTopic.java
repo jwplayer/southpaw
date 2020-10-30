@@ -121,6 +121,11 @@ public final class InMemoryTopic<K, V> extends BaseTopic<K, V> {
             public ConsumerRecord<K, V> next() {
                 return retVal.get(index++);
             }
+
+            @Override
+            public V peekValue() {
+                return retVal.get(index).value();
+            }
         };
     }
 

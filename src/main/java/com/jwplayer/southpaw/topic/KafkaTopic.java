@@ -52,8 +52,10 @@ import com.jwplayer.southpaw.util.ByteArray;
  */
 public class KafkaTopic<K, V> extends BaseTopic<K, V> {
     public static final long END_OFFSET_REFRESH_MS_DEFAULT = 60000;
+
     public static final String PERSISTENT = "persistent";
     public static final boolean PERSISTENT_DEFAULT = true;
+    public static final String TABLE_NAME = "table.name";
     /**
      * Le Logger
      */
@@ -98,6 +100,11 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
         @Override
         public int getApproximateCount() {
             return approximateCount;
+        }
+
+        @Override
+        public V peekValue() {
+            return nextValue;
         }
 
         /**
@@ -296,8 +303,15 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
      * The callback for Kafka producer writes
      */
     private final Callback producerCallback = new KafkaProducerCallback();
+    /**
+     * If the values for this topic should be saved
+     */
     private boolean persistent;
     private TopicPartition topicPartition;
+    /**
+     * The table name associated with this topic if transactional
+     */
+    private String tableName;
 
     @Override
     public void commit() {
@@ -352,6 +366,7 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
         }
 
         this.persistent = (Boolean)spConfig.getOrDefault(PERSISTENT, PERSISTENT_DEFAULT);
+        this.tableName = (String)spConfig.getOrDefault(TABLE_NAME, null);
     }
 
     @Override
@@ -442,5 +457,10 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
 
     public void setPollTimeout(long pollTimeout) {
         this.pollTimeout = pollTimeout;
+    }
+
+    @Override
+    public String getTableName() {
+        return this.tableName;
     }
 }

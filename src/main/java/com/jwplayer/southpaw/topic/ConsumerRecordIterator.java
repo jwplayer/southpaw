@@ -8,4 +8,6 @@ public interface ConsumerRecordIterator<K, V> extends Iterator<ConsumerRecord<K,
 
     int getApproximateCount();
 
+    V peekValue();
+
 }

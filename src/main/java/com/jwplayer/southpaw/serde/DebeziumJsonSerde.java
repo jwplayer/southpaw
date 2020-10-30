@@ -59,7 +59,7 @@ public class DebeziumJsonSerde implements BaseSerde<BaseRecord> {
                 }
                 Map<String, ?> after = (Map<String, ?>) envelope.get("after");
                 MapRecord result = new MapRecord(after);
-                //result.setMetadata(envelope);
+                result.setMetadata(envelope);
                 return result;
             }
 

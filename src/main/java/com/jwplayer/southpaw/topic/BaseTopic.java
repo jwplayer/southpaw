@@ -204,4 +204,12 @@ public abstract class BaseTopic<K, V> {
      * @param value - The serialized value.
      */
     public abstract void write(K key, V value);
+
+    /**
+     * Name of the table referenced in transaction metadata
+     * @return
+     */
+    public String getTableName() {
+        return null;
+    }
 }

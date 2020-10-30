@@ -15,17 +15,20 @@
  */
 package com.jwplayer.southpaw.record;
 
-import com.jwplayer.southpaw.util.ByteArray;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+
+import com.jwplayer.southpaw.util.ByteArray;
 
 
 /**
  * A record abstraction for standardizing and exposing some basic functionality.
  */
 public abstract class BaseRecord {
+
+    private Map<String, ?> metadata;
+
     /**
      * Accessor for a particular field in this record
      * @param fieldName - The name of the field to get
@@ -78,7 +81,20 @@ public abstract class BaseRecord {
      * Gives a friendly string representation of the object. Particularly useful for debugging in Intellij.
      * @return The string representation of this object.
      */
+    @Override
     public String toString() {
         return toMap().toString();
+    }
+
+    /**
+     * Metadata associated with the record to be used in initial processing decisions.
+     * @return
+     */
+    public Map<String, ?> getMetadata() {
+        return metadata;
+    }
+
+    public void setMetadata(Map<String, ?> metadata) {
+        this.metadata = metadata;
     }
 }
