@@ -19,6 +19,8 @@ import org.apache.commons.lang.NotImplementedException;
 import org.apache.commons.lang.RandomStringUtils;
 import org.junit.Test;
 
+import com.jwplayer.southpaw.util.ByteArraySet.Chunk;
+
 import scala.Tuple2;
 
 import java.util.*;
@@ -27,7 +29,6 @@ import static org.junit.Assert.*;
 
 
 public class ByteArraySetTest {
-    private static final int CHUNK_MAX_SIZE = 4096;
     private static final int RANDOM_STRING_SIZE = 6;
 
     /*
@@ -35,7 +36,7 @@ public class ByteArraySetTest {
      * chunk can contain. One is added to the divisor as Byte Arrays are preceded
      * by their size in chunks.
      */
-    private static final int PER_CHUNK_MAX_BYTE_ARRAY_COUNT = (int) Math.floor(CHUNK_MAX_SIZE / (1 + RANDOM_STRING_SIZE));
+    private static final int PER_CHUNK_MAX_BYTE_ARRAY_COUNT = (int) Math.floor(Chunk.MAX_CHUNK_SIZE / (1 + RANDOM_STRING_SIZE));
 
     private static final int SIZE_EMPTY = 0;
     private static final int SIZE_REALLY_SMALL = 1;
