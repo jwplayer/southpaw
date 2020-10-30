@@ -27,6 +27,29 @@ import static org.junit.Assert.*;
 
 
 public class ByteArraySetTest {
+    private static final int CHUNK_MAX_SIZE = 4096;
+    private static final int RANDOM_STRING_SIZE = 6;
+
+    /*
+     * The below variable corresponds to the maximum number of Byte Arrays a single
+     * chunk can contain. One is added to the divisor as Byte Arrays are preceded
+     * by their size in chunks.
+     */
+    private static final int PER_CHUNK_MAX_BYTE_ARRAY_COUNT = (int) Math.floor(CHUNK_MAX_SIZE / (1 + RANDOM_STRING_SIZE));
+
+    private static final int SIZE_EMPTY = 0;
+    private static final int SIZE_REALLY_SMALL = 1;
+    private static final int SIZE_SMALL = 2;
+    /*
+     * Regular size corresponds to data fitting in one single chunk.
+     */
+    private static final int SIZE_REGULAR = Math.min((int) Math.floor(ByteArraySet.MAX_FRONTING_SET_SIZE / 7), PER_CHUNK_MAX_BYTE_ARRAY_COUNT);
+    /*
+     * Big and really big sizes correspond to data not fitting in one single chunk.
+     */
+    private static final int SIZE_BIG = 2 * PER_CHUNK_MAX_BYTE_ARRAY_COUNT;
+    private static final int SIZE_REALLY_BIG = ByteArraySet.MAX_FRONTING_SET_SIZE + 5 * PER_CHUNK_MAX_BYTE_ARRAY_COUNT;
+
     public ByteArraySet createBigSet() {
         ByteArraySet set = new ByteArraySet();
         List<ByteArray> numbers = new ArrayList<>();
@@ -52,7 +75,7 @@ public class ByteArraySetTest {
     public List<Tuple2<String, ByteArray>> getRandomStringByteArrayTuples(int count) {
         List<Tuple2<String, ByteArray>> vals = new ArrayList<Tuple2<String, ByteArray>>();
         while(vals.size() < count) {
-            String stringVal = RandomStringUtils.randomAlphanumeric(6);
+            String stringVal = RandomStringUtils.randomAlphanumeric(RANDOM_STRING_SIZE);
             ByteArray byteArrayVal = new ByteArray(stringVal);
             Tuple2<String, ByteArray> val = new Tuple2<String, ByteArray>(stringVal, byteArrayVal);
             if (!vals.contains(val)) {
@@ -96,32 +119,32 @@ public class ByteArraySetTest {
 
     @Test
     public void emptyAdd() {
-        testAdd(0);
+        testAdd(SIZE_EMPTY);
     }
 
     @Test
     public void reallySmallAdd() {
-        testAdd(1);
+        testAdd(SIZE_REALLY_SMALL);
     }
 
     @Test
     public void smallAdd() {
-        testAdd(2);
+        testAdd(SIZE_SMALL);
     }
 
     @Test
     public void regularAdd() {
-        testAdd(150);
+        testAdd(SIZE_REGULAR);
     }
 
     @Test
     public void bigAdd() {
-        testAdd(750);
+        testAdd(SIZE_BIG);
     }
 
     @Test
     public void reallyBigAdd() {
-        testAdd(3567);
+        testAdd(SIZE_REALLY_BIG);
     }
 
     public void testAddAll(int size, boolean forceByteArraySet) {
@@ -186,20 +209,20 @@ public class ByteArraySetTest {
 
     @Test
     public void regularAddAll() {
-        testAddAll(150, false);
-        testAddAll(150, true);
+        testAddAll(SIZE_REGULAR, false);
+        testAddAll(SIZE_REGULAR, true);
     }
 
     @Test
     public void bigAddAll() {
-        testAddAll(750, false);
-        testAddAll(750, true);
+        testAddAll(SIZE_BIG, false);
+        testAddAll(SIZE_BIG, true);
     }
 
     @Test
     public void reallyBigAddAll() {
-        testAddAll(3567, false);
-        testAddAll(3567, true);
+        testAddAll(SIZE_REALLY_BIG, false);
+        testAddAll(SIZE_REALLY_BIG, true);
     }
 
     public void testSimilarAdd(boolean forceMerger) {
@@ -288,17 +311,17 @@ public class ByteArraySetTest {
 
     @Test
     public void regularSerializeDeserialize() {
-        testSerializeDeserialize(150, (byte) 2);
+        testSerializeDeserialize(SIZE_REGULAR, (byte) 2);
     }
 
     @Test
     public void bigSerializeDeserialize() {
-        testSerializeDeserialize(750, (byte) 3);
+        testSerializeDeserialize(SIZE_BIG, (byte) 3);
     }
 
     @Test
     public void reallyBigSerializeDeserialize() {
-        testSerializeDeserialize(3567, (byte) 3);
+        testSerializeDeserialize(SIZE_REALLY_BIG, (byte) 3);
     }
 
     public void testIterator(int size) {
@@ -331,32 +354,32 @@ public class ByteArraySetTest {
 
     @Test
     public void emptyIterator() {
-        testIterator(0);
+        testIterator(SIZE_EMPTY);
     }
 
     @Test
     public void reallySmallIterator() {
-        testIterator(1);
+        testIterator(SIZE_REALLY_SMALL);
     }
 
     @Test
     public void smallIterator() {
-        testIterator(2);
+        testIterator(SIZE_SMALL);
     }
 
     @Test
     public void regularIterator() {
-        testIterator(150);
+        testIterator(SIZE_REGULAR);
     }
 
     @Test
     public void bigIterator() {
-        testIterator(750);
+        testIterator(SIZE_BIG);
     }
 
     @Test
     public void reallyBigIterator() {
-        testIterator(3567);
+        testIterator(SIZE_REALLY_BIG);
     }
 
     public void testRemove(int size) {
@@ -392,32 +415,32 @@ public class ByteArraySetTest {
 
     @Test
     public void emptyRemove() {
-        testRemove(0);
+        testRemove(SIZE_EMPTY);
     }
 
     @Test
     public void reallySmallRemove() {
-        testRemove(1);
+        testRemove(SIZE_REALLY_SMALL);
     }
 
     @Test
     public void smallRemove() {
-        testRemove(2);
+        testRemove(SIZE_SMALL);
     }
 
     @Test
     public void regularRemove() {
-        testRemove(150);
+        testRemove(SIZE_REGULAR);
     }
 
     @Test
     public void bigRemove() {
-        testRemove(750);
+        testRemove(SIZE_BIG);
     }
 
     @Test
     public void reallyBigRemove() {
-        testRemove(3567);
+        testRemove(SIZE_REALLY_BIG);
     }
 
     public void testRandomSerializeDerializeSizeCheckRemove(int size) {
@@ -466,27 +489,27 @@ public class ByteArraySetTest {
 
     @Test
     public void reallySmallRandomSerializeDerializeSizeCheckRemove() {
-        testRandomSerializeDerializeSizeCheckRemove(1);
+        testRandomSerializeDerializeSizeCheckRemove(SIZE_REALLY_SMALL);
     }
 
     @Test
     public void smallRandomSerializeDerializeSizeCheckRemove() {
-        testRandomSerializeDerializeSizeCheckRemove(2);
+        testRandomSerializeDerializeSizeCheckRemove(SIZE_SMALL);
     }
 
     @Test
     public void regularRandomSerializedRemove() {
-        testRandomSerializeDerializeSizeCheckRemove(150);
+        testRandomSerializeDerializeSizeCheckRemove(SIZE_REGULAR);
     }
 
     @Test
     public void bigRandomSerializeDerializeSizeCheckRemove() {
-        testRandomSerializeDerializeSizeCheckRemove(750);
+        testRandomSerializeDerializeSizeCheckRemove(SIZE_BIG);
     }
 
     @Test
     public void reallyBigRandomSerializeDerializeSizeCheckRemove() {
-        testRandomSerializeDerializeSizeCheckRemove(3567);
+        testRandomSerializeDerializeSizeCheckRemove(SIZE_REALLY_BIG);
     }
 
     public void testSimilarRemove(boolean forceMerger) {
@@ -555,32 +578,32 @@ public class ByteArraySetTest {
 
     @Test
     public void emptyToArray() {
-        testToArray(0);
+        testToArray(SIZE_EMPTY);
     }
 
     @Test
     public void reallySmallToArray() {
-        testToArray(1);
+        testToArray(SIZE_REALLY_SMALL);
     }
 
     @Test
     public void smallToArray() {
-        testToArray(2);
+        testToArray(SIZE_SMALL);
     }
 
     @Test
     public void regularToArray() {
-        testToArray(150);
+        testToArray(SIZE_REGULAR);
     }
 
     @Test
     public void bigToArray() {
-        testToArray(750);
+        testToArray(SIZE_BIG);
     }
 
     @Test
     public void reallyBigToArray() {
-        testToArray(3567);
+        testToArray(SIZE_REALLY_BIG);
     }
 
     public void testContains(int size) {
@@ -614,32 +637,32 @@ public class ByteArraySetTest {
 
     @Test
     public void emptyContains() {
-        testContains(0);
+        testContains(SIZE_EMPTY);
     }
 
     @Test
     public void reallySmallContains() {
-        testContains(1);
+        testContains(SIZE_REALLY_SMALL);
     }
 
     @Test
     public void smallContains() {
-        testContains(2);
+        testContains(SIZE_SMALL);
     }
 
     @Test
     public void regularContains() {
-        testContains(150);
+        testContains(SIZE_REGULAR);
     }
 
     @Test
     public void bigContains() {
-        testContains(750);
+        testContains(SIZE_BIG);
     }
 
     @Test
     public void reallyBigContains() {
-        testContains(3567);
+        testContains(SIZE_REALLY_BIG);
     }
 
     @Test
@@ -658,109 +681,41 @@ public class ByteArraySetTest {
     public void testEmptyLastValueChunkIteratorBug() {
         ByteArraySet set = new ByteArraySet();
 
-        List<String> insertedVals = new ArrayList<String>(Arrays.asList(
-                "TwRxFt", "6qQWPy", "9ria0n", "HOi03p", "GWZn71", "XjxnZw", "n2lzAr", "ob749j", "K185en", "GVGKvr", "v2i31k", "ba6WTW",
-                "mI5XWH", "nDKao0", "KUhDTU", "jWKyde", "d09HsY", "ICEGbr", "1zFMrV", "as9sLL", "F8E9X9", "SI6Mwy", "6SYe00", "qm0LRg",
-                "pMRaeO", "WDayEc", "iZtOm8", "shpHbk", "fFTNIt", "atVJu3", "AAcd5o", "TtQJPh", "f2bR5U", "XuXcD8", "spjjK3", "PFJPTw",
-                "0gZQBc", "wmvdFl", "0u9hBM", "vawaKC", "DHiDPM", "odgBY5", "s3sLpX", "RZjHsY", "SQiQwm", "9KRUtG", "4XMbls", "cTqilQ",
-                "tWhTf8", "7cCVOG", "wnlMUC", "z5Lze0", "H3viHU", "T0uS0W", "2qNE1i", "RFhtaa", "uXLMQ3", "mBbGP5", "d8DSQO", "A5SD0C",
-                "S9CODO", "KxWhtn", "jaO8TT", "0GRsjy", "M9trwS", "T9bnd4", "MVZWuM", "eRGh2C", "tMOrvQ", "CFnZE9", "HkfKpp", "5yzNKb",
-                "Hg9thE", "HtQevs", "JqANlk", "RjYmGK", "CFvDWw", "aoYz3p", "qdLuPq", "t16LBl", "9ABwgQ", "Fm38GP", "FWs7MI", "ViOr77",
-                "5KuLkT", "MIBS0Y", "h97lM4", "KCvLiA", "vFlCeO", "Bx4CfG", "Fo9UjO", "MTV0lK", "R0ovoR", "1U9gBQ", "tRI2xN", "nBoYID",
-                "1rqsnz", "h7t4yb", "EemAVa", "EUoQz4", "Y4BUtj", "KPRZuu", "VkttSp", "sQdUGf", "YudArm", "kpJTzf", "vj9c3o", "jOcqcp",
-                "MlUoVL", "jBw1vg", "cJUXT6", "VHdORy", "wJ50kS", "Fm12tT", "CC6h9I", "QCYRv3", "hA1A9F", "O1PmKC", "Va9z4Z", "MGMPIQ",
-                "WQBgcN", "IiUXnX", "p6amEz", "929jH3", "PE2IyV", "8ZI9zE", "DrQlq3", "1ui24g", "2Xz7qw", "JSvu7m", "wG9dlX", "jKZ9tm",
-                "i8B3jn", "0SKCfP", "YuYveN", "8MpiKm", "AAqZ4A", "voLOfL", "1RRokq", "1skkcu", "g4f3gI", "PxmP3F", "Gy956M", "9POJS3",
-                "xgax5o", "Cp2uwR", "EKRQ6a", "EUkurY", "IgUp00", "npiwoL", "GLPvUV", "4k48au", "q2b4ro", "bLjjyL", "JnLW2h", "RcXZWQ",
-                "FsstmX", "RWTMSQ", "RpIaEC", "yfmjTx", "2UPdaJ", "6Rxc2Q", "LBFQRS", "9qoU1a", "ddy4hE", "SKjC6c", "c6iHyZ", "3TwerJ",
-                "i8ptpc", "haAdXY", "JyZeKI", "I47kCO", "SBVeEn", "Rv3grc", "EYFeRb", "lpefj1", "J18TrG", "ZINiuf", "P6zKqF", "JzZqcI",
-                "auZajU", "as2QnY", "MdQAB9", "aru9f4", "x13oIr", "qqGSGE", "OckD3p", "PthXva", "Q69BGu", "6Qorzv", "OGoGZX", "050LmB",
-                "coFGQZ", "tmtdqz", "LtfMK3", "K33R0O", "jC4otu", "DEDTPi", "TpL13C", "8LTFO3", "Ktielo", "4Y3kDE", "YEQKME", "HunGuN",
-                "BtuVed", "nhemmJ", "Ac8Xxk", "X8hzPX", "768Q5e", "7YZt1N", "0R1nxS", "HtxupF", "iSYb2C", "8rewmf", "Eduk6o", "ZMrm8Y",
-                "TTtl2P", "pKE7ee", "58xLPZ", "WCXGBd", "qek3bt", "8wfuuz", "1TEmi5", "IJTVEf", "PfzKqz", "6OvHIp", "9lPdSQ", "TOQoxG",
-                "tgXX4g", "m1VMoD", "svd4Mu", "6IT9C1", "P1dZQd", "WBxPi2", "WoTEuD", "GaYJXk", "u3vEJ0", "50c6Rl", "rrbgZH", "Cgofp5",
-                "N8xUBF", "gCcqhT", "QTCrr5", "Jpy88G", "VS3pes", "TxMqtd", "e5jmHQ", "06yu4C", "l5V3Wu", "rqMtZ1", "EuRjAQ", "HPQhG0",
-                "AH4Jfb", "dsDUii", "i80ftE", "d7BL7P", "ZwnvBs", "x817jt", "nkBqiv", "1QIFdF", "nvDP8z", "QaWdln", "RWlrXQ", "ZGrWwf",
-                "6laTiv", "NyvXw5", "JWFxTw", "7gPIJt", "PdRHRK", "dssiW0", "5ZRlRy", "lWJYcV", "cnWpcJ", "t6y5kl", "nB7IWh", "SZ0nkL",
-                "weTJ5o", "s5QFwL", "meJcRt", "ChWf3j", "FZDkgB", "sbZqwn", "vVDt50", "IlZu2r", "U1gnfz", "NeJTjz", "pBSE2Z", "YkJpf0",
-                "ZMk1XH", "bJcQBu", "ebWVhF", "41crxT", "rv2czZ", "i1K7mJ", "e2lz91", "mNPAhe", "JVOudM", "9lrUya", "KHc5y7", "K9kKz5",
-                "3SK8xF", "P91u2d", "2qjAXU", "EVy6Ka", "Hcc0km", "qS8NWH", "U62S1S", "THGBuV", "qDjUOz", "hbexIB", "DYhmT7", "qdZHrs",
-                "KQvdhL", "p9CcgB", "jFUjWw", "Be9F7C", "wHmPte", "Jy5dEu", "42QAEa", "8ShaKs", "PmgTWl", "kNzPlZ", "WipVMz", "hKRotO",
-                "L9YbeK", "lMntb4", "k9jIJq", "25utZ1", "tOpshu", "GvNh4F", "C5tAZG", "yKvRUm", "EoPjsZ", "gSVs5C", "HB64lo", "yQZPo7",
-                "J0ssLr", "KnCrw0", "oFa1wT", "23WrD7", "9PDJAx", "ywFWcR", "i079XR", "vhhpsU", "wKQHhA", "53NycK", "WQ3DrB", "SWYiQQ",
-                "wmQhet", "DxV2I6", "q38VCc", "KzHqlj", "VtuPmY", "OIDFnU", "iWRNp4", "ts70KW", "McrcHq", "mRCHYg", "k30tdl", "2c9T5B",
-                "8bmbTP", "irLSEE", "RdzkpR", "zxfl4B", "0IA82Y", "buR4iU", "SqzP5f", "FPFGVu", "qg9QcV", "qRxN8A", "h8BM2t", "IELvVb",
-                "RqlJnW", "cxPuxC", "mutu8V", "wgTMYH", "lYziiJ", "sntwc0", "DryNwp", "YamgkV", "E8zabs", "YhMRm1", "atJcvE", "UVuLX2",
-                "yQ9My6", "rVeBYM", "nX1zWU", "DMWYxI", "Iym6aZ", "FQdTWA", "2dy03W", "00xljA", "3cqwv1", "RVgiIj", "A37AdQ", "aC3UjB",
-                "TSqmCl", "v0LKC0", "nUOX26", "z7CpD4", "GqAroN", "QK89O4", "fxxFb5", "PvrkeJ", "N5lSV0", "nWtFFX", "ZLwE59", "LkG5Ua",
-                "c8EPBG", "woXVD6", "dhx63O", "utgrk7", "hqP4Pa", "KFPCwH", "6mjTZu", "H7lhha", "RrXrho", "H23edp", "BqgUGZ", "xGcGtM",
-                "3Au5kb", "YTv2eB", "UcYDzi", "KBJyRt", "Wx3MCS", "VHmpoZ", "HlPb7P", "CEdv3e", "eumbNw", "blF3UE", "DLjoGf", "KrdSns",
-                "0KyRL0", "r0QPRy", "bEMMOH", "ixajk6", "3cMXSF", "psENi6", "Vpcppc", "UdnxGI", "KX3yZ4", "wPyNV3", "EDjCh9", "qK86fM",
-                "W5P0fA", "dDckeg", "4IX9Wa", "eK4ICZ", "t31ujb", "R5KjH5", "GaU4Z5", "iUoee3", "8F2oWQ", "kvG1IA", "BNIgt4", "6BULzp",
-                "zQs0ic", "g3B3S3", "4rNJsQ", "szlwZC", "UZTEMM", "eci1SJ", "dUSeh4", "sbTanP", "D1vGRZ", "udVeUL", "bkaEXp", "NFFpsD",
-                "3m4C3I", "V75wGg", "XdsXzs", "Z76Dea", "363T4u", "oyqEME", "blN3tQ", "dWKHGh", "quFPoj", "XMHm3e", "FAox7C", "ksuGGf",
-                "fywwZf", "lwWZoG", "KjMa5n", "MgjT8y", "u0oihY", "Ywsj9s", "iENvyz", "EE1Ypz", "O3HFzi", "16Jxmg", "sEgcK7", "0cqGtO",
-                "6qFIW2", "rYDMov", "qCoDie", "x3ARgx", "KsUZ86", "gB9ssU", "vZk7TM", "FwIaQG", "1K3fmU", "1Mfmqi", "c0PyMC", "69yVKp",
-                "qyc4f0", "MgKDN5", "WMP5on", "39qP0N", "j1yfap", "GrqSFN", "0PgoAB", "YCkw4r", "2hQ5rt", "N756Pz", "TDCYko", "uSKCpj",
-                "Xifcyu", "JLGIwO", "2Z7II9", "ICuPD6", "94cU3i", "5xnWk4", "es4Sxn", "rqsLPW", "o5sRoC", "Ne2VQ2", "aNtYh2", "zgMj3T",
-                "Fd5tDE", "JsyJBv", "af7epq", "2IXLJL", "WJFzRc", "1kAQBN", "EZ4hN5", "WPrdN4", "wyDRRe", "gcjaEN", "sgKGFa", "AZb6fR",
-                "xngXyt", "xoIti4", "TR0i2k", "kLtWmJ", "byazyY", "RPz9jB", "OMU22b", "PyZcKQ", "K1fQJ3", "REJBU8", "8aff2b", "gxlzkT",
-                "RYR2av", "StDElz", "HvrDXJ", "AtVcyd", "ynnW6e", "gQ3Eup", "kRRnEu", "psRJzv", "vvBpCh", "CQyvbN", "ZV8EAb", "90847n",
-                "6TYyph", "aYOIb9", "JQtjeP", "XaEK2f", "FZj0PD", "ZSuHZ9", "E7kSuu", "bwQ3a8", "iX2EvT", "hkXjuc", "N6YI0m", "vHX2nd",
-                "ZYdwdP", "v097nz", "8ZoPeZ", "d82FW1", "pF9LN4", "Xzn72l", "HHGiKG", "a3RBZD", "LwW0N8", "Ddk1Px", "7NLH0N", "n5iGth",
-                "X68LEe", "Tra8s9", "q7Qgci", "cF8ii8", "mbsDaU", "RAaVlL", "DvFPFP", "5MxkXD", "nMXEHS", "tLsWGH", "KtrL2a", "4hIFPk",
-                "BEYM2q", "JGFTjJ", "KaoLbX", "9XCeHo", "eJzwxP", "1egwtf", "OuaaLM", "ohlXZ2", "klsCV9", "ak4mK8", "2MfH4h", "igYF8B",
-                "AvJSkL", "lg8yjp", "55Iybb", "nt4neo", "RSjaA8", "yg7fI9", "vAbYQi", "QkESbu", "koFGPf", "tD0QG9", "mt1jb7", "0UPyR6",
-                "bq9oGD", "YuIPBI", "kvUO25", "bcHCET", "KPFmuF", "X2P4Jy", "wlms22", "QcMEYw", "zF78Rd", "9Hg2UP", "Z5I6bs", "gIWpzm",
-                "1CIN57", "cA3v56", "PE9FAZ", "9n7LrD", "weRWA3", "1XjadO", "hub9jz", "Ff9FKT", "6OtucJ", "hfw6gj", "EUBBLs", "kb8aCl",
-                "O6XW6r", "KH8N3t"
-        ));
-            
-        List<String> deletedVals = new ArrayList<String>(Arrays.asList(
-                "O1PmKC", "5KuLkT", "KPFmuF", "i80ftE", "9ABwgQ", "GLPvUV", "PthXva", "haAdXY", "zQs0ic", "irLSEE", "ob749j", "CEdv3e",
-                "PFJPTw", "YuYveN", "5MxkXD", "AH4Jfb", "2IXLJL", "0KyRL0", "t16LBl", "EKRQ6a", "ZLwE59", "RVgiIj", "58xLPZ", "HtxupF",
-                "THGBuV", "6OvHIp", "00xljA", "9POJS3", "KH8N3t", "K9kKz5", "OMU22b", "dUSeh4", "2Z7II9", "X8hzPX", "KjMa5n", "l5V3Wu",
-                "fFTNIt", "PmgTWl", "FZj0PD", "WDayEc", "PvrkeJ", "t6y5kl", "6Rxc2Q", "Iym6aZ", "U1gnfz", "wG9dlX", "QcMEYw", "cnWpcJ",
-                "FWs7MI", "HPQhG0", "8rewmf", "ZINiuf", "Fo9UjO", "vAbYQi", "OGoGZX", "WoTEuD", "0gZQBc", "N5lSV0", "EoPjsZ", "XjxnZw",
-                "6SYe00", "H3viHU", "r0QPRy", "XMHm3e", "dhx63O", "4IX9Wa", "xngXyt", "RYR2av", "gxlzkT", "z5Lze0", "wJ50kS", "9lPdSQ",
-                "rqMtZ1", "wyDRRe", "npiwoL", "vvBpCh", "2UPdaJ", "psRJzv", "rqsLPW", "0cqGtO", "cxPuxC", "iZtOm8", "ddy4hE", "F8E9X9",
-                "tMOrvQ", "lMntb4", "ynnW6e", "L9YbeK", "vZk7TM", "gSVs5C", "weRWA3", "buR4iU", "XuXcD8", "JLGIwO", "C5tAZG", "u3vEJ0",
-                "8LTFO3", "Wx3MCS", "aoYz3p", "wPyNV3", "t31ujb", "JsyJBv", "PE2IyV", "WJFzRc", "RZjHsY", "cJUXT6", "HunGuN", "DYhmT7",
-                "bkaEXp", "JVOudM", "udVeUL", "x817jt", "pBSE2Z", "RqlJnW", "O3HFzi", "UVuLX2", "atJcvE", "psENi6", "Jpy88G", "u0oihY",
-                "1skkcu", "16Jxmg", "OIDFnU", "JWFxTw", "5xnWk4", "2qjAXU", "K1fQJ3", "spjjK3", "o5sRoC", "GqAroN", "DHiDPM", "BqgUGZ",
-                "768Q5e", "kvUO25", "RWlrXQ", "VS3pes", "3TwerJ", "as9sLL", "klsCV9", "AtVcyd", "c0PyMC", "iX2EvT", "aru9f4", "RcXZWQ",
-                "Xifcyu", "VHdORy", "W5P0fA", "SZ0nkL", "RAaVlL", "lWJYcV", "Xzn72l", "HkfKpp", "nhemmJ", "Y4BUtj", "O6XW6r", "929jH3",
-                "PxmP3F", "KsUZ86", "ba6WTW", "nX1zWU", "g3B3S3", "dDckeg", "Tra8s9", "Ff9FKT", "1kAQBN", "xoIti4", "shpHbk", "QkESbu",
-                "EUkurY", "iENvyz", "i8B3jn", "NeJTjz", "StDElz", "qS8NWH", "szlwZC", "1QIFdF", "fxxFb5", "JzZqcI", "dWKHGh", "eK4ICZ",
-                "REJBU8", "EUoQz4", "wmvdFl", "TR0i2k", "Rv3grc", "ixajk6", "AAqZ4A", "T9bnd4", "TxMqtd", "mNPAhe", "odgBY5", "c6iHyZ",
-                "sgKGFa", "ak4mK8", "hub9jz", "hqP4Pa", "YEQKME", "qdLuPq", "GvNh4F", "qRxN8A", "25utZ1", "HB64lo", "KtrL2a", "8aff2b",
-                "sntwc0", "uXLMQ3", "iSYb2C", "d8DSQO", "bcHCET", "KCvLiA", "zxfl4B", "ts70KW", "jOcqcp", "i079XR", "JSvu7m", "svd4Mu",
-                "Jy5dEu", "eci1SJ", "7YZt1N", "4hIFPk", "qqGSGE", "K185en", "lg8yjp", "7gPIJt", "sEgcK7", "uSKCpj", "WipVMz", "MgjT8y",
-                "7cCVOG", "woXVD6", "YTv2eB", "KHc5y7", "g4f3gI", "s3sLpX", "nUOX26", "s5QFwL", "gCcqhT", "N756Pz", "Hg9thE", "JqANlk",
-                "KrdSns", "xGcGtM", "a3RBZD", "Va9z4Z", "voLOfL", "UdnxGI", "as2QnY", "SWYiQQ", "hkXjuc", "tmtdqz"
-        ));
+        /*
+         * This bug only arises when:
+         *  - there are multiple chunks
+         *  - the first chunk has trailing zeros (a.k.a its last value was deleted)
+         */
 
-        int insertedValCount = 0;
-        for (String stringVal: insertedVals) {
-            if (insertedValCount == 603) {
+        int ChunkByteArrayCount = 2 * PER_CHUNK_MAX_BYTE_ARRAY_COUNT;
+        int FrontingSetByteArrayCount = Math.min(5, ByteArraySet.MAX_FRONTING_SET_SIZE - 1);
+        assertTrue(FrontingSetByteArrayCount > 0);
+
+        int size = ChunkByteArrayCount + FrontingSetByteArrayCount;
+
+        Set<ByteArray> vals = new TreeSet<>();
+        for (ByteArray val: getRandomByteArrays(size)) {
+            vals.add(val);
+        }
+
+        ByteArray firstChunkLastVal = null;
+        for (ByteArray val: vals) {
+            assertTrue(set.add(val));
+            assertTrue(set.contains(val));
+            if (set.size() == PER_CHUNK_MAX_BYTE_ARRAY_COUNT) {
+                firstChunkLastVal = val;
+            } else if (set.size() == ChunkByteArrayCount) {
                 // Forces the merger of the fronting set into the list of chunks
                 set.serialize();
             }
-        	ByteArray val = new ByteArray(stringVal);
-            assertTrue(set.add(val));
-            assertTrue(set.contains(val));
-            insertedValCount++;
         }
-        assertEquals(650, set.size());
+        assertEquals(size, set.size());
+        assertTrue(firstChunkLastVal != null);
 
-        for (String deletedVal: deletedVals) {
-            ByteArray val = new ByteArray(deletedVal);
-            assertTrue(set.remove(val));
-            assertFalse(set.contains(val));
-        }
-        assertEquals(400, set.size());
+        set.remove(firstChunkLastVal);
+        assertEquals(size - 1, set.size());
 
-        assertEquals(400, ByteArraySet.deserialize(set.serialize()).size());
+        assertEquals(size - 1, ByteArraySet.deserialize(set.serialize()).size());
     }
 
     @Test
