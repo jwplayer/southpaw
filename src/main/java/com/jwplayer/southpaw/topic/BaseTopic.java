@@ -15,15 +15,12 @@
  */
 package com.jwplayer.southpaw.topic;
 
-import com.jwplayer.southpaw.util.ByteArray;
-import com.jwplayer.southpaw.topic.TopicConfig;
-import com.jwplayer.southpaw.filter.BaseFilter;
-import com.jwplayer.southpaw.state.BaseState;
-import com.jwplayer.southpaw.metric.Metrics;
-import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.serialization.Serde;
 
-import java.util.Iterator;
+import com.jwplayer.southpaw.filter.BaseFilter;
+import com.jwplayer.southpaw.metric.Metrics;
+import com.jwplayer.southpaw.state.BaseState;
+import com.jwplayer.southpaw.util.ByteArray;
 
 
 /**
@@ -178,7 +175,7 @@ public abstract class BaseTopic<K, V> {
      * Reads records in topic based on the current offset.
      * @return The list of records read.
      */
-    public abstract Iterator<ConsumerRecord<K, V>> readNext();
+    public abstract ConsumerRecordIterator<K, V> readNext();
 
     /**
      * Resets the current offset to the beginning of the topic.
@@ -189,6 +186,7 @@ public abstract class BaseTopic<K, V> {
      * Gives a nicely formatted string representation of this object. Useful for the Intellij debugger.
      * @return Formatted string representation of this object
      */
+    @Override
     public String toString() {
         return String.format(
                 "{shortName=%s,topicName=%s,currentOffset=%s,keySerde=%s,valueSerde=%s}",

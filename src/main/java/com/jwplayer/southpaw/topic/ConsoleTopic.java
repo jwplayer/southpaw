@@ -15,13 +15,11 @@
  */
 package com.jwplayer.southpaw.topic;
 
-import com.jwplayer.southpaw.record.BaseRecord;
-import com.jwplayer.southpaw.util.ByteArray;
-import com.jwplayer.southpaw.filter.BaseFilter.FilterMode;
-import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.commons.lang.NotImplementedException;
 
-import java.util.Iterator;
+import com.jwplayer.southpaw.filter.BaseFilter.FilterMode;
+import com.jwplayer.southpaw.record.BaseRecord;
+import com.jwplayer.southpaw.util.ByteArray;
 
 
 public class ConsoleTopic<K, V> extends BaseTopic<K, V> {
@@ -51,7 +49,7 @@ public class ConsoleTopic<K, V> extends BaseTopic<K, V> {
     }
 
     @Override
-    public Iterator<ConsumerRecord<K, V>> readNext() {
+    public ConsumerRecordIterator<K, V> readNext() {
         throw new NotImplementedException();
     }
 

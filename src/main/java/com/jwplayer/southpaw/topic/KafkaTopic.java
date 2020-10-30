@@ -25,6 +25,7 @@ import org.apache.commons.lang.ObjectUtils;
 import org.apache.commons.lang.time.StopWatch;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.producer.Callback;
 import org.apache.kafka.clients.producer.KafkaProducer;
@@ -51,9 +52,8 @@ import com.jwplayer.southpaw.util.ByteArray;
  */
 public class KafkaTopic<K, V> extends BaseTopic<K, V> {
     public static final long END_OFFSET_REFRESH_MS_DEFAULT = 60000;
-    public static final String POLL_TIMEOUT_CONFIG = "poll.timeout";
-    public static final long POLL_TIMEOUT_DEFAULT = 1000;
-
+    public static final String PERSISTENT = "persistent";
+    public static final boolean PERSISTENT_DEFAULT = true;
     /**
      * Le Logger
      */
@@ -62,7 +62,7 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
     /**
      * This allows us to capture the record and update our state when next() is called.
      */
-    private static class KafkaTopicIterator<K, V> implements Iterator<ConsumerRecord<K, V>> {
+    private static class KafkaTopicIterator<K, V> implements ConsumerRecordIterator<K, V> {
 
         protected Iterator<ConsumerRecord<byte[], byte[]>> iter;
         protected KafkaTopic<K, V> topic;
@@ -82,15 +82,22 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
         private FilterMode nextRecordFilterMode;
         private ByteArray nextRecordPrimaryKey;
         private V nextValue;
+        private int approximateCount;
 
         /**
          * Constructor
          * @param iter - The iterator to wrap
          * @param topic - The topic whose offsets we'll update
          */
-        private KafkaTopicIterator(Iterator<ConsumerRecord<byte[], byte[]>> iter, KafkaTopic<K, V> topic) {
-            this.iter = iter;
+        private KafkaTopicIterator(ConsumerRecords<byte[], byte[]> consumerRecords, KafkaTopic<K, V> topic) {
+            this.iter = consumerRecords.iterator();
             this.topic = topic;
+            this.approximateCount = consumerRecords.count();
+        }
+
+        @Override
+        public int getApproximateCount() {
+            return approximateCount;
         }
 
         /**
@@ -114,9 +121,7 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
             // Obtain a record and stage it
             while(iter.hasNext() && filterMode == FilterMode.SKIP) {
                 record = iter.next();
-                // The current offset is one ahead of the last read one.
-                // This copies what Kafka would return as the current offset.
-                topic.setCurrentOffset(record.offset() + 1L);
+                topic.setCurrentOffset(record.offset());
 
                 key = topic.getKeySerde().deserializer().deserialize(record.topic(), record.key());
                 value = topic.getValueSerde().deserializer().deserialize(record.topic(), record.value());
@@ -138,7 +143,7 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
                         }
                         return oldRec;
                     });
-                } else if (value != null) {
+                } else if (value != null){ //skip tombstones
                     filterMode = FilterMode.UPDATE;
                 }
 
@@ -204,16 +209,24 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
                     // By design, this should never be the case
                     throw new IllegalStateException("Staged record has unexpected filter mode of SKIP");
                 case DELETE:
-                    topic.getState().delete(topic.getShortName() + "-" + DATA, this.nextRecordPrimaryKey.getBytes());
+                    if (topic.persistent) {
+                        topic.getState().delete(topic.getShortName() + "-" + DATA, this.nextRecordPrimaryKey.getBytes());
+                    }
                     value = null;
                     break;
                 case UPDATE:
                 default:
-                    topic.getState().put(topic.getShortName() + "-" + DATA, this.nextRecordPrimaryKey.getBytes(), record.value());
+                    //TODO: for debezium this could be the serialization of the value, not the whole envelope if we don't need txn processing
+                    if (topic.persistent) {
+                        topic.getState().put(topic.getShortName() + "-" + DATA, this.nextRecordPrimaryKey.getBytes(), record.value());
+                    }
                     break;
             }
 
             // mark the record as consumed from the staging area and return
+            //The current offset is one ahead of the last read one.
+            //This copies what Kafka would return as the current offset.
+            topic.setCurrentOffset(record.offset() + 1L);
             this.resetStagedRecord();
             return new ConsumerRecord<>(
                 record.topic(),
@@ -274,7 +287,7 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
     /**
      * The timeout for each poll call to Kafka
      */
-    private long pollTimeout;
+    private long pollTimeout = 0;
     /**
      * Producer for writing data back to the topic
      */
@@ -283,6 +296,8 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
      * The callback for Kafka producer writes
      */
     private final Callback producerCallback = new KafkaProducerCallback();
+    private boolean persistent;
+    private TopicPartition topicPartition;
 
     @Override
     public void commit() {
@@ -314,25 +329,29 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
         if(consumer.partitionsFor(topicName).size() > 1) {
             throw new RuntimeException(String.format("Topic '%s' has more than one partition. Southpaw currently only supports topics with a single partition.", topicName));
         }
+        topicPartition = new TopicPartition(topicName, 0);
         // Subscribe is lazy and requires a poll() call, which we don't want to require, so we do this instead
-        consumer.assign(Collections.singleton(new TopicPartition(topicName, 0)));
+        consumer.assign(Collections.singleton(topicPartition));
         byte[] bytes = this.getState().get(this.getShortName() + "-" + OFFSETS, Ints.toByteArray(0));
         if(bytes == null) {
-            consumer.seekToBeginning(Collections.singleton(new TopicPartition(topicName, 0)));
+            consumer.seekToBeginning(Collections.singleton(topicPartition));
             logger.info(String.format("No offsets found for topic %s, seeking to beginning.", this.getShortName()));
         } else {
             currentOffset = Longs.fromByteArray(bytes);
-            consumer.seek(new TopicPartition(topicName, 0), currentOffset);
+            consumer.seek(topicPartition, currentOffset);
             logger.info(String.format("Topic %s starting with offset %s.", this.getShortName(), currentOffset));
         }
         endOffsetWatch = new StopWatch();
         endOffsetWatch.start();
-        pollTimeout = ((Number) spConfig.getOrDefault(POLL_TIMEOUT_CONFIG, POLL_TIMEOUT_DEFAULT)).longValue();
+        //we don't want to have the main processing thread wait on individual topics
+        //pollTimeout = ((Number) spConfig.getOrDefault(POLL_TIMEOUT_CONFIG, POLL_TIMEOUT_DEFAULT)).longValue();
 
         // Check producer config
         if(!ObjectUtils.equals(spConfig.get(ProducerConfig.ACKS_CONFIG), "all")) {
             logger.warn("It is recommended to set ACKS to 'all' otherwise data loss can occur");
         }
+
+        this.persistent = (Boolean)spConfig.getOrDefault(PERSISTENT, PERSISTENT_DEFAULT);
     }
 
     @Override
@@ -358,8 +377,8 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
     public long getLag() {
         // Periodically cache the end offset
         if(endOffset == null || endOffsetWatch.getTime() > END_OFFSET_REFRESH_MS_DEFAULT) {
-            Map<TopicPartition, Long> offsets = consumer.endOffsets(Collections.singletonList(new TopicPartition(topicName, 0)));
-            endOffset = offsets.get(new TopicPartition(topicName, 0));
+            Map<TopicPartition, Long> offsets = consumer.endOffsets(Collections.singletonList(topicPartition));
+            endOffset = offsets.get(topicPartition);
             endOffsetWatch.reset();
             endOffsetWatch.start();
         }
@@ -380,15 +399,15 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
     }
 
     @Override
-    public Iterator<ConsumerRecord<K, V>> readNext() {
-        return new KafkaTopicIterator<>(consumer.poll(pollTimeout).iterator(), this);
+    public ConsumerRecordIterator<K, V> readNext() {
+        return new KafkaTopicIterator<>(consumer.poll(pollTimeout), this);
     }
 
     @Override
     public void resetCurrentOffset() {
         logger.info(String.format("Resetting offsets for topic %s, seeking to beginning.", this.getShortName()));
         this.getState().delete(this.getShortName() + "-" + OFFSETS, Ints.toByteArray(0));
-        consumer.seekToBeginning(ImmutableList.of(new TopicPartition(topicName, 0)));
+        consumer.seekToBeginning(ImmutableList.of(topicPartition));
         currentOffset = null;
     }
 
@@ -419,5 +438,9 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
 
             throw new RuntimeException("Failed to write record to " + this.getShortName() + " topic: " + ex.getMessage(), ex);
         }
+    }
+
+    public void setPollTimeout(long pollTimeout) {
+        this.pollTimeout = pollTimeout;
     }
 }

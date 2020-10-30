@@ -32,7 +32,6 @@ topics:
     group.id: "southpaw"
     enable.auto.commit: false
     key.serde.class: "com.jwplayer.southpaw.serde.AvroSerde"
-    poll.timeout: 100
     schema.registry.url: "http://schema_registry_url:80"
     topic.class: "com.jwplayer.southpaw.topic.KafkaTopic"
     value.serde.class: "com.jwplayer.southpaw.serde.AvroSerde"

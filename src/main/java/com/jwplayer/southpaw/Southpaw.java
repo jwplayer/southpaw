@@ -23,7 +23,6 @@ import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -57,6 +56,7 @@ import com.jwplayer.southpaw.serde.BaseSerde;
 import com.jwplayer.southpaw.state.BaseState;
 import com.jwplayer.southpaw.state.RocksDBState;
 import com.jwplayer.southpaw.topic.BaseTopic;
+import com.jwplayer.southpaw.topic.ConsumerRecordIterator;
 import com.jwplayer.southpaw.topic.TopicConfig;
 import com.jwplayer.southpaw.util.ByteArray;
 import com.jwplayer.southpaw.util.ByteArraySet;
@@ -163,7 +163,7 @@ public class Southpaw {
         public static final String CREATE_RECORDS_TRIGGER_CONFIG = "create.records.trigger";
         public static final int CREATE_RECORDS_TRIGGER_DEFAULT = 250000;
         public static final String TOPIC_LAG_TRIGGER_CONFIG = "topic.lag.trigger";
-        public static final String TOPIC_LAG_TRIGGER_DEFAULT = "1000";
+        public static final int TOPIC_LAG_TRIGGER_DEFAULT = 1000;
 
         /**
          * Time interval (roughly) between backups
@@ -263,6 +263,7 @@ public class Southpaw {
         while(processRecords) {
             // Loop through each input topic and read a batch of records
 
+            boolean foundAny = false;
             for (Map.Entry<String, BaseTopic<BaseRecord, BaseRecord>> entry : topics) {
                 String entity = entry.getKey();
                 BaseTopic<BaseRecord, BaseRecord> inputTopic = entry.getValue();
@@ -272,7 +273,10 @@ public class Southpaw {
                 calculateTotalLag();
 
                 do {
-                    Iterator<ConsumerRecord<BaseRecord, BaseRecord>> records = inputTopic.readNext();
+                    ConsumerRecordIterator<BaseRecord, BaseRecord> records = inputTopic.readNext();
+                    if (records.getApproximateCount() > 0) {
+                        foundAny = true;
+                    }
                     // Loop through each record and process it
                     while (records.hasNext()) {
                         ConsumerRecord<BaseRecord, BaseRecord> newRecord = records.next();
@@ -359,6 +363,16 @@ public class Southpaw {
                         }
                     }
                 } while (topicLag > config.topicLagTrigger);
+            }
+
+            if (!foundAny) {
+                try {
+                    Thread.sleep(5);
+                } catch (InterruptedException e) {
+                    Thread.interrupted();
+                    throw new RuntimeException(e);
+                }
+                continue;
             }
 
             // Create the denormalized records that have been queued up
