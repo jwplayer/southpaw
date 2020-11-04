@@ -21,9 +21,10 @@ import org.junit.Test;
 
 import com.jwplayer.southpaw.util.ByteArraySet.Chunk;
 
-import scala.Tuple2;
 
 import java.util.*;
+import java.util.stream.Stream;
+import java.util.stream.Collectors;
 
 import static org.junit.Assert.*;
 
@@ -73,25 +74,13 @@ public class ByteArraySetTest {
         return set;
     }
 
-    public List<Tuple2<String, ByteArray>> getRandomStringByteArrayTuples(int count) {
-        List<Tuple2<String, ByteArray>> vals = new ArrayList<Tuple2<String, ByteArray>>();
-        while(vals.size() < count) {
-            String stringVal = RandomStringUtils.randomAlphanumeric(RANDOM_STRING_SIZE);
-            ByteArray byteArrayVal = new ByteArray(stringVal);
-            Tuple2<String, ByteArray> val = new Tuple2<String, ByteArray>(stringVal, byteArrayVal);
-            if (!vals.contains(val)) {
-                vals.add(val);
-            }
-        }
-        return vals;
-    }
-
     public List<ByteArray> getRandomByteArrays(int count) {
-        List<ByteArray> vals = new ArrayList<ByteArray>();
-        for (Tuple2<String, ByteArray> tuple: getRandomStringByteArrayTuples(count)) {
-            vals.add(tuple._2);
-        }
-        return vals;
+        return Stream.generate(() -> RandomStringUtils.randomAlphanumeric(RANDOM_STRING_SIZE))
+                .limit(count)
+                .collect(Collectors.toSet())
+                .stream()
+                .map(str -> new ByteArray(str.getBytes()))
+                .collect(Collectors.toList());
     }
 
     public void testAdd(int size) {
@@ -447,19 +436,15 @@ public class ByteArraySetTest {
     public void testRandomSerializeDerializeSizeCheckRemove(int size) {
         ByteArraySet set = new ByteArraySet();
 
-        List<Tuple2<String, ByteArray>> tuples = getRandomStringByteArrayTuples(size);
+        List<ByteArray> vals = getRandomByteArrays(size);
 
-        List<Tuple2<String, ByteArray>> vals = new ArrayList<Tuple2<String, ByteArray>>();
-        for (Tuple2<String, ByteArray> val: tuples) {
-            vals.add(val);
-        }
         Collections.shuffle(vals);
 
         int forceMergerSize = (new Random()).nextInt(size);
         List<String> insertedStringVals = new ArrayList<String>();
-        for (Tuple2<String, ByteArray> val: vals) {
-            insertedStringVals.add(val._1);
-            assertTrue(set.add(val._2));
+        for (ByteArray val: vals) {
+            insertedStringVals.add(new String(val.getBytes()));
+            assertTrue(set.add(val));
             if (set.size() == forceMergerSize) {
                 // Forces the merger of the fronting set into the list of chunks
                 set.serialize();
@@ -469,7 +454,7 @@ public class ByteArraySetTest {
         int deserializedCheckSize = (new Random()).nextInt(size);
         int currentSize = size;
         List<String> deletedStringVals = new ArrayList<String>();
-        for (Tuple2<String, ByteArray> val: tuples) {
+        for (ByteArray val: vals) {
             if (currentSize == deserializedCheckSize) {
                 if (currentSize != ByteArraySet.deserialize(set.serialize()).size()) {
                     assertEquals("",
@@ -480,9 +465,9 @@ public class ByteArraySetTest {
                                     deserializedCheckSize));
                 }
             }
-            assertTrue(set.remove(val._2));
-            assertFalse(set.contains(val._2));
-            deletedStringVals.add(val._1);
+            assertTrue(set.remove(val));
+            assertFalse(set.contains(val));
+            deletedStringVals.add(new String(val.getBytes()));
             currentSize -= 1;
             assertEquals(currentSize, set.size());
         }
