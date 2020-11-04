@@ -118,12 +118,12 @@ public class MultiIndexTest {
     @Test
     public void testEmptyIndexAdd() {
         index.add(new ByteArray("A"), new ByteArray(0L));
-        ByteArraySet primaryKeys = index.getIndexEntry(new ByteArray("A"));
+        Set<ByteArray> primaryKeys = index.getIndexEntry(new ByteArray("A"));
 
         assertNotNull(primaryKeys);
         assertEquals(1, primaryKeys.size());
         assertTrue(primaryKeys.contains(new ByteArray(0L)));
-        ByteArraySet foreignKeys = index.getForeignKeys(new ByteArray(0L));
+        Set<ByteArray> foreignKeys = index.getForeignKeys(new ByteArray(0L));
         assertNotNull(foreignKeys);
         assertEquals(1, foreignKeys.size());
         assertTrue(foreignKeys.contains(new ByteArray("A")));
@@ -131,7 +131,7 @@ public class MultiIndexTest {
 
     @Test
     public void testEmptyIndexGetOffsets() {
-        ByteArraySet primaryKeys = index.getIndexEntry(new ByteArray("A"));
+        Set<ByteArray> primaryKeys = index.getIndexEntry(new ByteArray("A"));
 
         assertNull(primaryKeys);
     }
@@ -146,7 +146,7 @@ public class MultiIndexTest {
 
     @Test
     public void testEmptyIndexRemove() {
-        ByteArraySet primaryKeys = index.remove(new ByteArray("A"));
+        Set<ByteArray> primaryKeys = index.remove(new ByteArray("A"));
 
         assertNull(primaryKeys);
     }
@@ -175,11 +175,11 @@ public class MultiIndexTest {
         index.add(new ByteArray("C"), new ByteArray(5L));
         index.flush();
 
-        ByteArraySet primaryKeys = index.getIndexEntry(new ByteArray("A"));
+        Set<ByteArray> primaryKeys = index.getIndexEntry(new ByteArray("A"));
         assertNotNull(primaryKeys);
         assertEquals(1, primaryKeys.size());
         assertTrue(primaryKeys.contains(new ByteArray(0L)));
-        ByteArraySet keys = index.getForeignKeys(new ByteArray(0L));
+        Set<ByteArray> keys = index.getForeignKeys(new ByteArray(0L));
         assertNotNull(keys);
         assertEquals(1, keys.size());
         assertEquals(new ByteArray("A"), keys.toArray(new ByteArray[1])[0]);
@@ -220,12 +220,12 @@ public class MultiIndexTest {
     public void testMultiIndexAdd() throws Exception {
         MultiIndex<BaseRecord, BaseRecord> index = createMultiIndex();
         index.add(new ByteArray("B"), new ByteArray(9L));
-        ByteArraySet primaryKeys = index.getIndexEntry(new ByteArray("B"));
+        Set<ByteArray> primaryKeys = index.getIndexEntry(new ByteArray("B"));
 
         assertNotNull(primaryKeys);
         assertEquals(2, primaryKeys.size());
         assertTrue(primaryKeys.contains(new ByteArray(9L)));
-        ByteArraySet keys = index.getForeignKeys(new ByteArray(9L));
+        Set<ByteArray> keys = index.getForeignKeys(new ByteArray(9L));
         assertNotNull(keys);
         assertEquals(1, keys.size());
         assertEquals(new ByteArray("B"), keys.toArray(new ByteArray[1])[0]);
@@ -234,12 +234,12 @@ public class MultiIndexTest {
     @Test
     public void testMultiIndexGetIndexEntry() throws Exception {
         MultiIndex<BaseRecord, BaseRecord> index = createMultiIndex();
-        ByteArraySet primaryKeys = index.getIndexEntry(new ByteArray("A"));
+        Set<ByteArray> primaryKeys = index.getIndexEntry(new ByteArray("A"));
 
         assertNotNull(primaryKeys);
         assertEquals(3, primaryKeys.size());
         assertTrue(primaryKeys.contains(new ByteArray(1)));
-        ByteArraySet foreignKeys = index.getForeignKeys(new ByteArray(1));
+        Set<ByteArray> foreignKeys = index.getForeignKeys(new ByteArray(1));
         assertNotNull(foreignKeys);
         assertEquals(2, foreignKeys.size());
         assertEquals(new ByteArray("A"), foreignKeys.toArray(new ByteArray[2])[0]);
@@ -278,7 +278,7 @@ public class MultiIndexTest {
     @Test
     public void testMultiIndexRemove() throws Exception {
         MultiIndex<BaseRecord, BaseRecord> index = createMultiIndex();
-        ByteArraySet primaryKeys = index.remove(new ByteArray("B"));
+        Set<ByteArray> primaryKeys = index.remove(new ByteArray("B"));
 
         assertNotNull(primaryKeys);
         assertEquals(1, primaryKeys.size());
@@ -292,10 +292,10 @@ public class MultiIndexTest {
 
         assertFalse(index.remove(new ByteArray("A"), new ByteArray(9)));
         assertTrue(index.remove(new ByteArray("A"), new ByteArray(1)));
-        ByteArraySet primaryKeys = index.getIndexEntry(new ByteArray("A"));
+        Set<ByteArray> primaryKeys = index.getIndexEntry(new ByteArray("A"));
         assertNotNull(primaryKeys);
         assertEquals(2L, primaryKeys.size());
-        ByteArraySet foreignKeys = index.getForeignKeys(new ByteArray(1));
+        Set<ByteArray> foreignKeys = index.getForeignKeys(new ByteArray(1));
         assertNotNull(foreignKeys);
         assertEquals(1, foreignKeys.size());
         assertEquals(new ByteArray("C"), foreignKeys.toArray(new ByteArray[1])[0]);
@@ -395,7 +395,7 @@ public class MultiIndexTest {
         index.flush();
 
         //The record originally written only to the index now exists in both
-        ByteArraySet actualKeys = index.getIndexEntry(new ByteArray("A"));
+        Set<ByteArray> actualKeys = index.getIndexEntry(new ByteArray("A"));
         assertTrue(actualKeys.containsAll(indexKeys));
 
         actualKeys = index.getForeignKeys(new ByteArray(0L));
@@ -442,7 +442,7 @@ public class MultiIndexTest {
         index = createEmptyIndex(state);
 
         //Ensure setup is correct and we have lossed data in our index
-        ByteArraySet actualKeys;
+        Set<ByteArray> actualKeys;
         actualKeys = index.getIndexEntry(new ByteArray("A"));
         assertNull(actualKeys);
 
@@ -485,7 +485,7 @@ public class MultiIndexTest {
         index = createEmptyIndex(state);
 
         //Ensure setup is correct and we can retrieve an expected primary key from state
-        ByteArraySet actualKeys;
+        Set<ByteArray> actualKeys;
         actualKeys = index.getIndexEntry(new ByteArray("A"));
         assertNotNull(actualKeys);
         assertEquals(1, actualKeys.size());

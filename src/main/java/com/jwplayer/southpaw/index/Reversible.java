@@ -16,7 +16,8 @@
 package com.jwplayer.southpaw.index;
 
 import com.jwplayer.southpaw.util.ByteArray;
-import com.jwplayer.southpaw.util.ByteArraySet;
+
+import java.util.Set;
 
 /**
  * Interface for indices that support a reverse lookup (primary key -> foreign key(s))
@@ -27,5 +28,5 @@ public interface Reversible {
      * @param primaryKey - The primary key to lookup
      * @return The keys for the given primary key or null if no corresponding entry exists
      */
-    ByteArraySet getForeignKeys(ByteArray primaryKey);
+    Set<ByteArray> getForeignKeys(ByteArray primaryKey);
 }
