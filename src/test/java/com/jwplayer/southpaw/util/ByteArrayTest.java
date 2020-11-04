@@ -62,12 +62,11 @@ public class ByteArrayTest {
     @Test
     public void testFromBytes() throws Exception {
         byte[] bytes = Hex.decodeHex("01410204d20100".toCharArray());
-        ByteArraySet expectedSet = new ByteArraySet();
-        expectedSet.add(new ByteArray("A"));
-        expectedSet.add(new ByteArray(1234));
-        expectedSet.add(new ByteArray(false));
-        ByteArraySet actualSet = ByteArray.fromBytes(bytes);
-        assertEquals(expectedSet, actualSet);
+        Set<ByteArray> set = new HashSet<>(3);
+        set.add(new ByteArray("A"));
+        set.add(new ByteArray(1234));
+        set.add(new ByteArray(false));
+        assertEquals(set, ByteArray.fromBytes(bytes));
     }
 
     @Test
