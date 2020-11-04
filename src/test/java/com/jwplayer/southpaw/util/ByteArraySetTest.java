@@ -74,17 +74,13 @@ public class ByteArraySetTest {
         return set;
     }
 
-    public List<ByteArray> getRandomStringByteArrayTuples(int count) {
+    public List<ByteArray> getRandomByteArrays(int count) {
         return Stream.generate(() -> RandomStringUtils.randomAlphanumeric(RANDOM_STRING_SIZE))
                 .limit(count)
                 .collect(Collectors.toSet())
                 .stream()
                 .map(str -> new ByteArray(str.getBytes()))
                 .collect(Collectors.toList());
-    }
-
-    public List<ByteArray> getRandomByteArrays(int count) {
-        return getRandomStringByteArrayTuples(count);
     }
 
     public void testAdd(int size) {
@@ -440,7 +436,7 @@ public class ByteArraySetTest {
     public void testRandomSerializeDerializeSizeCheckRemove(int size) {
         ByteArraySet set = new ByteArraySet();
 
-        List<ByteArray> vals = getRandomStringByteArrayTuples(size);
+        List<ByteArray> vals = getRandomByteArrays(size);
 
         Collections.shuffle(vals);
 
