@@ -334,7 +334,7 @@ public class ByteArraySetTest {
         int count = 0;
         while(iter.hasNext()) {
             ByteArray val = iter.next();
-            assertTrue(!alreadySeenVals.contains(val));
+            assertFalse(alreadySeenVals.contains(val));
             alreadySeenVals.add(val);
             assertTrue(vals.contains(val));
             count++;
@@ -696,7 +696,7 @@ public class ByteArraySetTest {
             }
         }
         assertEquals(size, set.size());
-        assertTrue(firstChunkLastVal != null);
+        assertNotNull(firstChunkLastVal);
 
         set.remove(firstChunkLastVal);
         assertEquals(size - 1, set.size());
