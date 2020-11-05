@@ -30,6 +30,7 @@ import static org.junit.Assert.*;
 
 public class ByteArraySetTest {
     private static final int RANDOM_STRING_SIZE = 6;
+    private static final long RANDOM_SEED = new Random().nextLong();
 
     /*
      * The below variable corresponds to the maximum number of Byte Arrays a single
@@ -49,7 +50,7 @@ public class ByteArraySetTest {
      * Big and really big sizes correspond to data not fitting in one single chunk.
      */
     private static final int SIZE_BIG = 2 * PER_CHUNK_MAX_BYTE_ARRAY_COUNT;
-    private static final int SIZE_REALLY_BIG = ByteArraySet.MAX_FRONTING_SET_SIZE + 5 * PER_CHUNK_MAX_BYTE_ARRAY_COUNT;
+    private static final int SIZE_REALLY_BIG = ByteArraySet.MAX_FRONTING_SET_SIZE + 2 * PER_CHUNK_MAX_BYTE_ARRAY_COUNT;
 
     public ByteArraySet createBigSet() {
         ByteArraySet set = new ByteArraySet();
@@ -73,16 +74,25 @@ public class ByteArraySetTest {
         return set;
     }
 
-    public List<ByteArray> getRandomByteArrays(int count) {
-        return Stream.generate(() -> RandomStringUtils.randomAlphanumeric(RANDOM_STRING_SIZE))
+    public List<ByteArray> getRandomByteArrays(int count, long seed) {
+        System.out.println("Generating random " + count + " Byte Array(s) with " + seed + " seed");
+        Random randomSeed = new Random(seed);
+        List<ByteArray> vals = Stream.generate(() -> RandomStringUtils.random(RANDOM_STRING_SIZE, 0, 0, true, true, null, randomSeed))
                 .limit(count)
                 .collect(Collectors.toSet())
                 .stream()
                 .map(str -> new ByteArray(str.getBytes()))
                 .collect(Collectors.toList());
+        assertEquals(count, vals.size());
+        return vals;
+    }
+
+    public List<ByteArray> getRandomByteArrays(int count) {
+        return getRandomByteArrays(count, RANDOM_SEED);
     }
 
     public void testAdd(int size) {
+        System.out.println("Testing add method with " + size + " size");
         ByteArraySet set = new ByteArraySet();
 
         List<ByteArray> vals = getRandomByteArrays(size);
@@ -136,7 +146,16 @@ public class ByteArraySetTest {
         testAdd(SIZE_REALLY_BIG);
     }
 
+    public long getDifferentRandomSeed() {
+        long differentRandomSeed = RANDOM_SEED;
+        while (differentRandomSeed == RANDOM_SEED ) {
+            differentRandomSeed = new Random().nextLong();
+        }
+        return differentRandomSeed;
+    }
+
     public void testAddAll(int size, boolean forceByteArraySet) {
+        System.out.println("Testing addAll method with " + size + " size and " + forceByteArraySet + " forceByteArraySet");
         ByteArraySet set = new ByteArraySet();
 
         List<ByteArray> vals = getRandomByteArrays(size);
@@ -146,7 +165,7 @@ public class ByteArraySetTest {
         }
         assertEquals(size, set.size());
 
-        List<ByteArray> stagedVals = getRandomByteArrays(size);
+        List<ByteArray> stagedVals = getRandomByteArrays(size, getDifferentRandomSeed());
         Set<ByteArray> extraVals;
         if (forceByteArraySet) {
             extraVals = new ByteArraySet();
@@ -155,7 +174,7 @@ public class ByteArraySetTest {
         }
         while(extraVals.size() < size) {
             if (stagedVals.size() == 0) {
-                stagedVals = getRandomByteArrays(size);
+                stagedVals = getRandomByteArrays(size, getDifferentRandomSeed());
             }
             ByteArray val = stagedVals.get(0);
             stagedVals.remove(0);
@@ -215,6 +234,7 @@ public class ByteArraySetTest {
     }
 
     public void testSimilarAdd(boolean forceMerger) {
+        System.out.println("Testing add method for similar inputs with " + forceMerger + " forceMerger");
         ByteArraySet set = new ByteArraySet();
 
         List<ByteArray> vals = new ArrayList<ByteArray>();
@@ -252,6 +272,7 @@ public class ByteArraySetTest {
     }
 
     public void testSerializeDeserialize(int size, byte leadingByte) {
+        System.out.println("Testing serialize/deserialize methods with " + size + " size and " + leadingByte + " leading byte");
         ByteArraySet set = new ByteArraySet();
 
         List<ByteArray> vals = getRandomByteArrays(size);
@@ -314,6 +335,7 @@ public class ByteArraySetTest {
     }
 
     public void testIterator(int size) {
+        System.out.println("Testing iterator method with " + size + " size");
         ByteArraySet set = new ByteArraySet();
 
         List<ByteArray> vals = getRandomByteArrays(size);
@@ -372,6 +394,7 @@ public class ByteArraySetTest {
     }
 
     public void testRemove(int size) {
+        System.out.println("Testing remove method with " + size + " size");
         ByteArraySet set = new ByteArraySet();
 
         List<ByteArray> vals = getRandomByteArrays(size);
@@ -433,10 +456,15 @@ public class ByteArraySetTest {
     }
 
     public void testRandomSerializeDerializeSizeCheckRemove(int size) {
+        System.out.println("Testing serialize/deserialize methods with random-size check with " + size + " size");
         ByteArraySet set = new ByteArraySet();
 
-        List<ByteArray> vals = getRandomByteArrays(size);
+        List<ByteArray> originalVals = getRandomByteArrays(size);
 
+        List<ByteArray> vals = new ArrayList<ByteArray>();
+        for (ByteArray val: originalVals) {
+            vals.add(val);
+        }
         Collections.shuffle(vals);
 
         int forceMergerSize = (new Random()).nextInt(size);
@@ -453,7 +481,7 @@ public class ByteArraySetTest {
         int deserializedCheckSize = (new Random()).nextInt(size);
         int currentSize = size;
         List<String> deletedStringVals = new ArrayList<String>();
-        for (ByteArray val: vals) {
+        for (ByteArray val: originalVals) {
             if (currentSize == deserializedCheckSize) {
                 if (currentSize != ByteArraySet.deserialize(set.serialize()).size()) {
                     assertEquals("",
@@ -498,6 +526,7 @@ public class ByteArraySetTest {
     }
 
     public void testSimilarRemove(boolean forceMerger) {
+        System.out.println("Testing remove method for similar inputs with " + forceMerger + " forceMerger");
         ByteArraySet set = new ByteArraySet();
 
         List<ByteArray> vals = new ArrayList<ByteArray>();
@@ -537,6 +566,7 @@ public class ByteArraySetTest {
     }
 
     public void testToArray(int size) {
+        System.out.println("Testing toArray method with " + size + " size");
         ByteArraySet set = new ByteArraySet();
 
         List<ByteArray> vals = getRandomByteArrays(size);
@@ -592,6 +622,7 @@ public class ByteArraySetTest {
     }
 
     public void testContains(int size) {
+        System.out.println("Testing contains method with " + size + " size");
         ByteArraySet set = new ByteArraySet();
 
         List<ByteArray> vals = getRandomByteArrays(size);
@@ -652,6 +683,7 @@ public class ByteArraySetTest {
 
     @Test
     public void testNullEquals() {
+        System.out.println("Testing equals method with null");
         ByteArraySet set = new ByteArraySet();
 
         List<ByteArray> vals = getRandomByteArrays(3);
@@ -664,6 +696,7 @@ public class ByteArraySetTest {
 
     @Test
     public void testEmptyLastValueChunkIteratorBug() {
+        System.out.println("Testing iterator bug for a chunk with an empty last value");
         ByteArraySet set = new ByteArraySet();
 
         /*
