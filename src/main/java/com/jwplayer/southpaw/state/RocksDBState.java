@@ -19,16 +19,13 @@ import com.codahale.metrics.Timer;
 import com.google.common.base.Preconditions;
 import com.jwplayer.southpaw.metric.Metrics;
 import com.jwplayer.southpaw.util.ByteArray;
-import com.jwplayer.southpaw.util.FileHelper;
 import com.jwplayer.southpaw.util.S3Helper;
-import org.apache.commons.io.FileUtils;
 import org.apache.commons.codec.binary.Hex;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.rocksdb.*;
 
 import java.io.File;
-import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.*;
@@ -129,9 +126,13 @@ public class RocksDBState extends BaseState {
     }
 
     /**
-     * Backup URI
+     * Backup URI where a backup will end up
      */
     protected URI backupURI;
+    /**
+     * Backup Path. local path where a backup will write out to
+     */
+    protected String backupPath;
     /**
      * Auto rollback to previous backups on restoration failure
      */
@@ -202,6 +203,14 @@ public class RocksDBState extends BaseState {
      */
     protected Options rocksDBOptions;
     /**
+     * RocksDB backup engine
+     */
+    protected BackupEngine backupEngine;
+    /**
+     * Rocks DB backup engine options
+     */
+    protected BackupableDBOptions backupOptions;
+    /**
      * Rocks DB Flush options
      */
     protected FlushOptions flushOptions;
@@ -243,39 +252,21 @@ public class RocksDBState extends BaseState {
     public void backup() {
         logger.info("Backing up RocksDB state");
         try {
-            switch(backupURI.getScheme().toLowerCase()) {
-                case FileHelper.SCHEME:
-                    backup(backupURI.getPath());
-                    break;
-                case S3Helper.SCHEME:
-                    String localBackupPath = getLocalBackupPath(uri);
-                    backup(localBackupPath);
-                    s3Helper.syncToS3(new URI(localBackupPath), backupURI);
-                    break;
-                default:
-                    throw new RuntimeException("Unsupported schema: " + backupURI.getScheme());
-            }
-        } catch(InterruptedException | ExecutionException | URISyntaxException | RocksDBException ex) {
-            throw new RuntimeException(ex);
-        }
-        logger.info("RocksDB state backup complete");
-    }
-
-    /**
-     * Backups the DB to a local path.
-     * @param backupPath - The local backup path
-     */
-    protected void backup(String backupPath) throws RocksDBException {
-        File file = new File(backupPath);
-        if(!file.exists()) file.mkdir();
-        logger.info("Opening RocksDB backup engine");
-        try (final BackupableDBOptions backupOptions = new BackupableDBOptions(backupPath)
-                .setShareTableFiles(true)
-                .setMaxBackgroundOperations(parallelism);
-            final BackupEngine backupEngine = BackupEngine.open(Env.getDefault(), backupOptions)) {
+            openBackupEngine();
             backupEngine.createNewBackup(rocksDB, true);
             backupEngine.purgeOldBackups(backupsToKeep);
+        } catch(RocksDBException ex) {
+            throw new RuntimeException(ex);
         }
+
+        if(s3Helper != null) {
+            try {
+                s3Helper.syncToS3(new URI(backupPath), backupURI);
+            } catch(InterruptedException | ExecutionException | URISyntaxException ex) {
+                throw new RuntimeException(ex);
+            }
+        }
+        logger.info("RocksDB state backup complete");
     }
 
     @Override
@@ -283,6 +274,7 @@ public class RocksDBState extends BaseState {
         if(!isOpen()) {
             return;
         }
+        logger.info("Closing RocksDB state");
         super.close();
 
         for (Iterator iterator : iterators) {
@@ -304,9 +296,25 @@ public class RocksDBState extends BaseState {
         writeOptions = null;
         rocksDB = null;
 
+        closeBackupEngine();
+
         if (s3Helper != null) {
             s3Helper.close();
+            s3Helper = null;
         }
+        logger.info("RocksDB state closed");
+    }
+
+    private void closeBackupEngine() {
+        if (backupEngine != null) {
+            logger.info("Closing RocksDB backup engine");
+            backupOptions.close();
+            backupEngine.close();
+            logger.info("RocksDB backup engine closed");
+        }
+
+        backupOptions = null;
+        backupEngine = null;
     }
 
     @Override
@@ -330,7 +338,18 @@ public class RocksDBState extends BaseState {
 
             if(backupURI.getScheme().toLowerCase().equals(S3Helper.SCHEME)) {
                 s3Helper = new S3Helper(config);
+                backupPath = getLocalBackupPath(backupURI);
+            } else {
+                backupPath = backupURI.getPath();
             }
+
+            File file = new File(backupPath);
+            if (!file.exists()) {
+                boolean created = file.mkdir();
+                logger.info("Created RocksDB backup directory: " + created);
+            }
+            backupPath = file.getPath();
+
         } catch(Exception ex) {
             throw new RuntimeException(ex);
         }
@@ -341,6 +360,7 @@ public class RocksDBState extends BaseState {
         if(isOpen()){
             throw new RuntimeException("RocksDB is already open!");
         }
+        logger.info("Opening RocksDB state");
         try {
             // Create the backing DB
             sstFileManager = new SstFileManager(Env.getDefault());
@@ -441,6 +461,17 @@ public class RocksDBState extends BaseState {
             throw new RuntimeException(ex);
         }
         super.open();
+        logger.info("Finished opening RocksDB state");
+    }
+
+    private void openBackupEngine() throws RocksDBException{
+        if (backupEngine == null) {
+            logger.info("Opening RocksDB backup engine");
+            backupOptions = new BackupableDBOptions(backupPath)
+                    .setShareTableFiles(true)
+                    .setMaxBackgroundOperations(parallelism);
+            backupEngine = BackupEngine.open(Env.getDefault(), backupOptions);
+        }
     }
 
     @Override
@@ -498,22 +529,17 @@ public class RocksDBState extends BaseState {
     public void deleteBackups() {
         logger.info("Deleting RocksDB state backups");
         try {
-            File file;
-            switch(backupURI.getScheme().toLowerCase()) {
-                case FileHelper.SCHEME:
-                    file = new File(backupURI);
-                    FileUtils.deleteDirectory(file);
-                    break;
-                case S3Helper.SCHEME:
-                    String localBackupPath = getLocalBackupPath(uri);
-                    file = new File(localBackupPath);
-                    FileUtils.deleteDirectory(file);
-                    s3Helper.deleteKeys(backupURI);
-                    break;
-                default:
-                    throw new RuntimeException("Unsupported schema: " + backupURI.getScheme());
+            openBackupEngine();
+            final List<BackupInfo> backupInfoList = backupEngine.getBackupInfo();
+
+            for (BackupInfo backupInfo : backupInfoList) {
+                backupEngine.deleteBackup(backupInfo.backupId());
             }
-        } catch(IOException | InterruptedException | ExecutionException ex) {
+
+            if(s3Helper != null){
+                s3Helper.deleteKeys(backupURI);
+            }
+        } catch(RocksDBException | InterruptedException | ExecutionException ex) {
             throw new RuntimeException(ex);
         }
         metrics.backupsDeleted.mark();
@@ -618,20 +644,11 @@ public class RocksDBState extends BaseState {
         logger.info("Restoring RocksDB state from backups");
         try(Timer.Context context = metrics.backupsRestored.time()) {
             try {
-                switch (backupURI.getScheme().toLowerCase()) {
-                    case FileHelper.SCHEME:
-                        restore(uri, backupURI.getPath());
-                        break;
-                    case S3Helper.SCHEME:
-                        String localBackupPath = getLocalBackupPath(uri);
-                        File file = new File(localBackupPath);
-                        if (!file.exists()) file.mkdir();
-                        s3Helper.syncFromS3(new URI(localBackupPath), backupURI);
-                        restore(uri, localBackupPath);
-                        break;
-                    default:
-                        throw new RuntimeException("Unsupported schema: " + backupURI.getScheme());
+                if (s3Helper != null) {
+                    s3Helper.syncFromS3(new URI(backupPath), backupURI);
                 }
+                openBackupEngine();
+                restore(uri, backupPath);
             } catch (InterruptedException | ExecutionException | RocksDBException | URISyntaxException ex) {
                 throw new RuntimeException(ex);
             }
@@ -648,11 +665,7 @@ public class RocksDBState extends BaseState {
     protected void restore(URI dbUri, String backupPath) throws RocksDBException {
         File path = new File(backupPath);
         if(path.exists()) {
-            try (final BackupableDBOptions backupOptions = new BackupableDBOptions(backupPath)
-                    .setShareTableFiles(true)
-                    .setMaxBackgroundOperations(parallelism);
-                 final RestoreOptions restoreOptions = new RestoreOptions(false);
-                 final BackupEngine backupEngine = BackupEngine.open(Env.getDefault(), backupOptions)) {
+            try (final RestoreOptions restoreOptions = new RestoreOptions(false)) {
 
                 final List<BackupInfo> backupInfo = backupEngine.getBackupInfo();
 
@@ -698,3 +711,4 @@ public class RocksDBState extends BaseState {
         }
     }
 }
+
