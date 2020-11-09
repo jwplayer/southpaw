@@ -74,7 +74,7 @@ public class ByteArraySetTest {
         return set;
     }
 
-    public List<ByteArray> getRandomByteArrays(int count, long seed) {
+    private List<ByteArray> getRandomByteArrays(int count, long seed) {
         System.out.println("Generating random " + count + " Byte Array(s) with " + seed + " seed");
         Random randomSeed = new Random(seed);
         List<ByteArray> vals = Stream.generate(() -> RandomStringUtils.random(RANDOM_STRING_SIZE, 0, 0, true, true, null, randomSeed))
@@ -87,7 +87,7 @@ public class ByteArraySetTest {
         return vals;
     }
 
-    public List<ByteArray> getRandomByteArrays(int count) {
+    private List<ByteArray> getRandomByteArrays(int count) {
         return getRandomByteArrays(count, RANDOM_SEED);
     }
 
