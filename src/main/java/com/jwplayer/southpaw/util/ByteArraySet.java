@@ -596,23 +596,6 @@ public class ByteArraySet implements Set<ByteArray> {
     }
 
     @Override
-    public boolean equals(Object object) {
-        if (!(object instanceof ByteArraySet)) {
-            return false;
-        }
-
-        if (size() != ((ByteArraySet) object).size()) {
-            return false;
-        }
-        for (ByteArray ba: (ByteArraySet) object) {
-            if (!contains(ba)) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    @Override
     public ByteArray[] toArray() {
         return toArray(new ByteArray[size()]);
     }
