@@ -91,7 +91,7 @@ public class ByteArraySetTest {
         return getRandomByteArrays(count, RANDOM_SEED);
     }
 
-    public void testAdd(int size) {
+    private void testAdd(int size) {
         System.out.println("Testing add method with " + size + " size");
         ByteArraySet set = new ByteArraySet();
 
@@ -142,7 +142,7 @@ public class ByteArraySetTest {
         testAdd(SIZE_REALLY_BIG);
     }
 
-    public long getDifferentRandomSeed() {
+    private long getDifferentRandomSeed() {
         long differentRandomSeed = RANDOM_SEED;
         while (differentRandomSeed == RANDOM_SEED ) {
             differentRandomSeed = new Random().nextLong();
@@ -150,7 +150,7 @@ public class ByteArraySetTest {
         return differentRandomSeed;
     }
 
-    public void testAddAll(int size, boolean forceByteArraySet) {
+    private void testAddAll(int size, boolean forceByteArraySet) {
         System.out.println("Testing addAll method with " + size + " size and " + forceByteArraySet + " forceByteArraySet");
         ByteArraySet set = new ByteArraySet();
 
@@ -229,7 +229,7 @@ public class ByteArraySetTest {
         testAddAll(SIZE_REALLY_BIG, true);
     }
 
-    public void testSimilarAdd(boolean forceMerger) {
+    private void testSimilarAdd(boolean forceMerger) {
         System.out.println("Testing add method for similar inputs with " + forceMerger + " forceMerger");
         ByteArraySet set = new ByteArraySet();
 
@@ -267,7 +267,7 @@ public class ByteArraySetTest {
         testSimilarAdd(false);
     }
 
-    public void testSerializeDeserialize(int size, byte leadingByte) {
+    private void testSerializeDeserialize(int size, byte leadingByte) {
         System.out.println("Testing serialize/deserialize methods with " + size + " size and " + leadingByte + " leading byte");
         ByteArraySet set = new ByteArraySet();
 
@@ -330,7 +330,7 @@ public class ByteArraySetTest {
         testSerializeDeserialize(SIZE_REALLY_BIG, (byte) 3);
     }
 
-    public void testIterator(int size) {
+    private void testIterator(int size) {
         System.out.println("Testing iterator method with " + size + " size");
         ByteArraySet set = new ByteArraySet();
 
@@ -389,7 +389,7 @@ public class ByteArraySetTest {
         testIterator(SIZE_REALLY_BIG);
     }
 
-    public void testRemove(int size) {
+    private void testRemove(int size) {
         System.out.println("Testing remove method with " + size + " size");
         ByteArraySet set = new ByteArraySet();
 
@@ -451,7 +451,7 @@ public class ByteArraySetTest {
         testRemove(SIZE_REALLY_BIG);
     }
 
-    public void testRandomSerializeDerializeSizeCheckRemove(int size) {
+    private void testRandomSerializeDerializeSizeCheckRemove(int size) {
         System.out.println("Testing serialize/deserialize methods with random-size check with " + size + " size");
         ByteArraySet set = new ByteArraySet();
 
@@ -521,7 +521,7 @@ public class ByteArraySetTest {
         testRandomSerializeDerializeSizeCheckRemove(SIZE_REALLY_BIG);
     }
 
-    public void testSimilarRemove(boolean forceMerger) {
+    private void testSimilarRemove(boolean forceMerger) {
         System.out.println("Testing remove method for similar inputs with " + forceMerger + " forceMerger");
         ByteArraySet set = new ByteArraySet();
 
@@ -561,7 +561,7 @@ public class ByteArraySetTest {
         testSimilarRemove(false);
     }
 
-    public void testToArray(int size) {
+    private void testToArray(int size) {
         System.out.println("Testing toArray method with " + size + " size");
         ByteArraySet set = new ByteArraySet();
 
@@ -617,7 +617,7 @@ public class ByteArraySetTest {
         testToArray(SIZE_REALLY_BIG);
     }
 
-    public void testContains(int size) {
+    private void testContains(int size) {
         System.out.println("Testing contains method with " + size + " size");
         ByteArraySet set = new ByteArraySet();
 
