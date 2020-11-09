@@ -110,10 +110,6 @@ public class ByteArraySetTest {
             assertTrue(set.contains(val));
         }
         assertEquals(size, set.size());
-
-        for (ByteArray val: vals) {
-            assertTrue(set.contains(val));
-        }
     }
 
     @Test
