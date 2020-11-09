@@ -97,7 +97,7 @@ public class ByteArraySetTest {
 
         List<ByteArray> vals = getRandomByteArrays(size);
 
-        List<ByteArray> insertedVals = new ArrayList<ByteArray>();
+        List<ByteArray> insertedVals = new ArrayList<>();
         for (ByteArray val: vals) {
             assertTrue(set.add(val));
             assertTrue(set.contains(val));
@@ -233,13 +233,13 @@ public class ByteArraySetTest {
         System.out.println("Testing add method for similar inputs with " + forceMerger + " forceMerger");
         ByteArraySet set = new ByteArraySet();
 
-        List<ByteArray> vals = new ArrayList<ByteArray>();
+        List<ByteArray> vals = new ArrayList<>();
         vals.add(new ByteArray("bytear"));
         vals.add(new ByteArray("ByteAr"));
         vals.add(new ByteArray("bytea0"));
         vals.add(new ByteArray("0ytear"));
 
-        List<ByteArray> insertedVals = new ArrayList<ByteArray>();
+        List<ByteArray> insertedVals = new ArrayList<>();
         for (ByteArray val: vals) {
             if (forceMerger) {
                 set.serialize();
@@ -347,7 +347,7 @@ public class ByteArraySetTest {
         assertEquals(size, set.size());
 
         Iterator<ByteArray> iter = set.iterator();
-        List<ByteArray> alreadySeenVals = new ArrayList<ByteArray>();
+        List<ByteArray> alreadySeenVals = new ArrayList<>();
         int count = 0;
         while(iter.hasNext()) {
             ByteArray val = iter.next();
@@ -457,14 +457,14 @@ public class ByteArraySetTest {
 
         List<ByteArray> originalVals = getRandomByteArrays(size);
 
-        List<ByteArray> vals = new ArrayList<ByteArray>();
+        List<ByteArray> vals = new ArrayList<>();
         for (ByteArray val: originalVals) {
             vals.add(val);
         }
         Collections.shuffle(vals);
 
         int forceMergerSize = (new Random()).nextInt(size);
-        List<String> insertedStringVals = new ArrayList<String>();
+        List<String> insertedStringVals = new ArrayList<>();
         for (ByteArray val: vals) {
             insertedStringVals.add(new String(val.getBytes()));
             assertTrue(set.add(val));
@@ -476,7 +476,7 @@ public class ByteArraySetTest {
 
         int deserializedCheckSize = (new Random()).nextInt(size);
         int currentSize = size;
-        List<String> deletedStringVals = new ArrayList<String>();
+        List<String> deletedStringVals = new ArrayList<>();
         for (ByteArray val: originalVals) {
             if (currentSize == deserializedCheckSize) {
                 if (currentSize != ByteArraySet.deserialize(set.serialize()).size()) {
@@ -525,7 +525,7 @@ public class ByteArraySetTest {
         System.out.println("Testing remove method for similar inputs with " + forceMerger + " forceMerger");
         ByteArraySet set = new ByteArraySet();
 
-        List<ByteArray> vals = new ArrayList<ByteArray>();
+        List<ByteArray> vals = new ArrayList<>();
         vals.add(new ByteArray("bytear"));
         vals.add(new ByteArray("ByteAr"));
         vals.add(new ByteArray("bytea0"));
@@ -541,7 +541,7 @@ public class ByteArraySetTest {
             set.serialize();
         }
 
-        List<ByteArray> deletedVals = new ArrayList<ByteArray>();
+        List<ByteArray> deletedVals = new ArrayList<>();
         for(ByteArray val: vals) {
             assertTrue(set.remove(val));
             assertFalse(set.contains(val));
@@ -576,7 +576,7 @@ public class ByteArraySetTest {
             assertTrue(set.isEmpty());
         }
 
-        List<ByteArray> alreadySeenVals = new ArrayList<ByteArray>();
+        List<ByteArray> alreadySeenVals = new ArrayList<>();
         int seenCount = 0;
         for(ByteArray val: set.toArray()) {
             assertFalse(alreadySeenVals.contains(val));
