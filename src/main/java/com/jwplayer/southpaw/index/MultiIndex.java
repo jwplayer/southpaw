@@ -222,9 +222,9 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
         ByteArraySet foreignKeys = getForeignKeys(primaryKey);
         if(foreignKeys != null) {
             foreignKeys.remove(foreignKey);
-            entryRICache.remove(primaryKey);
             if(foreignKeys.size() == 0) {
                 state.delete(reverseIndexName, primaryKey.getBytes());
+                entryRICache.remove(primaryKey);
                 pendingRIWrites.remove(primaryKey);
             } else {
                 putRIToState(primaryKey, foreignKeys);
@@ -239,9 +239,9 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
         ByteArraySet primaryKeys = getIndexEntry(foreignKey);
         if(primaryKeys != null) {
             if(primaryKeys.remove(primaryKey)) {
-                entryCache.remove(foreignKey);
                 if(primaryKeys.size() == 0) {
                     state.delete(indexName, foreignKey.getBytes());
+                    entryCache.remove(foreignKey);
                     pendingWrites.remove(foreignKey);
                 } else {
                     putToState(foreignKey, primaryKeys);
