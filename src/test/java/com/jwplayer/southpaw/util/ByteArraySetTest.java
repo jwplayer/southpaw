@@ -682,19 +682,6 @@ public class ByteArraySetTest {
     }
 
     @Test
-    public void testNullEquals() {
-        System.out.println("Testing equals method with null");
-        ByteArraySet set = new ByteArraySet();
-
-        List<ByteArray> vals = getRandomByteArrays(3);
-
-        for (ByteArray val: vals) {
-            assertTrue(set.add(val));
-        }
-        assertNotEquals(null, set);
-    }
-
-    @Test
     public void testEmptyLastValueChunkIteratorBug() {
         System.out.println("Testing iterator bug for a chunk with an empty last value");
         ByteArraySet set = new ByteArraySet();
