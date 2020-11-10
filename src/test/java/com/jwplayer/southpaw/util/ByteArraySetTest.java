@@ -95,7 +95,7 @@ public class ByteArraySetTest {
         System.out.println("Testing add method with " + size + " size");
         ByteArraySet set = new ByteArraySet();
 
-        List<ByteArray> vals = getRandomByteArrays(size);
+        final List<ByteArray> vals = getRandomByteArrays(size);
 
         List<ByteArray> insertedVals = new ArrayList<>();
         for (ByteArray val: vals) {
@@ -144,7 +144,7 @@ public class ByteArraySetTest {
 
     private long getDifferentRandomSeed() {
         long differentRandomSeed = RANDOM_SEED;
-        while (differentRandomSeed == RANDOM_SEED ) {
+        while (differentRandomSeed == RANDOM_SEED) {
             differentRandomSeed = new Random().nextLong();
         }
         return differentRandomSeed;
@@ -154,7 +154,7 @@ public class ByteArraySetTest {
         System.out.println("Testing addAll method with " + size + " size and " + forceByteArraySet + " forceByteArraySet");
         ByteArraySet set = new ByteArraySet();
 
-        List<ByteArray> vals = getRandomByteArrays(size);
+        final List<ByteArray> vals = getRandomByteArrays(size);
 
         for (ByteArray val: vals) {
             assertTrue(set.add(val));
@@ -166,15 +166,14 @@ public class ByteArraySetTest {
         if (forceByteArraySet) {
             extraVals = new ByteArraySet();
         } else {
-            extraVals = new HashSet<ByteArray>();
+            extraVals = new HashSet<>();
         }
         while(extraVals.size() < size) {
             if (stagedVals.size() == 0) {
                 stagedVals = getRandomByteArrays(size, getDifferentRandomSeed());
             }
-            ByteArray val = stagedVals.get(0);
-            stagedVals.remove(0);
-            if (!vals.contains(val) && !extraVals.contains(val)) {
+            ByteArray val = stagedVals.remove(0);
+            if (!vals.contains(val)) {
                 extraVals.add(val);
             }
         }
@@ -195,20 +194,20 @@ public class ByteArraySetTest {
 
     @Test
     public void emptyAddAll() {
-        testAddAll(0, false);
-        testAddAll(0, true);
+        testAddAll(SIZE_EMPTY, false);
+        testAddAll(SIZE_EMPTY, true);
     }
 
     @Test
     public void reallySmallAddAll() {
-        testAddAll(1, false);
-        testAddAll(1, true);
+        testAddAll(SIZE_REALLY_SMALL, false);
+        testAddAll(SIZE_REALLY_SMALL, true);
     }
 
     @Test
     public void smallAddAll() {
-        testAddAll(2, false);
-        testAddAll(2, true);
+        testAddAll(SIZE_SMALL, false);
+        testAddAll(SIZE_SMALL, true);
     }
 
     @Test
@@ -245,16 +244,11 @@ public class ByteArraySetTest {
                 set.serialize();
             }
             assertTrue(set.add(val));
-            assertTrue(set.contains(val));
             insertedVals.add(val);
             assertEquals(insertedVals.size(), set.size());
         }
 
         assertEquals(4, set.size());
-
-        for (ByteArray val: vals) {
-            assertTrue(set.contains(val));
-        }
     }
 
     @Test
@@ -271,16 +265,10 @@ public class ByteArraySetTest {
         System.out.println("Testing serialize/deserialize methods with " + size + " size and " + leadingByte + " leading byte");
         ByteArraySet set = new ByteArraySet();
 
-        List<ByteArray> vals = getRandomByteArrays(size);
+        final List<ByteArray> vals = getRandomByteArrays(size);
 
-        for (ByteArray val: vals) {
-            assertTrue(set.add(val));
-        }
-        if (size > 0) {
-            assertFalse(set.isEmpty());
-        } else {
-            assertTrue(set.isEmpty());
-        }
+        assertTrue(set.addAll(vals));
+
         Collections.shuffle(vals);
 
         byte[] bytes = set.serialize();
@@ -292,12 +280,7 @@ public class ByteArraySetTest {
         }
         assertEquals(size, deSet.size());
 
-        int count = 0;
-        for(ByteArray val: deSet) {
-            assertTrue(vals.contains(val));
-            count++;
-        }
-        assertEquals(size, count);
+        assertTrue(vals.containsAll(deSet));
     }
 
     @Test
@@ -334,17 +317,9 @@ public class ByteArraySetTest {
         System.out.println("Testing iterator method with " + size + " size");
         ByteArraySet set = new ByteArraySet();
 
-        List<ByteArray> vals = getRandomByteArrays(size);
+        final List<ByteArray> vals = getRandomByteArrays(size);
 
-        for (ByteArray val: vals) {
-            assertTrue(set.add(val));
-        }
-        if (size > 0) {
-            assertFalse(set.isEmpty());
-        } else {
-            assertTrue(set.isEmpty());
-        }
-        assertEquals(size, set.size());
+        assertTrue(set.addAll(vals));
 
         Iterator<ByteArray> iter = set.iterator();
         List<ByteArray> alreadySeenVals = new ArrayList<>();
@@ -393,24 +368,13 @@ public class ByteArraySetTest {
         System.out.println("Testing remove method with " + size + " size");
         ByteArraySet set = new ByteArraySet();
 
-        List<ByteArray> vals = getRandomByteArrays(size);
+        final List<ByteArray> vals = getRandomByteArrays(size);
 
-        for (ByteArray val: vals) {
-            assertTrue(set.add(val));
-        }
-        if (size > 0) {
-            assertFalse(set.isEmpty());
-        } else {
-            assertTrue(set.isEmpty());
-        }
+        assertTrue(set.addAll(vals));
+
         Collections.shuffle(vals);
 
-        int count = 0;
-        for(ByteArray val: set) {
-            assertTrue(vals.contains(val));
-            count++;
-        }
-        assertEquals(size, count);
+        assertTrue(vals.containsAll(set));
 
         int currentSize = size;
         for(ByteArray val: vals) {
@@ -455,7 +419,7 @@ public class ByteArraySetTest {
         System.out.println("Testing serialize/deserialize methods with random-size check with " + size + " size");
         ByteArraySet set = new ByteArraySet();
 
-        List<ByteArray> originalVals = getRandomByteArrays(size);
+        final List<ByteArray> originalVals = getRandomByteArrays(size);
 
         List<ByteArray> vals = new ArrayList<>();
         for (ByteArray val: originalVals) {
@@ -463,7 +427,7 @@ public class ByteArraySetTest {
         }
         Collections.shuffle(vals);
 
-        int forceMergerSize = (new Random()).nextInt(size);
+        int forceMergerSize = (new Random(RANDOM_SEED)).nextInt(size);
         List<String> insertedStringVals = new ArrayList<>();
         for (ByteArray val: vals) {
             insertedStringVals.add(new String(val.getBytes()));
@@ -474,7 +438,7 @@ public class ByteArraySetTest {
             }
         }
 
-        int deserializedCheckSize = (new Random()).nextInt(size);
+        int deserializedCheckSize = (new Random(RANDOM_SEED)).nextInt(size);
         int currentSize = size;
         List<String> deletedStringVals = new ArrayList<>();
         for (ByteArray val: originalVals) {
@@ -489,7 +453,6 @@ public class ByteArraySetTest {
                 }
             }
             assertTrue(set.remove(val));
-            assertFalse(set.contains(val));
             deletedStringVals.add(new String(val.getBytes()));
             currentSize -= 1;
             assertEquals(currentSize, set.size());
@@ -531,10 +494,9 @@ public class ByteArraySetTest {
         vals.add(new ByteArray("bytea0"));
         vals.add(new ByteArray("0ytear"));
 
-        for (ByteArray val: vals) {
-            assertTrue(set.add(val));
-        }
+        assertTrue(set.addAll(vals));
         assertEquals(4, set.size());
+
         Collections.shuffle(vals);
 
         if (forceMerger) {
@@ -544,7 +506,6 @@ public class ByteArraySetTest {
         List<ByteArray> deletedVals = new ArrayList<>();
         for(ByteArray val: vals) {
             assertTrue(set.remove(val));
-            assertFalse(set.contains(val));
 
             deletedVals.add(val);
             assertEquals(4, set.size() + deletedVals.size());
@@ -565,16 +526,9 @@ public class ByteArraySetTest {
         System.out.println("Testing toArray method with " + size + " size");
         ByteArraySet set = new ByteArraySet();
 
-        List<ByteArray> vals = getRandomByteArrays(size);
+        final List<ByteArray> vals = getRandomByteArrays(size);
 
-        for (ByteArray val: vals) {
-            assertTrue(set.add(val));
-        }
-        if (size > 0) {
-            assertFalse(set.isEmpty());
-        } else {
-            assertTrue(set.isEmpty());
-        }
+        assertTrue(set.addAll(vals));
 
         List<ByteArray> alreadySeenVals = new ArrayList<>();
         int seenCount = 0;
@@ -621,23 +575,17 @@ public class ByteArraySetTest {
         System.out.println("Testing contains method with " + size + " size");
         ByteArraySet set = new ByteArraySet();
 
-        List<ByteArray> vals = getRandomByteArrays(size);
+        final List<ByteArray> vals = getRandomByteArrays(size);
 
-        for (ByteArray val: vals) {
-            assertTrue(set.add(val));
-        }
-        if (size > 0) {
-            assertFalse(set.isEmpty());
-        } else {
-            assertTrue(set.isEmpty());
-        }
+        assertTrue(set.addAll(vals));
+
         Collections.shuffle(vals);
 
         for(ByteArray val: vals) {
             assertTrue(set.contains(val));
         }
 
-        List<ByteArray> absentVals = getRandomByteArrays(10);
+        final List<ByteArray> absentVals = getRandomByteArrays(10);
         for(ByteArray val: absentVals) {
             if (vals.contains(val)) {
                 assertTrue(set.contains(val));
@@ -695,14 +643,11 @@ public class ByteArraySetTest {
         int size = ChunkByteArrayCount + FrontingSetByteArrayCount;
 
         Set<ByteArray> vals = new TreeSet<>();
-        for (ByteArray val: getRandomByteArrays(size)) {
-            vals.add(val);
-        }
+        vals.addAll(getRandomByteArrays(size));
 
         ByteArray firstChunkLastVal = null;
         for (ByteArray val: vals) {
             assertTrue(set.add(val));
-            assertTrue(set.contains(val));
             if (set.size() == PER_CHUNK_MAX_BYTE_ARRAY_COUNT) {
                 firstChunkLastVal = val;
             } else if (set.size() == ChunkByteArrayCount) {
