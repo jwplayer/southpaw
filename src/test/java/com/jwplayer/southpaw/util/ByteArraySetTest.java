@@ -265,7 +265,11 @@ public class ByteArraySetTest {
 
         final List<ByteArray> vals = getRandomByteArrays(size);
 
-        assertTrue(set.addAll(vals));
+        if (size > 0) {
+            assertTrue(set.addAll(vals));
+        } else {
+            assertFalse(set.addAll(vals));
+        }
 
         byte[] bytes = set.serialize();
         assertEquals(leadingByte, bytes[0]);
@@ -311,7 +315,11 @@ public class ByteArraySetTest {
 
         final List<ByteArray> vals = getRandomByteArrays(size);
 
-        assertTrue(set.addAll(vals));
+        if (size > 0) {
+            assertTrue(set.addAll(vals));
+        } else {
+            assertFalse(set.addAll(vals));
+        }
 
         Iterator<ByteArray> iter = set.iterator();
         List<ByteArray> alreadySeenVals = new ArrayList<>();
@@ -360,7 +368,11 @@ public class ByteArraySetTest {
 
         final List<ByteArray> vals = getRandomByteArrays(size);
 
-        assertTrue(set.addAll(vals));
+        if (size > 0) {
+            assertTrue(set.addAll(vals));
+        } else {
+            assertFalse(set.addAll(vals));
+        }
 
         Collections.shuffle(vals);
 
@@ -501,7 +513,11 @@ public class ByteArraySetTest {
 
         final List<ByteArray> vals = getRandomByteArrays(size);
 
-        assertTrue(set.addAll(vals));
+        if (size > 0) {
+            assertTrue(set.addAll(vals));
+        } else {
+            assertFalse(set.addAll(vals));
+        }
 
         List<ByteArray> alreadySeenVals = new ArrayList<>();
         for(ByteArray val: set.toArray()) {
@@ -548,7 +564,11 @@ public class ByteArraySetTest {
 
         final List<ByteArray> vals = getRandomByteArrays(size);
 
-        assertTrue(set.addAll(vals));
+        if (size > 0) {
+            assertTrue(set.addAll(vals));
+        } else {
+            assertFalse(set.addAll(vals));
+        }
 
         Collections.shuffle(vals);
 
