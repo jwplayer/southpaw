@@ -18,6 +18,8 @@ package com.jwplayer.southpaw.util;
 import org.apache.commons.lang.NotImplementedException;
 import org.apache.commons.lang.RandomStringUtils;
 import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.jwplayer.southpaw.util.ByteArraySet.Chunk;
 
@@ -31,6 +33,10 @@ import static org.junit.Assert.*;
 public class ByteArraySetTest {
     private static final int RANDOM_STRING_SIZE = 6;
     private static final long RANDOM_SEED = new Random().nextLong();
+    /**
+     * Le Logger
+     */
+    private static final Logger logger =  LoggerFactory.getLogger(ByteArraySetTest.class);
 
     /*
      * The below variable corresponds to the maximum number of Byte Arrays a single
@@ -75,7 +81,7 @@ public class ByteArraySetTest {
     }
 
     private List<ByteArray> getRandomByteArrays(int count, long seed) {
-        System.out.println("Generating random " + count + " Byte Array(s) with " + seed + " seed");
+        logger.info("Generating random " + count + " Byte Array(s) with " + seed + " seed");
         Random randomSeed = new Random(seed);
         List<ByteArray> vals = Stream.generate(() -> RandomStringUtils.random(RANDOM_STRING_SIZE, 0, 0, true, true, null, randomSeed))
                 .limit(count)
@@ -92,7 +98,7 @@ public class ByteArraySetTest {
     }
 
     private void testAdd(int size) {
-        System.out.println("Testing add method with " + size + " size");
+        logger.info("Testing add method with " + size + " size");
         ByteArraySet set = new ByteArraySet();
 
         final List<ByteArray> vals = getRandomByteArrays(size);
@@ -151,7 +157,7 @@ public class ByteArraySetTest {
     }
 
     private void testAddAll(int size, boolean forceByteArraySet) {
-        System.out.println("Testing addAll method with " + size + " size and " + forceByteArraySet + " forceByteArraySet");
+        logger.info("Testing addAll method with " + size + " size and " + forceByteArraySet + " forceByteArraySet");
         ByteArraySet set = new ByteArraySet();
 
         final List<ByteArray> vals = getRandomByteArrays(size);
@@ -229,7 +235,7 @@ public class ByteArraySetTest {
     }
 
     private void testSimilarAdd(boolean forceMerger) {
-        System.out.println("Testing add method for similar inputs with " + forceMerger + " forceMerger");
+        logger.info("Testing add method for similar inputs with " + forceMerger + " forceMerger");
         ByteArraySet set = new ByteArraySet();
 
         List<ByteArray> vals = new ArrayList<>();
@@ -260,7 +266,7 @@ public class ByteArraySetTest {
     }
 
     private void testSerializeDeserialize(int size, byte leadingByte) {
-        System.out.println("Testing serialize/deserialize methods with " + size + " size and " + leadingByte + " leading byte");
+        logger.info("Testing serialize/deserialize methods with " + size + " size and " + leadingByte + " leading byte");
         ByteArraySet set = new ByteArraySet();
 
         final List<ByteArray> vals = getRandomByteArrays(size);
@@ -310,7 +316,7 @@ public class ByteArraySetTest {
     }
 
     private void testIterator(int size) {
-        System.out.println("Testing iterator method with " + size + " size");
+        logger.info("Testing iterator method with " + size + " size");
         ByteArraySet set = new ByteArraySet();
 
         final List<ByteArray> vals = getRandomByteArrays(size);
@@ -363,7 +369,7 @@ public class ByteArraySetTest {
     }
 
     private void testRemove(int size) {
-        System.out.println("Testing remove method with " + size + " size");
+        logger.info("Testing remove method with " + size + " size");
         ByteArraySet set = new ByteArraySet();
 
         final List<ByteArray> vals = getRandomByteArrays(size);
@@ -418,7 +424,7 @@ public class ByteArraySetTest {
     }
 
     private void testRandomSerializeDerializeSizeCheckRemove(int size) {
-        System.out.println("Testing serialize/deserialize methods with random-size check with " + size + " size");
+        logger.info("Testing serialize/deserialize methods with random-size check with " + size + " size");
         ByteArraySet set = new ByteArraySet();
 
         final List<ByteArray> originalVals = getRandomByteArrays(size);
@@ -472,7 +478,7 @@ public class ByteArraySetTest {
     }
 
     private void testSimilarRemove(boolean forceMerger) {
-        System.out.println("Testing remove method for similar inputs with " + forceMerger + " forceMerger");
+        logger.info("Testing remove method for similar inputs with " + forceMerger + " forceMerger");
         ByteArraySet set = new ByteArraySet();
 
         List<ByteArray> vals = new ArrayList<>();
@@ -508,7 +514,7 @@ public class ByteArraySetTest {
     }
 
     private void testToArray(int size) {
-        System.out.println("Testing toArray method with " + size + " size");
+        logger.info("Testing toArray method with " + size + " size");
         ByteArraySet set = new ByteArraySet();
 
         final List<ByteArray> vals = getRandomByteArrays(size);
@@ -559,7 +565,7 @@ public class ByteArraySetTest {
     }
 
     private void testContains(int size) {
-        System.out.println("Testing contains method with " + size + " size");
+        logger.info("Testing contains method with " + size + " size");
         ByteArraySet set = new ByteArraySet();
 
         final List<ByteArray> vals = getRandomByteArrays(size);
@@ -618,7 +624,7 @@ public class ByteArraySetTest {
 
     @Test
     public void testEmptyLastValueChunkIteratorBug() {
-        System.out.println("Testing iterator bug for a chunk with an empty last value");
+        logger.info("Testing iterator bug for a chunk with an empty last value");
         ByteArraySet set = new ByteArraySet();
 
         /*
@@ -627,13 +633,13 @@ public class ByteArraySetTest {
          *  - the first chunk has trailing zeros (a.k.a its last value was deleted)
          */
 
-        int ChunkByteArrayCount = 2 * PER_CHUNK_MAX_BYTE_ARRAY_COUNT;
-        int FrontingSetByteArrayCount = Math.min(5, ByteArraySet.MAX_FRONTING_SET_SIZE - 1);
+        final int ChunkByteArrayCount = 2 * PER_CHUNK_MAX_BYTE_ARRAY_COUNT;
+        final int FrontingSetByteArrayCount = Math.min(5, ByteArraySet.MAX_FRONTING_SET_SIZE - 1);
         assertTrue(FrontingSetByteArrayCount > 0);
 
-        int size = ChunkByteArrayCount + FrontingSetByteArrayCount;
+        final int size = ChunkByteArrayCount + FrontingSetByteArrayCount;
 
-        Set<ByteArray> vals = new TreeSet<>(getRandomByteArrays(size));
+        final Set<ByteArray> vals = new TreeSet<>(getRandomByteArrays(size));
 
         ByteArray firstChunkLastVal = null;
         for (ByteArray val: vals) {
