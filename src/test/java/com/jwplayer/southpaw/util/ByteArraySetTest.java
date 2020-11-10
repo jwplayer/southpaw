@@ -58,11 +58,16 @@ public class ByteArraySetTest {
     private static final int SIZE_BIG = 2 * PER_CHUNK_MAX_BYTE_ARRAY_COUNT;
     private static final int SIZE_REALLY_BIG = ByteArraySet.MAX_FRONTING_SET_SIZE + 2 * PER_CHUNK_MAX_BYTE_ARRAY_COUNT;
 
+    private static boolean alreadyLoggedConfigs = false;
+
     /**
      * Constructor
      */
     public ByteArraySetTest() {
-        logger.info("Running ByteArraySet test(s) with random seed: " + RANDOM_SEED);
+        if (!alreadyLoggedConfigs) {
+            logger.info("Running ByteArraySet test(s) with random seed: " + RANDOM_SEED);
+            alreadyLoggedConfigs = true;
+        }
     }
 
     public ByteArraySet createBigSet() {
@@ -163,6 +168,7 @@ public class ByteArraySetTest {
     }
 
     private void testAddAll(int size, boolean forceByteArraySet) {
+        logger.info("Testing addAll for (size, forceByteArraySet): (" + size + "," + forceByteArraySet + ")");
         ByteArraySet set = new ByteArraySet();
 
         final List<ByteArray> vals = getRandomByteArrays(size);
