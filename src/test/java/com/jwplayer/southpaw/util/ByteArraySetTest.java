@@ -387,6 +387,10 @@ public class ByteArraySetTest {
             assertFalse(set.addAll(vals));
         }
 
+        /*
+         * Shuffles values to make sure we do not remove them in the same
+         * order we added them in.
+         */
         Collections.shuffle(vals);
 
         assertTrue(vals.containsAll(set));
@@ -436,6 +440,11 @@ public class ByteArraySetTest {
         final List<ByteArray> originalVals = getRandomByteArrays(size);
 
         List<ByteArray> vals = new ArrayList<>(originalVals);
+
+        /*
+         * Shuffles values to make sure we do not remove them in the same
+         * order we added them in.
+         */
         Collections.shuffle(vals);
 
         int forceMergerSize = (new Random(RANDOM_SEED)).nextInt(size);
@@ -635,11 +644,17 @@ public class ByteArraySetTest {
          *  - the first chunk has trailing zeros (a.k.a its last value was deleted)
          */
 
-        final int ChunkByteArrayCount = 2 * PER_CHUNK_MAX_BYTE_ARRAY_COUNT;
-        final int FrontingSetByteArrayCount = Math.min(5, ByteArraySet.MAX_FRONTING_SET_SIZE - 1);
-        assertTrue(FrontingSetByteArrayCount > 0);
+        final int chunkByteArrayCount = 2 * PER_CHUNK_MAX_BYTE_ARRAY_COUNT;
+        final int frontingSetByteArrayCount = Math.min(5, ByteArraySet.MAX_FRONTING_SET_SIZE - 1);
+        /*
+         * The number of values present in the fronting set at the time of
+         * serialization is frontingSetByteArrayCount. We enforce it to be
+         * strictly greater than zero to ensure ByteArraySet.merge is
+         * called on serialization.
+         */
+        assertTrue(frontingSetByteArrayCount > 0);
 
-        final int size = ChunkByteArrayCount + FrontingSetByteArrayCount;
+        final int size = chunkByteArrayCount + frontingSetByteArrayCount;
 
         final Set<ByteArray> vals = new TreeSet<>(getRandomByteArrays(size));
 
@@ -648,7 +663,7 @@ public class ByteArraySetTest {
             assertTrue(set.add(val));
             if (set.size() == PER_CHUNK_MAX_BYTE_ARRAY_COUNT) {
                 firstChunkLastVal = val;
-            } else if (set.size() == ChunkByteArrayCount) {
+            } else if (set.size() == chunkByteArrayCount) {
                 // Forces the merger of the fronting set into the list of chunks
                 set.serialize();
             }
