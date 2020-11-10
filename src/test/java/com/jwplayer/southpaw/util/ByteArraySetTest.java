@@ -247,8 +247,6 @@ public class ByteArraySetTest {
             insertedVals.add(val);
             assertEquals(insertedVals.size(), set.size());
         }
-
-        assertEquals(4, set.size());
     }
 
     @Test
@@ -269,18 +267,12 @@ public class ByteArraySetTest {
 
         assertTrue(set.addAll(vals));
 
-        Collections.shuffle(vals);
-
         byte[] bytes = set.serialize();
         assertEquals(leadingByte, bytes[0]);
         ByteArraySet deSet = ByteArraySet.deserialize(bytes);
 
-        for(ByteArray val: vals) {
-            assertTrue(deSet.contains(val));
-        }
-        assertEquals(size, deSet.size());
-
         assertTrue(vals.containsAll(deSet));
+        assertEquals(size, deSet.size());
     }
 
     @Test
@@ -323,15 +315,13 @@ public class ByteArraySetTest {
 
         Iterator<ByteArray> iter = set.iterator();
         List<ByteArray> alreadySeenVals = new ArrayList<>();
-        int count = 0;
         while(iter.hasNext()) {
             ByteArray val = iter.next();
             assertFalse(alreadySeenVals.contains(val));
             alreadySeenVals.add(val);
             assertTrue(vals.contains(val));
-            count++;
         }
-        assertEquals(size, count);
+        assertEquals(size, alreadySeenVals.size());
     }
 
     @Test
@@ -421,16 +411,11 @@ public class ByteArraySetTest {
 
         final List<ByteArray> originalVals = getRandomByteArrays(size);
 
-        List<ByteArray> vals = new ArrayList<>();
-        for (ByteArray val: originalVals) {
-            vals.add(val);
-        }
+        List<ByteArray> vals = new ArrayList<>(originalVals);
         Collections.shuffle(vals);
 
         int forceMergerSize = (new Random(RANDOM_SEED)).nextInt(size);
-        List<String> insertedStringVals = new ArrayList<>();
         for (ByteArray val: vals) {
-            insertedStringVals.add(new String(val.getBytes()));
             assertTrue(set.add(val));
             if (set.size() == forceMergerSize) {
                 // Forces the merger of the fronting set into the list of chunks
@@ -440,22 +425,12 @@ public class ByteArraySetTest {
 
         int deserializedCheckSize = (new Random(RANDOM_SEED)).nextInt(size);
         int currentSize = size;
-        List<String> deletedStringVals = new ArrayList<>();
         for (ByteArray val: originalVals) {
             if (currentSize == deserializedCheckSize) {
-                if (currentSize != ByteArraySet.deserialize(set.serialize()).size()) {
-                    assertEquals("",
-                            String.format("\nInserted Vals: %s\nDeleted Vals: %s\nMerger Size: %d\nCheck Size: %d\n",
-                                    insertedStringVals.toString(),
-                                    deletedStringVals.toString(),
-                                    forceMergerSize,
-                                    deserializedCheckSize));
-                }
+                assertEquals(currentSize, ByteArraySet.deserialize(set.serialize()).size());
             }
             assertTrue(set.remove(val));
-            deletedStringVals.add(new String(val.getBytes()));
             currentSize -= 1;
-            assertEquals(currentSize, set.size());
         }
     }
 
@@ -495,7 +470,6 @@ public class ByteArraySetTest {
         vals.add(new ByteArray("0ytear"));
 
         assertTrue(set.addAll(vals));
-        assertEquals(4, set.size());
 
         Collections.shuffle(vals);
 
@@ -506,9 +480,8 @@ public class ByteArraySetTest {
         List<ByteArray> deletedVals = new ArrayList<>();
         for(ByteArray val: vals) {
             assertTrue(set.remove(val));
-
             deletedVals.add(val);
-            assertEquals(4, set.size() + deletedVals.size());
+            assertEquals(vals.size(), set.size() + deletedVals.size());
         }
     }
 
@@ -531,14 +504,12 @@ public class ByteArraySetTest {
         assertTrue(set.addAll(vals));
 
         List<ByteArray> alreadySeenVals = new ArrayList<>();
-        int seenCount = 0;
         for(ByteArray val: set.toArray()) {
             assertFalse(alreadySeenVals.contains(val));
             alreadySeenVals.add(val);
             assertTrue(vals.contains(val));
-            seenCount++;
         }
-        assertEquals(size, seenCount);
+        assertEquals(size, alreadySeenVals.size());
     }
 
     @Test
@@ -642,8 +613,7 @@ public class ByteArraySetTest {
 
         int size = ChunkByteArrayCount + FrontingSetByteArrayCount;
 
-        Set<ByteArray> vals = new TreeSet<>();
-        vals.addAll(getRandomByteArrays(size));
+        Set<ByteArray> vals = new TreeSet<>(getRandomByteArrays(size));
 
         ByteArray firstChunkLastVal = null;
         for (ByteArray val: vals) {
