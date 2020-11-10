@@ -58,6 +58,13 @@ public class ByteArraySetTest {
     private static final int SIZE_BIG = 2 * PER_CHUNK_MAX_BYTE_ARRAY_COUNT;
     private static final int SIZE_REALLY_BIG = ByteArraySet.MAX_FRONTING_SET_SIZE + 2 * PER_CHUNK_MAX_BYTE_ARRAY_COUNT;
 
+    /**
+     * Constructor
+     */
+    public ByteArraySetTest() {
+        logger.info("Running ByteArraySet test(s) with random seed: " + RANDOM_SEED);
+    }
+
     public ByteArraySet createBigSet() {
         ByteArraySet set = new ByteArraySet();
         List<ByteArray> numbers = new ArrayList<>();
@@ -81,7 +88,6 @@ public class ByteArraySetTest {
     }
 
     private List<ByteArray> getRandomByteArrays(int count, long seed) {
-        logger.info("Generating random " + count + " Byte Array(s) with " + seed + " seed");
         Random randomSeed = new Random(seed);
         List<ByteArray> vals = Stream.generate(() -> RandomStringUtils.random(RANDOM_STRING_SIZE, 0, 0, true, true, null, randomSeed))
                 .limit(count)
@@ -98,7 +104,6 @@ public class ByteArraySetTest {
     }
 
     private void testAdd(int size) {
-        logger.info("Testing add method with " + size + " size");
         ByteArraySet set = new ByteArraySet();
 
         final List<ByteArray> vals = getRandomByteArrays(size);
@@ -153,11 +158,11 @@ public class ByteArraySetTest {
         while (differentRandomSeed == RANDOM_SEED) {
             differentRandomSeed = new Random().nextLong();
         }
+        logger.info("Getting different random seed: " + differentRandomSeed);
         return differentRandomSeed;
     }
 
     private void testAddAll(int size, boolean forceByteArraySet) {
-        logger.info("Testing addAll method with " + size + " size and " + forceByteArraySet + " forceByteArraySet");
         ByteArraySet set = new ByteArraySet();
 
         final List<ByteArray> vals = getRandomByteArrays(size);
@@ -235,7 +240,6 @@ public class ByteArraySetTest {
     }
 
     private void testSimilarAdd(boolean forceMerger) {
-        logger.info("Testing add method for similar inputs with " + forceMerger + " forceMerger");
         ByteArraySet set = new ByteArraySet();
 
         List<ByteArray> vals = new ArrayList<>();
@@ -266,7 +270,6 @@ public class ByteArraySetTest {
     }
 
     private void testSerializeDeserialize(int size, byte leadingByte) {
-        logger.info("Testing serialize/deserialize methods with " + size + " size and " + leadingByte + " leading byte");
         ByteArraySet set = new ByteArraySet();
 
         final List<ByteArray> vals = getRandomByteArrays(size);
@@ -316,7 +319,6 @@ public class ByteArraySetTest {
     }
 
     private void testIterator(int size) {
-        logger.info("Testing iterator method with " + size + " size");
         ByteArraySet set = new ByteArraySet();
 
         final List<ByteArray> vals = getRandomByteArrays(size);
@@ -369,7 +371,6 @@ public class ByteArraySetTest {
     }
 
     private void testRemove(int size) {
-        logger.info("Testing remove method with " + size + " size");
         ByteArraySet set = new ByteArraySet();
 
         final List<ByteArray> vals = getRandomByteArrays(size);
@@ -424,7 +425,6 @@ public class ByteArraySetTest {
     }
 
     private void testRandomSerializeDerializeSizeCheckRemove(int size) {
-        logger.info("Testing serialize/deserialize methods with random-size check with " + size + " size");
         ByteArraySet set = new ByteArraySet();
 
         final List<ByteArray> originalVals = getRandomByteArrays(size);
@@ -478,7 +478,6 @@ public class ByteArraySetTest {
     }
 
     private void testSimilarRemove(boolean forceMerger) {
-        logger.info("Testing remove method for similar inputs with " + forceMerger + " forceMerger");
         ByteArraySet set = new ByteArraySet();
 
         List<ByteArray> vals = new ArrayList<>();
@@ -514,7 +513,6 @@ public class ByteArraySetTest {
     }
 
     private void testToArray(int size) {
-        logger.info("Testing toArray method with " + size + " size");
         ByteArraySet set = new ByteArraySet();
 
         final List<ByteArray> vals = getRandomByteArrays(size);
@@ -565,7 +563,6 @@ public class ByteArraySetTest {
     }
 
     private void testContains(int size) {
-        logger.info("Testing contains method with " + size + " size");
         ByteArraySet set = new ByteArraySet();
 
         final List<ByteArray> vals = getRandomByteArrays(size);
@@ -624,7 +621,6 @@ public class ByteArraySetTest {
 
     @Test
     public void testEmptyLastValueChunkIteratorBug() {
-        logger.info("Testing iterator bug for a chunk with an empty last value");
         ByteArraySet set = new ByteArraySet();
 
         /*
