@@ -310,12 +310,23 @@ public class ByteArraySet implements Set<ByteArray> {
         @Override
         public ByteArray next() {
             int size = (int) currentChunk.bytes[currentOffset];
+            /*
+             * Regardless of the size of the current value, we must update
+             * the state of the iterator (current chunk/offset). Not doing
+             * so would lead to data loss on serialization/deserialization.
+             */
             if(size == 0) {
                 currentOffset += 1;
+                updateState();
                 return null;
             }
             byte[] retVal = Arrays.copyOfRange(currentChunk.bytes, currentOffset + 1, currentOffset + size + 1);
             currentOffset += 1 + size;
+            updateState();
+            return new ByteArray(retVal);
+        }
+
+        private void updateState() {
             if(currentOffset >= currentChunk.size) {
                 if(chunksIter.hasNext()) {
                     currentChunk = chunksIter.next();
@@ -324,7 +335,6 @@ public class ByteArraySet implements Set<ByteArray> {
                     currentChunk = null;
                 }
             }
-            return new ByteArray(retVal);
         }
     }
 
