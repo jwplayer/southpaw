@@ -1,5 +1,25 @@
 # Change log
 
+## 0.6.0
+November 18th, 2020
+
+### Upgrade Notes:
+* It is recommended to rebuild southpaw state if there is a chance of a relation containing a parent record with a child relation joining 1,000 or more records
+
+### New Features
+* Adds support for building against Java 11 [#65](https://github.com/jwplayer/southpaw/pull/65)
+* Adds slf4j bridge dependency for capturing logs from aws sdk [#70](https://github.com/jwplayer/southpaw/pull/70)
+
+### Bug Fixes
+* Removal of some unused variables [#69](https://github.com/jwplayer/southpaw/pull/69)
+* Fix deprecation warnings [#68](https://github.com/jwplayer/southpaw/pull/68)
+* Fixes outdated docs regarding logging [#71](https://github.com/jwplayer/southpaw/pull/71)
+* Bump junit from 4.11 to 4.13.1 [#72](https://github.com/jwplayer/southpaw/pull/72)
+* Reuse RocksDB BackupEngine object [#67](https://github.com/jwplayer/southpaw/pull/67)
+* Add missing jwplayer CODE_OF_CONDUCT.md file [#85](https://github.com/jwplayer/southpaw/pull/85)
+* Fix serialization warning and unnecessary conversion of set to array for iteration [#79](https://github.com/jwplayer/southpaw/pull/79)
+* Fixes a bug in ByteArraySet chunk iteration that can lead to data loss on large joins of 1,000+ child records [#75](https://github.com/jwplayer/southpaw/pull/75)
+
 ## 0.5.3
 September 14th, 2020
 
