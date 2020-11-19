@@ -336,9 +336,10 @@ public class RocksDBState extends BaseState {
             this.restoreMode = RestoreMode.parse(config.getOrDefault(RESTORE_MODE_CONFIG, RestoreMode.NEVER.getValue()).toString());
             this.uri = new URI(Preconditions.checkNotNull(config.get(URI_CONFIG).toString()));
 
+            // TODO: We need to split S3 persistence out of RocksDBState. It doesn't belong here
             if(backupURI.getScheme().toLowerCase().equals(S3Helper.SCHEME)) {
                 s3Helper = new S3Helper(config);
-                backupPath = getLocalBackupPath(backupURI);
+                backupPath = getLocalBackupPath(uri);
             } else {
                 backupPath = backupURI.getPath();
             }
@@ -464,7 +465,7 @@ public class RocksDBState extends BaseState {
         logger.info("Finished opening RocksDB state");
     }
 
-    private void openBackupEngine() throws RocksDBException{
+    protected void openBackupEngine() throws RocksDBException{
         if (backupEngine == null) {
             logger.info("Opening RocksDB backup engine");
             backupOptions = new BackupableDBOptions(backupPath)
