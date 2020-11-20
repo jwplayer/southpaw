@@ -1,5 +1,11 @@
 # Change log
 
+## 0.6.1
+November 20th, 2020
+
+### Bug Fixes
+*  Fix backup path when using an s3 uri [#86](https://github.com/jwplayer/southpaw/pull/86)
+
 ## 0.6.0
 November 18th, 2020
 
