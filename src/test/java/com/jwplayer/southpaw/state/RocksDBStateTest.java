@@ -19,6 +19,9 @@ import com.jwplayer.southpaw.util.ByteArray;
 import org.junit.*;
 import org.junit.rules.ExpectedException;
 import org.junit.rules.TemporaryFolder;
+import org.rocksdb.BackupEngine;
+import org.rocksdb.RocksDB;
+import org.rocksdb.RocksDBException;
 
 import java.io.IOException;
 import java.net.URI;
@@ -707,6 +710,32 @@ public class RocksDBStateTest {
         }
         // Local database was used which has more recent data than the backup
         assertEquals(200, (int) count);
+    }
+
+    @Test
+    public void openBackupEngineBackup() throws RocksDBException {
+        Map<String, Object> config = createConfig(dbUri, backupUri);
+
+        assertNull(state.backupEngine);
+        state.configure(config);
+        state.openBackupEngine();
+
+        assertNotNull(state.backupEngine);
+    }
+
+    @Test
+    public void openBackupEngineS3Backup() throws RocksDBException {
+        String s3BackupUri = "s3://test-bucket";
+        Map<String, Object> config = createConfig(dbUri, s3BackupUri);
+        config.put("aws.s3.access.key.id", "foo");
+        config.put("aws.s3.access.key", "bar");
+        config.put("aws.s3.region", "us-east-1");
+
+        assertNull(state.backupEngine);
+        state.configure(config);
+        state.openBackupEngine();
+
+        assertNotNull(state.backupEngine);
     }
 
     @Test
