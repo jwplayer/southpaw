@@ -31,12 +31,12 @@
         <version.avro>1.8.2</version.avro>
         <version.commons.io>2.6</version.commons.io>
         <version.commons.lang>2.6</version.commons.lang>
-        <version.confluent>4.0.0</version.confluent>
+        <version.confluent>6.0.0</version.confluent>
         <version.dropwizard>4.0.2</version.dropwizard>
         <version.guava>29.0-jre</version.guava>
         <version.jackson>2.11.1</version.jackson>
         <version.jopt.simple>4.9</version.jopt.simple>
-        <version.kafka>1.0.0</version.kafka>
+        <version.kafka>2.6.0</version.kafka>
         <version.logback>1.2.3</version.logback>
         <version.rocksdb>5.17.2</version.rocksdb>
         <version.slf4j>1.7.25</version.slf4j>
@@ -44,7 +44,7 @@
         <version.xml.bind>2.3.1</version.xml.bind>
 
         <!-- Testing -->
-        <version.curator>2.12.0</version.curator>
+        <version.curator>5.1.0</version.curator>
         <version.junit>4.13.1</version.junit>
         <version.mockito>2.25.1</version.mockito>
         <version.s3mock>0.2.5</version.s3mock>
