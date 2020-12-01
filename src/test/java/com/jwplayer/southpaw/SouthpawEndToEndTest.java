@@ -128,13 +128,12 @@ public class SouthpawEndToEndTest {
             }
         }
 
-        int entryChecks = 0;
-        for(Map.Entry<String, Map<ByteArray, DenormalizedRecord>> entry: denormalizedRecords.entrySet()) {
-            for(Map.Entry<ByteArray, DenormalizedRecord> innerEntry: entry.getValue().entrySet()) {
-                assertEquals(expectedResults.get(innerEntry.getKey()), innerEntry.getValue());
-                entryChecks++;
-            }
-        }
-        assertEquals(12, entryChecks);
+        assertEquals(denormalizedRecords.entrySet().stream()
+                .flatMap(entry -> entry.getValue().entrySet().stream())
+                .peek(innerEntry ->
+                        assertEquals(
+                                expectedResults.get(innerEntry.getKey()),
+                                innerEntry.getValue()
+                        )).count(), expectedResults.size());
     }
 }
