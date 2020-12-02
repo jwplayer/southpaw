@@ -18,53 +18,62 @@ package com.jwplayer.southpaw;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jwplayer.southpaw.json.DenormalizedRecord;
 import com.jwplayer.southpaw.record.BaseRecord;
+import com.jwplayer.southpaw.state.RocksDBState;
 import com.jwplayer.southpaw.topic.BaseTopic;
 import com.jwplayer.southpaw.util.ByteArray;
 import com.jwplayer.southpaw.util.FileHelper;
-import org.apache.commons.codec.binary.Hex;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.junit.After;
+import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.junit.rules.TemporaryFolder;
 import org.yaml.snakeyaml.Yaml;
 
-import java.io.File;
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.util.*;
 
 import static org.junit.Assert.*;
 
 
-@RunWith(Parameterized.class)
 public class SouthpawEndToEndTest {
-    private static final String ROCKSDB_BASE_URI = "file:///tmp/RocksDB/";
     private static final String CONFIG_PATH = "test-resources/config.sample.yaml";
     private static final String RELATIONS_PATH = "test-resources/relations.sample.json";
     private static final String RELATIONS_PATH2 = "test-resources/relations2.sample.json";
     private static final String RELATIONS_PATH3 = "test-resources/relations3.sample.json";
     private static final String TOPIC_DATA_PATH = "test-resources/topic/";
 
-    private String testName;
-    private DenormalizedRecord actualRecord;
-    private DenormalizedRecord expectedRecord;
+    private MockSouthpaw southpaw;
+    private Map<String, Object> config;
 
-    public SouthpawEndToEndTest(
-            String testName,
-            DenormalizedRecord actualRecord,
-            DenormalizedRecord expectedRecord
-    ) {
-        this.testName = testName;
-        this.actualRecord = actualRecord;
-        this.expectedRecord = expectedRecord;
+    @Rule
+    public final TemporaryFolder dbFolder = new TemporaryFolder();
+
+    @Rule
+    public final TemporaryFolder backupFolder = new TemporaryFolder();
+
+    @Before
+    public void setup() throws Exception {
+        Yaml yaml = new Yaml();
+        config = yaml.load(FileHelper.getInputStream(new URI(CONFIG_PATH)));
+        config.put(RocksDBState.URI_CONFIG, dbFolder.getRoot().toURI().toString());
+        config.put(RocksDBState.BACKUP_URI_CONFIG, backupFolder.getRoot().toURI().toString());
+        southpaw = new MockSouthpaw(
+                config,
+                Arrays.asList(new URI(RELATIONS_PATH), new URI(RELATIONS_PATH2), new URI(RELATIONS_PATH3))
+        );
+        Southpaw.deleteBackups(config);
     }
 
-    @Parameterized.Parameters(name = "{0}")
-    public static Collection<Object[]> getTestCases() throws Exception {
-        // call setup function since parameter cases are setup prior to @Before being called
-        setup();
+    @After
+    public void cleanup() {
+        southpaw.close();
+        Southpaw.deleteBackups(config);
+        Southpaw.deleteState(config);
+    }
 
+    @Test
+    public void testRecord() throws Exception {
         // Build the expected results
         ObjectMapper mapper = new ObjectMapper();
         Map<ByteArray, DenormalizedRecord> expectedResults = new HashMap<>(12);
@@ -86,13 +95,7 @@ public class SouthpawEndToEndTest {
 
         // Generate the actual results
         int maxRecords = 0;
-        Yaml yaml = new Yaml();
-        Map<String, Object> config = yaml.load(FileHelper.getInputStream(new URI(CONFIG_PATH)));
-        MockSouthpaw southpaw = new MockSouthpaw(
-                config,
-                Arrays.asList(new URI(RELATIONS_PATH), new URI(RELATIONS_PATH2), new URI(RELATIONS_PATH3))
-        );
-        Southpaw.deleteBackups(config);
+
         Map<String, BaseTopic<BaseRecord, BaseRecord>> normalizedTopics = southpaw.getNormalizedTopics();
         Map<String, String[]> records = new HashMap<>();
         for(Map.Entry<String, BaseTopic<BaseRecord, BaseRecord>> entry: normalizedTopics.entrySet()) {
@@ -100,7 +103,6 @@ public class SouthpawEndToEndTest {
             maxRecords = Math.max(records.get(entry.getKey()).length, maxRecords);
         }
         Map<String, Map<ByteArray, DenormalizedRecord>> denormalizedRecords = new HashMap<>();
-        List<Object[]> retVal = new ArrayList<>();
 
         for(int i = 0; i < maxRecords / 2; i++) {
             for(Map.Entry<String, BaseTopic<BaseRecord, BaseRecord>> entry: normalizedTopics.entrySet()) {
@@ -126,37 +128,12 @@ public class SouthpawEndToEndTest {
             }
         }
 
-        for(Map.Entry<String, Map<ByteArray, DenormalizedRecord>> entry: denormalizedRecords.entrySet()) {
-            for(Map.Entry<ByteArray, DenormalizedRecord> innerEntry: entry.getValue().entrySet()) {
-                retVal.add(new Object[] {
-                        String.format("Denormalized Entity: %s / Primary Key: %s", entry.getKey(), Hex.encodeHexString(innerEntry.getKey().getBytes())),
-                        innerEntry.getValue(),
-                        expectedResults.get(innerEntry.getKey())
-                });
-            }
-        }
-        southpaw.close();
-        Southpaw.deleteBackups(config);
-        Southpaw.deleteState(config);
-
-        assertEquals(12, retVal.size());
-        return retVal;
-    }
-
-    public static void setup() throws URISyntaxException {
-        // This setup function is called manually within the parameterized test cases
-        File folder = new File(new URI(ROCKSDB_BASE_URI));
-        folder.mkdirs();
-    }
-
-    @After
-    public void cleanup() throws URISyntaxException {
-        File folder = new File(new URI(ROCKSDB_BASE_URI));
-        folder.delete();
-    }
-
-    @Test
-    public void testRecord() {
-        assertEquals(expectedRecord, actualRecord);
+        assertEquals(denormalizedRecords.entrySet().stream()
+                .flatMap(entry -> entry.getValue().entrySet().stream())
+                .peek(innerEntry ->
+                        assertEquals(
+                                expectedResults.get(innerEntry.getKey()),
+                                innerEntry.getValue()
+                        )).count(), expectedResults.size());
     }
 }
