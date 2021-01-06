@@ -1,4 +1,5 @@
-[![Build Status](https://travis-ci.org/jwplayer/southpaw.svg?branch=master)](https://travis-ci.org/jwplayer/southpaw)
+[![Build](https://github.com/jwplayer/southpaw/workflows/Southpaw%20CI/badge.svg?branch=master)](https://github.com/jwplayer/southpaw/actions?query=workflow%3A%22Southpaw+CI%22+branch%3A%22master%22)
+
 
 # Southpaw
 
