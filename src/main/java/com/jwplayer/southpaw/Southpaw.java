@@ -344,12 +344,11 @@ public class Southpaw {
                             if (runWatch.getTime() > runTimeS * 1000 && runTimeS > 0) return;
                         }
                     } else if(config.commitTimeS > 0 && commitWatch.getTime() > config.commitTimeS * 1000) {
-                        try(Timer.Context context = metrics.stateCommitted.time()) {
-                            logger.info("Performing a time based commit");
-                            calculateRecordsToCreate();
-                            calculateTotalLag();
-                            commit();
-                        }
+
+                        logger.info("Performing a time based commit");
+                        calculateRecordsToCreate();
+                        calculateTotalLag();
+                        commit();
                     }
                 } while (topicLag > config.topicLagTrigger);
             }
@@ -402,27 +401,29 @@ public class Southpaw {
      * Commit / flush offsets and data for the normalized topics and indices
      */
     public void commit() {
-        logger.info("Committing southpaw state");
-        // Commit / flush changes
-        for(Map.Entry<String, BaseTopic<byte[], DenormalizedRecord>> topic: outputTopics.entrySet()) {
-            topic.getValue().flush();
-        }
-        for(Map.Entry<String, BaseIndex<BaseRecord, BaseRecord, Set<ByteArray>>> index: fkIndices.entrySet()) {
-            index.getValue().flush();
-        }
-        for(Map.Entry<Relation, ByteArraySet> entry: dePKsByType.entrySet()) {
-            state.put(METADATA_KEYSPACE, createDePKEntryName(entry.getKey()).getBytes(), entry.getValue().serialize());
-            state.flush(METADATA_KEYSPACE);
-        }
-        for(Map.Entry<String, BaseTopic<BaseRecord, BaseRecord>> entry: inputTopics.entrySet()) {
-            entry.getValue().commit();
-        }
-        state.flush();
+        try(Timer.Context context = metrics.stateCommitted.time()) {
+            logger.info("Committing southpaw state");
+            // Commit / flush changes
+            for (Map.Entry<String, BaseTopic<byte[], DenormalizedRecord>> topic : outputTopics.entrySet()) {
+                topic.getValue().flush();
+            }
+            for (Map.Entry<String, BaseIndex<BaseRecord, BaseRecord, Set<ByteArray>>> index : fkIndices.entrySet()) {
+                index.getValue().flush();
+            }
+            for (Map.Entry<Relation, ByteArraySet> entry : dePKsByType.entrySet()) {
+                state.put(METADATA_KEYSPACE, createDePKEntryName(entry.getKey()).getBytes(), entry.getValue().serialize());
+                state.flush(METADATA_KEYSPACE);
+            }
+            for (Map.Entry<String, BaseTopic<BaseRecord, BaseRecord>> entry : inputTopics.entrySet()) {
+                entry.getValue().commit();
+            }
+            state.flush();
 
-        // Commit performed. Reset timer
-        commitWatch.reset();
-        commitWatch.start();
-        logger.info("Finished committing southpaw state");
+            // Commit performed. Reset timer
+            commitWatch.reset();
+            commitWatch.start();
+            logger.info("Finished committing southpaw state");
+        }
     }
 
     /**
