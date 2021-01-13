@@ -140,6 +140,11 @@ public class Southpaw {
     protected BaseState state;
 
     /**
+     * Timer for when to initiate incremental commit
+     */
+    private StopWatch commitWatch;
+
+    /**
      * Base Southpaw config
      */
     protected static class Config {
@@ -236,11 +241,13 @@ public class Southpaw {
      */
     protected void build(int runTimeS) {
         logger.info("Building denormalized records");
+
         StopWatch backupWatch = new StopWatch();
         backupWatch.start();
         StopWatch runWatch = new StopWatch();
         runWatch.start();
-        StopWatch commitWatch = new StopWatch();
+
+        commitWatch = new StopWatch();
         commitWatch.start();
 
         List<Map.Entry<String, BaseTopic<BaseRecord, BaseRecord>>> topics = new ArrayList<>(inputTopics.entrySet());
@@ -326,24 +333,22 @@ public class Southpaw {
                             (config.backupTimeS > 0 && backupWatch.getTime() > config.backupTimeS * 1000)
                             || (runWatch.getTime() > runTimeS * 1000 && runTimeS > 0)) {
                         try(Timer.Context context = metrics.backupsCreated.time()) {
-                            logger.info("Performing a backup after a full commit");
+                            logger.info("Performing southpaw backup");
                             calculateRecordsToCreate();
                             calculateTotalLag();
                             commit();
                             state.backup();
                             backupWatch.reset();
                             backupWatch.start();
+                            logger.info("Finished performing southpaw backup");
                             if (runWatch.getTime() > runTimeS * 1000 && runTimeS > 0) return;
                         }
                     } else if(config.commitTimeS > 0 && commitWatch.getTime() > config.commitTimeS * 1000) {
-                        try(Timer.Context context = metrics.stateCommitted.time()) {
-                            logger.info("Performing a full commit");
-                            calculateRecordsToCreate();
-                            calculateTotalLag();
-                            commit();
-                            commitWatch.reset();
-                            commitWatch.start();
-                        }
+
+                        logger.info("Performing a time based commit");
+                        calculateRecordsToCreate();
+                        calculateTotalLag();
+                        commit();
                     }
                 } while (topicLag > config.topicLagTrigger);
             }
@@ -396,21 +401,29 @@ public class Southpaw {
      * Commit / flush offsets and data for the normalized topics and indices
      */
     public void commit() {
-        // Commit / flush changes
-        for(Map.Entry<String, BaseTopic<byte[], DenormalizedRecord>> topic: outputTopics.entrySet()) {
-            topic.getValue().flush();
+        try(Timer.Context context = metrics.stateCommitted.time()) {
+            logger.info("Committing southpaw state");
+            // Commit / flush changes
+            for (Map.Entry<String, BaseTopic<byte[], DenormalizedRecord>> topic : outputTopics.entrySet()) {
+                topic.getValue().flush();
+            }
+            for (Map.Entry<String, BaseIndex<BaseRecord, BaseRecord, Set<ByteArray>>> index : fkIndices.entrySet()) {
+                index.getValue().flush();
+            }
+            for (Map.Entry<Relation, ByteArraySet> entry : dePKsByType.entrySet()) {
+                state.put(METADATA_KEYSPACE, createDePKEntryName(entry.getKey()).getBytes(), entry.getValue().serialize());
+                state.flush(METADATA_KEYSPACE);
+            }
+            for (Map.Entry<String, BaseTopic<BaseRecord, BaseRecord>> entry : inputTopics.entrySet()) {
+                entry.getValue().commit();
+            }
+            state.flush();
+
+            // Commit performed. Reset timer
+            commitWatch.reset();
+            commitWatch.start();
+            logger.info("Finished committing southpaw state");
         }
-        for(Map.Entry<String, BaseIndex<BaseRecord, BaseRecord, Set<ByteArray>>> index: fkIndices.entrySet()) {
-            index.getValue().flush();
-        }
-        for(Map.Entry<Relation, ByteArraySet> entry: dePKsByType.entrySet()) {
-            state.put(METADATA_KEYSPACE, createDePKEntryName(entry.getKey()).getBytes(), entry.getValue().serialize());
-            state.flush(METADATA_KEYSPACE);
-        }
-        for(Map.Entry<String, BaseTopic<BaseRecord, BaseRecord>> entry: inputTopics.entrySet()) {
-            entry.getValue().commit();
-        }
-        state.flush();
     }
 
     /**
