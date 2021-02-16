@@ -1,0 +1,13 @@
+[
+  {
+    "DenormalizedName": "DeMediaMetadata",
+    "Entity": "media",
+    "Children": [
+      {
+        "Entity": "user_custom_params",
+        "JoinKey": "user_id",
+        "ParentKey": "user_id"
+      }
+    ]
+  }
+]
