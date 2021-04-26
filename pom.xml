@@ -29,7 +29,7 @@
         <version.amazonaws>1.11.292</version.amazonaws>
         <version.apache.commons>4.1</version.apache.commons>
         <version.avro>1.8.2</version.avro>
-        <version.commons.io>2.6</version.commons.io>
+        <version.commons.io>2.7</version.commons.io>
         <version.commons.lang>2.6</version.commons.lang>
         <version.confluent>4.0.0</version.confluent>
         <version.dropwizard>4.0.2</version.dropwizard>
