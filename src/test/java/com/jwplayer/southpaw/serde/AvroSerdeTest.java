@@ -29,6 +29,7 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.nio.BufferUnderflowException;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -67,7 +68,7 @@ public class AvroSerdeTest {
         serde.close();
     }
 
-    @Test(expected = SerializationException.class)
+    @Test(expected = BufferUnderflowException.class)
     public void testDeserializerEmptyBytes() {
         byte[] bytes = new byte[0];
         serde.deserializer().deserialize("Person", bytes);

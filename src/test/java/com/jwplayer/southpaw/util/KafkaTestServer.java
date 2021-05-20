@@ -15,46 +15,54 @@
  */
 package com.jwplayer.southpaw.util;
 
-import kafka.admin.AdminUtils;
 import kafka.server.KafkaConfig;
 import kafka.server.KafkaServerStartable;
-import kafka.utils.ZkUtils;
 import org.apache.curator.test.InstanceSpec;
+import org.apache.curator.test.TestingServer;
+import org.apache.kafka.clients.admin.AdminClient;
+import org.apache.kafka.clients.admin.AdminClientConfig;
+import org.apache.kafka.clients.admin.NewTopic;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.*;
 
 
 public class KafkaTestServer {
     public static final String HOST = "localhost";
 
-    private KafkaServerStartable kafkaServer;
-    private Integer port;
-    private ZookeeperTestServer zkServer;
-    private ZkUtils zkUtils;
+    private final KafkaServerStartable kafkaServer;
+    private final AdminClient adminClient;
+    private final Integer port;
+    private final TestingServer zkServer;
 
     public KafkaTestServer() {
-        zkServer = new ZookeeperTestServer();
-        zkUtils = zkServer.getZkUtils();
+        try {
+            zkServer = new TestingServer();
+        } catch (Exception ex) {
+            throw new RuntimeException("Couldn't start test ZK server", ex);
+        }
         port = InstanceSpec.getRandomPort();
         File logDir;
         logDir = new File(System.getProperty("java.io.tmpdir"), "kafka/logs/log-" + port.toString());
         logDir.deleteOnExit();
         Properties kafkaProperties = new Properties();
         kafkaProperties.setProperty(KafkaConfig.BrokerIdProp(), "0");
-        kafkaProperties.setProperty(KafkaConfig.ZkConnectProp(), zkServer.getConnectionString());
+        kafkaProperties.setProperty(KafkaConfig.ZkConnectProp(), zkServer.getConnectString());
         kafkaProperties.setProperty(KafkaConfig.PortProp(), port.toString());
         kafkaProperties.setProperty(KafkaConfig.LogDirProp(), logDir.getAbsolutePath());
         kafkaProperties.setProperty(KafkaConfig.DefaultReplicationFactorProp(), "1");
         kafkaProperties.setProperty(KafkaConfig.OffsetsTopicReplicationFactorProp(), "1");
         kafkaServer = new KafkaServerStartable(new KafkaConfig(kafkaProperties));
         kafkaServer.startup();
+
+        Properties properties = new Properties();
+        properties.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, getConnectionString());
+        adminClient = AdminClient.create(properties);
     }
 
-    public void createTopic(String topic, Integer partitions) {
-        if(!AdminUtils.topicExists(zkUtils, topic)) {
-            AdminUtils.createTopic(zkUtils, topic, partitions, 1, new Properties(), null);
-        }
+    public void createTopic(String topic, int partitions) {
+        adminClient.createTopics(Collections.singletonList(new NewTopic(topic, partitions, (short) 1)));
     }
 
     public String getConnectionString() {
@@ -62,7 +70,12 @@ public class KafkaTestServer {
     }
 
     public void shutdown() {
+        adminClient.close();
         kafkaServer.shutdown();
-        zkServer.shutdown();
+        try {
+            zkServer.close();
+        } catch (IOException ex) {
+            throw new RuntimeException("Couldn't shutdown test ZK server", ex);
+        }
     }
 }
