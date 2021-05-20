@@ -396,3 +396,14 @@ Southpaw makes use of [logback](http://logback.qos.ch) for logging. Refer to log
 ## Known Issues
 
 * RocksDB may not work on newer Windows: https://github.com/facebook/rocksdb/issues/2531
+
+## Checkstyle
+
+This codebase utilizes [google-java checkstyle](https://github.com/checkstyle/checkstyle/blob/master/src/main/resources/google_checks.xml).
+If you are using Intellij, first install the Checkstyle IDE plugin. Then within Preferences,
+set Checkstyle to "google checks".
+
+When you do a maven build, you will be able to see the checkstyle report under
+``target/site/checkstyle.html``.
+
+Please do your best to correct style warnings.
