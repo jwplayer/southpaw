@@ -45,7 +45,7 @@
 
         <!-- Testing -->
         <version.curator>2.12.0</version.curator>
-        <version.jacoco>0.8.1</version.jacoco>
+        <version.jacoco>0.8.7</version.jacoco>
         <version.junit>4.13.1</version.junit>
         <version.mockito>2.25.1</version.mockito>
         <version.s3mock>0.2.5</version.s3mock>
