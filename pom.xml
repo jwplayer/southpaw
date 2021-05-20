@@ -52,6 +52,7 @@
         <modules.argline />
 
         <!-- Plugins -->
+        <version.checkstyle.plugin>3.1.0</version.checkstyle.plugin>
         <version.compiler.plugin>3.8.1</version.compiler.plugin>
         <version.enforcer.plugin>3.0.0-M3</version.enforcer.plugin>
         <version.jsonschema2pojo.plugin>1.0.0</version.jsonschema2pojo.plugin>
@@ -195,6 +196,33 @@
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-checkstyle-plugin</artifactId>
+                <version>${version.checkstyle.plugin}</version>
+                <dependencies>
+                    <dependency>
+                        <groupId>com.puppycrawl.tools</groupId>
+                        <artifactId>checkstyle</artifactId>
+                        <version>8.29</version>
+                    </dependency>
+                </dependencies>
+                <executions>
+                    <execution>
+                        <phase>verify</phase>
+                        <id>auto-checkstyle</id>
+                        <goals>
+                            <goal>checkstyle</goal>
+                            <goal>check</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <encoding>UTF-8</encoding>
+                    <configLocation>src/checkstyle/google_checks.xml</configLocation>
+                    <linkXRef>false</linkXRef>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>${version.compiler.plugin}</version>
                 <configuration>
@@ -265,6 +293,24 @@
             </plugin>
         </plugins>
     </build>
+
+    <reporting>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-checkstyle-plugin</artifactId>
+                <version>${version.checkstyle.plugin}</version>
+                <reportSets>
+                    <reportSet>
+                        <reports>
+                            <report>checkstyle</report>
+                        </reports>
+                    </reportSet>
+                </reportSets>
+            </plugin>
+        </plugins>
+    </reporting>
+
     <profiles>
         <profile>
             <id>jdk11</id>
