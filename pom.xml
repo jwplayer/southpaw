@@ -29,11 +29,11 @@
         <version.amazonaws>1.11.292</version.amazonaws>
         <version.apache.commons>4.1</version.apache.commons>
         <version.avro>1.8.2</version.avro>
-        <version.commons.io>2.6</version.commons.io>
+        <version.commons.io>2.7</version.commons.io>
         <version.commons.lang>2.6</version.commons.lang>
         <version.confluent>4.0.0</version.confluent>
         <version.dropwizard>4.0.2</version.dropwizard>
-        <version.guava>29.0-jre</version.guava>
+        <version.guava>30.0-jre</version.guava>
         <version.jackson>2.11.1</version.jackson>
         <version.jopt.simple>4.9</version.jopt.simple>
         <version.kafka>1.0.0</version.kafka>
