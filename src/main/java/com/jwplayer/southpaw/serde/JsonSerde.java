@@ -13,96 +13,96 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.jwplayer.southpaw.serde;
 
 import com.jwplayer.southpaw.record.BaseRecord;
 import com.jwplayer.southpaw.record.MapRecord;
 import io.confluent.kafka.serializers.KafkaJsonDeserializer;
 import io.confluent.kafka.serializers.KafkaJsonSerializer;
+import java.util.Map;
 import org.apache.kafka.common.serialization.Deserializer;
 import org.apache.kafka.common.serialization.Serializer;
 
-import java.util.Map;
-
 
 public class JsonSerde implements BaseSerde<BaseRecord> {
-    JsonDeserializer internalDeserializer;
-    JsonSerializer internalSerializer;
+  JsonDeserializer internalDeserializer;
+  JsonSerializer internalSerializer;
 
-    public static class JsonDeserializer implements Deserializer<BaseRecord> {
-        private KafkaJsonDeserializer<Map<String, ?>> internalDeserializer;
+  public static class JsonDeserializer implements Deserializer<BaseRecord> {
+    private KafkaJsonDeserializer<Map<String, ?>> internalDeserializer;
 
-        public JsonDeserializer() {
-            internalDeserializer = new KafkaJsonDeserializer<>();
-        }
-
-        @Override
-        public void configure(Map<String, ?> config, boolean isKey) {
-            internalDeserializer.configure(config, isKey);
-        }
-
-        @Override
-        public BaseRecord deserialize(String topic, byte[] bytes) {
-            return new MapRecord(internalDeserializer.deserialize(topic, bytes));
-        }
-
-        @Override
-        public void close() {
-            internalDeserializer.close();
-        }
-    }
-
-    public static class JsonSerializer implements Serializer<BaseRecord> {
-        KafkaJsonSerializer<Map<String, ?>> internalSerializer;
-
-        public JsonSerializer() {
-            internalSerializer = new KafkaJsonSerializer<>();
-        }
-
-        @Override
-        public void configure(Map<String, ?> config, boolean isKey) {
-            internalSerializer.configure(config, isKey);
-        }
-
-        @Override
-        public byte[] serialize(String topic, BaseRecord record) {
-            if(record == null) {
-                return internalSerializer.serialize(topic, null);
-            } else {
-                return internalSerializer.serialize(topic, record.toMap());
-            }
-        }
-
-        @Override
-        public void close() {
-            internalSerializer.close();
-        }
-    }
-
-    public JsonSerde() {
-        internalDeserializer = new JsonDeserializer();
-        internalSerializer = new JsonSerializer();
+    public JsonDeserializer() {
+      internalDeserializer = new KafkaJsonDeserializer<>();
     }
 
     @Override
     public void configure(Map<String, ?> config, boolean isKey) {
-        internalDeserializer.configure(config, isKey);
-        internalSerializer.configure(config, isKey);
+      internalDeserializer.configure(config, isKey);
+    }
+
+    @Override
+    public BaseRecord deserialize(String topic, byte[] bytes) {
+      return new MapRecord(internalDeserializer.deserialize(topic, bytes));
     }
 
     @Override
     public void close() {
-        internalDeserializer.close();
-        internalSerializer.close();
+      internalDeserializer.close();
+    }
+  }
+
+  public static class JsonSerializer implements Serializer<BaseRecord> {
+    KafkaJsonSerializer<Map<String, ?>> internalSerializer;
+
+    public JsonSerializer() {
+      internalSerializer = new KafkaJsonSerializer<>();
     }
 
     @Override
-    public Serializer<BaseRecord> serializer() {
-        return internalSerializer;
+    public void configure(Map<String, ?> config, boolean isKey) {
+      internalSerializer.configure(config, isKey);
     }
 
     @Override
-    public Deserializer<BaseRecord> deserializer() {
-        return internalDeserializer;
+    public byte[] serialize(String topic, BaseRecord record) {
+      if (record == null) {
+        return internalSerializer.serialize(topic, null);
+      } else {
+        return internalSerializer.serialize(topic, record.toMap());
+      }
     }
+
+    @Override
+    public void close() {
+      internalSerializer.close();
+    }
+  }
+
+  public JsonSerde() {
+    internalDeserializer = new JsonDeserializer();
+    internalSerializer = new JsonSerializer();
+  }
+
+  @Override
+  public void configure(Map<String, ?> config, boolean isKey) {
+    internalDeserializer.configure(config, isKey);
+    internalSerializer.configure(config, isKey);
+  }
+
+  @Override
+  public void close() {
+    internalDeserializer.close();
+    internalSerializer.close();
+  }
+
+  @Override
+  public Serializer<BaseRecord> serializer() {
+    return internalSerializer;
+  }
+
+  @Override
+  public Deserializer<BaseRecord> deserializer() {
+    return internalDeserializer;
+  }
 }

@@ -13,83 +13,83 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.jwplayer.southpaw;
 
 import com.jwplayer.southpaw.state.BaseState;
 import com.jwplayer.southpaw.util.ByteArray;
-import org.apache.commons.lang.NotImplementedException;
-
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.commons.lang.NotImplementedException;
 
 public class MockState extends BaseState {
 
-    private Map<ByteArray, Map<ByteArray, byte[]>> dataBatches;
+  private Map<ByteArray, Map<ByteArray, byte[]>> dataBatches;
 
-    @Override
-    public void backup() {
-        throw new NotImplementedException();
-    }
+  @Override
+  public void backup() {
+    throw new NotImplementedException();
+  }
 
-    @Override
-    public void configure(Map<String, Object> config) {
+  @Override
+  public void configure(Map<String, Object> config) {
 
-    }
+  }
 
-    @Override
-    public void open() {
-        dataBatches = new HashMap<>();
-        super.open();
-    }
+  @Override
+  public void open() {
+    dataBatches = new HashMap<>();
+    super.open();
+  }
 
-    @Override
-    public void createKeySpace(String keySpace) {
-        dataBatches.put(new ByteArray(keySpace), new HashMap<>());
-    }
+  @Override
+  public void createKeySpace(String keySpace) {
+    dataBatches.put(new ByteArray(keySpace), new HashMap<>());
+  }
 
-    @Override
-    public void delete() {
-        dataBatches.clear();
-    }
+  @Override
+  public void delete() {
+    dataBatches.clear();
+  }
 
-    @Override
-    public void delete(String keySpace, byte[] key) {
-        dataBatches.get(new ByteArray(keySpace)).remove(new ByteArray(key));
-    }
+  @Override
+  public void delete(String keySpace, byte[] key) {
+    dataBatches.get(new ByteArray(keySpace)).remove(new ByteArray(key));
+  }
 
-    @Override
-    public void deleteBackups() {
-        throw new NotImplementedException();
-    }
+  @Override
+  public void deleteBackups() {
+    throw new NotImplementedException();
+  }
 
-    @Override
-    public void flush() {
+  @Override
+  public void flush() {
 
-    }
+  }
 
-    @Override
-    public void flush(String keySpace) {
+  @Override
+  public void flush(String keySpace) {
 
-    }
+  }
 
-    @Override
-    public byte[] get(String keySpace, byte[] key) {
-       return dataBatches.get(new ByteArray(keySpace)).get(new ByteArray(key));
-    }
+  @Override
+  public byte[] get(String keySpace, byte[] key) {
+    return dataBatches.get(new ByteArray(keySpace)).get(new ByteArray(key));
+  }
 
-    @Override
-    public Iterator iterate(String keySpace) {
-        return null;
-    }
+  @Override
+  public Iterator iterate(String keySpace) {
+    return null;
+  }
 
-    @Override
-    public void put(String keySpace, byte[] key, byte[] value) {
-        Map<ByteArray, byte[]> dataBatch = dataBatches.get(new ByteArray(keySpace));
-        dataBatch.put(new ByteArray(key), value);
-    }
+  @Override
+  public void put(String keySpace, byte[] key, byte[] value) {
+    Map<ByteArray, byte[]> dataBatch = dataBatches.get(new ByteArray(keySpace));
+    dataBatch.put(new ByteArray(key), value);
+  }
 
-    @Override
-    public void restore() {
-        throw new NotImplementedException();
-    }
+  @Override
+  public void restore() {
+    throw new NotImplementedException();
+  }
 }

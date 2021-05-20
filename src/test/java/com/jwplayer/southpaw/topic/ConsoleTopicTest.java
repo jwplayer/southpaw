@@ -13,81 +13,83 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.jwplayer.southpaw.topic;
 
 import com.jwplayer.southpaw.MockState;
 import com.jwplayer.southpaw.filter.BaseFilter;
 import com.jwplayer.southpaw.util.ByteArray;
-import org.apache.commons.lang.NotImplementedException;
-import org.apache.kafka.common.serialization.Serdes;
-import org.junit.*;
-
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.commons.lang.NotImplementedException;
+import org.apache.kafka.common.serialization.Serdes;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
 
 
 public class ConsoleTopicTest {
-    private MockState state;
-    private ConsoleTopic<String, String> topic;
+  private MockState state;
+  private ConsoleTopic<String, String> topic;
 
 
-    @Before
-    public void setUp() {
-        topic = new ConsoleTopic<>();
-        Map<String, Object> config = new HashMap<>();
-        state = new MockState();
-        state.open();
-        topic.configure(new TopicConfig<String, String>()
-            .setShortName("TestTopic")
-            .setSouthpawConfig(config)
-            .setState(state)
-            .setKeySerde(Serdes.String())
-            .setValueSerde(Serdes.String())
-            .setFilter(new BaseFilter()));
-    }
+  @Before
+  public void setUp() {
+    topic = new ConsoleTopic<>();
+    Map<String, Object> config = new HashMap<>();
+    state = new MockState();
+    state.open();
+    topic.configure(new TopicConfig<String, String>()
+        .setShortName("TestTopic")
+        .setSouthpawConfig(config)
+        .setState(state)
+        .setKeySerde(Serdes.String())
+        .setValueSerde(Serdes.String())
+        .setFilter(new BaseFilter()));
+  }
 
-    @After
-    public void tearDown() {
-        state.delete();
-    }
+  @After
+  public void tearDown() {
+    state.delete();
+  }
 
-    @Test
-    public void testCommit() {
-        topic.commit();
-    }
+  @Test
+  public void testCommit() {
+    topic.commit();
+  }
 
-    @Test
-    public void testFlush() {
-        topic.flush();
-    }
+  @Test
+  public void testFlush() {
+    topic.flush();
+  }
 
-    @Test(expected = NotImplementedException.class)
-    public void testGetCurrentOffset() {
-        topic.getCurrentOffset();
-    }
+  @Test(expected = NotImplementedException.class)
+  public void testGetCurrentOffset() {
+    topic.getCurrentOffset();
+  }
 
-    @Test(expected = NotImplementedException.class)
-    public void testGetLag() {
-        topic.getLag();
-    }
+  @Test(expected = NotImplementedException.class)
+  public void testGetLag() {
+    topic.getLag();
+  }
 
-    @Test(expected = NotImplementedException.class)
-    public void testReadByPK() {
-        topic.readByPK(new ByteArray(1));
-    }
+  @Test(expected = NotImplementedException.class)
+  public void testReadByPK() {
+    topic.readByPK(new ByteArray(1));
+  }
 
-    @Test(expected = NotImplementedException.class)
-    public void testReadNext() {
-        topic.readNext();
-    }
+  @Test(expected = NotImplementedException.class)
+  public void testReadNext() {
+    topic.readNext();
+  }
 
-    @Test(expected = NotImplementedException.class)
-    public void testResetCurrentOffset() {
-        topic.resetCurrentOffset();
-    }
+  @Test(expected = NotImplementedException.class)
+  public void testResetCurrentOffset() {
+    topic.resetCurrentOffset();
+  }
 
-    @Test
-    public void write() {
-        topic.write("A", "B");
-    }
+  @Test
+  public void write() {
+    topic.write("A", "B");
+  }
 }

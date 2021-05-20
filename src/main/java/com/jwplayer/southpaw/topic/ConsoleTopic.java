@@ -13,61 +13,61 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.jwplayer.southpaw.topic;
 
+import com.jwplayer.southpaw.filter.BaseFilter.FilterMode;
 import com.jwplayer.southpaw.record.BaseRecord;
 import com.jwplayer.southpaw.util.ByteArray;
-import com.jwplayer.southpaw.filter.BaseFilter.FilterMode;
-import org.apache.kafka.clients.consumer.ConsumerRecord;
-import org.apache.commons.lang.NotImplementedException;
-
 import java.util.Iterator;
+import org.apache.commons.lang.NotImplementedException;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 
 
 public class ConsoleTopic<K, V> extends BaseTopic<K, V> {
-    @Override
-    public void commit() {
-        // noop
-    }
+  @Override
+  public void commit() {
+    // noop
+  }
 
-    @Override
-    public void flush() {
-        // noop
-    }
+  @Override
+  public void flush() {
+    // noop
+  }
 
-    @Override
-    public Long getCurrentOffset() {
-        throw new NotImplementedException();
-    }
+  @Override
+  public Long getCurrentOffset() {
+    throw new NotImplementedException();
+  }
 
-    @Override
-    public long getLag() {
-        throw new NotImplementedException();
-    }
+  @Override
+  public long getLag() {
+    throw new NotImplementedException();
+  }
 
-    @Override
-    public V readByPK(ByteArray primaryKey) {
-        throw new NotImplementedException();
-    }
+  @Override
+  public V readByPK(ByteArray primaryKey) {
+    throw new NotImplementedException();
+  }
 
-    @Override
-    public Iterator<ConsumerRecord<K, V>> readNext() {
-        throw new NotImplementedException();
-    }
+  @Override
+  public Iterator<ConsumerRecord<K, V>> readNext() {
+    throw new NotImplementedException();
+  }
 
-    @Override
-    public void resetCurrentOffset() {
-        throw new NotImplementedException();
-    }
+  @Override
+  public void resetCurrentOffset() {
+    throw new NotImplementedException();
+  }
 
-    @Override
-    public void write(K key, V value) {
-        String k = new String(this.getKeySerde().serializer().serialize(topicName, key));
-        String v = new String(this.getValueSerde().serializer().serialize(topicName, value));
-        FilterMode filterMode = FilterMode.UPDATE;
-        if (value instanceof BaseRecord) {
-            filterMode = this.getFilter().filter(this.getShortName(), (BaseRecord) value, null);
-        }
-        System.out.println(String.format("key: %s / value: %s / filter mode: %s", k, v, filterMode));
+  @Override
+  public void write(K key, V value) {
+    String k = new String(this.getKeySerde().serializer().serialize(topicName, key));
+    String v = new String(this.getValueSerde().serializer().serialize(topicName, value));
+    FilterMode filterMode = FilterMode.UPDATE;
+    if (value instanceof BaseRecord) {
+      filterMode = this.getFilter().filter(this.getShortName(), (BaseRecord) value, null);
     }
+    System.out.println(String.format("key: %s / value: %s / filter mode: %s", k, v, filterMode));
+  }
 }

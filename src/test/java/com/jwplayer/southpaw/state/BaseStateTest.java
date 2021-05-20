@@ -13,44 +13,46 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.jwplayer.southpaw.state;
 
-import org.junit.Test;
+package com.jwplayer.southpaw.state;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 
+
+import org.junit.Test;
+
 public class BaseStateTest {
 
-    @Test
-    public void parseAlways() {
-        assertEquals(BaseState.RestoreMode.ALWAYS, BaseState.RestoreMode.parse("always"));
+  @Test
+  public void parseAlways() {
+    assertEquals(BaseState.RestoreMode.ALWAYS, BaseState.RestoreMode.parse("always"));
 
-        assertEquals(BaseState.RestoreMode.ALWAYS, BaseState.RestoreMode.parse("ALWAYS"));
+    assertEquals(BaseState.RestoreMode.ALWAYS, BaseState.RestoreMode.parse("ALWAYS"));
 
-        assertEquals(BaseState.RestoreMode.ALWAYS, BaseState.RestoreMode.parse("aLwAyS"));
-    }
+    assertEquals(BaseState.RestoreMode.ALWAYS, BaseState.RestoreMode.parse("aLwAyS"));
+  }
 
-    @Test
-    public void parseWhenNeeded() {
-        assertEquals(BaseState.RestoreMode.WHEN_NEEDED, BaseState.RestoreMode.parse("when_needed"));
+  @Test
+  public void parseWhenNeeded() {
+    assertEquals(BaseState.RestoreMode.WHEN_NEEDED, BaseState.RestoreMode.parse("when_needed"));
 
-        assertEquals(BaseState.RestoreMode.WHEN_NEEDED, BaseState.RestoreMode.parse("WHEN_NEEDED"));
+    assertEquals(BaseState.RestoreMode.WHEN_NEEDED, BaseState.RestoreMode.parse("WHEN_NEEDED"));
 
-        assertEquals(BaseState.RestoreMode.WHEN_NEEDED, BaseState.RestoreMode.parse("WhEn_NeEdEd"));
-    }
+    assertEquals(BaseState.RestoreMode.WHEN_NEEDED, BaseState.RestoreMode.parse("WhEn_NeEdEd"));
+  }
 
-    @Test
-    public void parseNever() {
-        assertEquals(BaseState.RestoreMode.NEVER, BaseState.RestoreMode.parse("never"));
+  @Test
+  public void parseNever() {
+    assertEquals(BaseState.RestoreMode.NEVER, BaseState.RestoreMode.parse("never"));
 
-        assertEquals(BaseState.RestoreMode.NEVER, BaseState.RestoreMode.parse("NEVER"));
+    assertEquals(BaseState.RestoreMode.NEVER, BaseState.RestoreMode.parse("NEVER"));
 
-        assertEquals(BaseState.RestoreMode.NEVER, BaseState.RestoreMode.parse("NeVeR"));
-    }
+    assertEquals(BaseState.RestoreMode.NEVER, BaseState.RestoreMode.parse("NeVeR"));
+  }
 
-    @Test
-    public void parseInvalid() {
-        assertNull(BaseState.RestoreMode.parse("not-a-mode"));
-    }
+  @Test
+  public void parseInvalid() {
+    assertNull(BaseState.RestoreMode.parse("not-a-mode"));
+  }
 }

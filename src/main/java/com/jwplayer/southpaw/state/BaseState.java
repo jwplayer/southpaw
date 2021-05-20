@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.jwplayer.southpaw.state;
 
 import java.util.AbstractMap;
@@ -24,172 +25,182 @@ import java.util.Map;
  */
 public abstract class BaseState {
 
-    private boolean isOpen = false;
+  private boolean isOpen = false;
+
+  /**
+   * The set of predefined RestoreMode options for {@link BaseState} restores.
+   */
+  public enum RestoreMode {
+    /**
+     * Always attempt to perform a state restore. If a state backup exists this will restore
+     * and overwrite any existing state that might exist.
+     */
+    ALWAYS("always"),
 
     /**
-     * The set of predefined RestoreMode options for {@link BaseState} restores.
+     * Only attempt to perform a state restore if local state doesn't exist
      */
-    public enum RestoreMode {
-        /**
-         * Always attempt to perform a state restore. If a state backup exists this will restore
-         * and overwrite any existing state that might exist.
-         */
-        ALWAYS ("always"),
+    WHEN_NEEDED("when_needed"),
 
-        /**
-         * Only attempt to perform a state restore if local state doesn't exist
-         */
-        WHEN_NEEDED ("when_needed"),
+    /**
+     * Never attempt to perform a state restore.
+     */
+    NEVER("never");
 
-        /**
-         * Never attempt to perform a state restore.
-         */
-        NEVER ("never");
+    private final String value;
 
-        private final String value;
+    RestoreMode(String value) {
+      this.value = value;
+    }
 
-        RestoreMode(String value) {
-            this.value = value;
+    public String getValue() {
+      return this.value;
+    }
+
+    /**
+     * Determine if the supplied value is one of the predefined state restore modes.
+     *
+     * @param value the configuration property value; may not be null
+     * @return the matching mode, or null if match is not found
+     */
+    public static RestoreMode parse(String value) {
+      if (value == null) {
+        return null;
+      }
+
+      value = value.trim();
+      for (RestoreMode option : RestoreMode.values()) {
+        if (option.getValue().equalsIgnoreCase(value)) {
+          return option;
         }
-
-        public String getValue() {
-            return this.value;
-        }
-
-        /**
-         * Determine if the supplied value is one of the predefined state restore modes.
-         * @param value the configuration property value; may not be null
-         * @return the matching mode, or null if match is not found
-         */
-        public static RestoreMode parse(String value) {
-            if (value == null) {
-                return null;
-            }
-
-            value = value.trim();
-            for (RestoreMode option : RestoreMode.values()) {
-                if (option.getValue().equalsIgnoreCase(value)) {
-                    return option;
-                }
-            }
-            return null;
-        }
+      }
+      return null;
     }
+  }
 
-    public BaseState() { }
+  public BaseState() {
+  }
 
-    public BaseState(Map<String, Object> config) {
-        configure(config);
-    }
+  public BaseState(Map<String, Object> config) {
+    configure(config);
+  }
+
+  /**
+   * An iterator for keys in the state.
+   */
+  public abstract static class Iterator implements java.util.Iterator<AbstractMap.SimpleEntry<byte[], byte[]>> {
+    /**
+     * Close the iterator after use.
+     */
+    public abstract void close();
 
     /**
-     * An iterator for keys in the state.
+     * Reset the iterator so it may be reused.
      */
-    public abstract static class Iterator implements java.util.Iterator<AbstractMap.SimpleEntry<byte[], byte[]>> {
-        /**
-         * Close the iterator after use.
-         */
-        public abstract void close();
+    public abstract void reset();
+  }
 
-        /**
-         * Reset the iterator so it may be reused.
-         */
-        public abstract void reset();
-    }
+  /**
+   * Backup this state
+   */
+  public abstract void backup();
 
-    /**
-     * Backup this state
-     */
-    public abstract void backup();
+  /**
+   * Close the state
+   */
+  public void close() {
+    this.isOpen = false;
+  }
 
-    /**
-     * Close the state
-     */
-    public void close() {
-        this.isOpen = false;
-    }
+  /**
+   * Configure the state. Should be called after instantiation, but before opening the state.
+   *
+   * @param config - Configuration for the state
+   */
+  public abstract void configure(Map<String, Object> config);
 
-    /**
-     * Configure the state. Should be called after instantiation, but before opening the state.
-     * @param config - Configuration for the state
-     */
-    public abstract void configure(Map<String, Object> config);
+  /**
+   * Create a new key space
+   *
+   * @param keySpace - The key space to create
+   */
+  public abstract void createKeySpace(String keySpace);
 
-    /**
-     * Create a new key space
-     * @param keySpace - The key space to create
-     */
-    public abstract void createKeySpace(String keySpace);
+  /**
+   * Delete the state
+   */
+  public abstract void delete();
 
-    /**
-     * Delete the state
-     */
-    public abstract void delete();
+  /**
+   * Delete the given key
+   *
+   * @param keySpace - The key space where the key is stored
+   * @param key      - The key to delete
+   */
+  public abstract void delete(String keySpace, byte[] key);
 
-    /**
-     * Delete the given key
-     * @param keySpace - The key space where the key is stored
-     * @param key - The key to delete
-     */
-    public abstract void delete(String keySpace, byte[] key);
+  /**
+   * Deletes any backups for this state. Obviously, be very careful using this.
+   */
+  public abstract void deleteBackups();
 
-    /**
-     * Deletes any backups for this state. Obviously, be very careful using this.
-     */
-    public abstract void deleteBackups();
+  /**
+   * Flush all pending puts for all key spaces
+   */
+  public abstract void flush();
 
-    /**
-     * Flush all pending puts for all key spaces
-     */
-    public abstract void flush();
+  /**
+   * Flush all pending puts for the given key space
+   *
+   * @param keySpace - The key space to flush
+   */
+  public abstract void flush(String keySpace);
 
-    /**
-     * Flush all pending puts for the given key space
-     * @param keySpace - The key space to flush
-     */
-    public abstract void flush(String keySpace);
+  /**
+   * Get the value for the given key from the given key space.
+   *
+   * @param keySpace - The key space where the value is stored
+   * @param key      - The key of the value to get
+   * @return The value for the given key in the given key space
+   */
+  public abstract byte[] get(String keySpace, byte[] key);
 
-    /**
-     * Get the value for the given key from the given key space.
-     * @param keySpace - The key space where the value is stored
-     * @param key - The key of the value to get
-     * @return The value for the given key in the given key space
-     */
-    public abstract byte[] get(String keySpace, byte[] key);
+  /**
+   * Get an iterator for all keys in the given key space
+   *
+   * @param keySpace - The key space to iterate over
+   * @return An iterator for all keys in the key space
+   */
+  public abstract Iterator iterate(String keySpace);
 
-    /**
-     * Get an iterator for all keys in the given key space
-     * @param keySpace - The key space to iterate over
-     * @return An iterator for all keys in the key space
-     */
-    public abstract Iterator iterate(String keySpace);
+  /**
+   * Checks if the state is open.
+   *
+   * @return True if the state is open; False if the state is closed.
+   */
+  public boolean isOpen() {
+    return this.isOpen;
+  }
 
-    /**
-     * Checks if the state is open.
-     * @return True if the state is open; False if the state is closed.
-     */
-    public boolean isOpen() {
-        return this.isOpen;
-    }
+  /**
+   * Open the state. Should be called after instantiation, but before using the state.
+   */
+  public void open() {
+    this.isOpen = true;
+  }
 
-    /**
-     * Open the state. Should be called after instantiation, but before using the state.
-     */
-    public void open() {
-        this.isOpen = true;
-    };
+  /**
+   * Put a new value into the state for the given key and key space. Puts may be batched and the values may not be
+   * available until flush() is called.
+   *
+   * @param keySpace - The key space to store the key and value in
+   * @param key      - The key to store
+   * @param value    - The value to store
+   */
+  public abstract void put(String keySpace, byte[] key, byte[] value);
 
-    /**
-     * Put a new value into the state for the given key and key space. Puts may be batched and the values may not be
-     * available until flush() is called.
-     * @param keySpace - The key space to store the key and value in
-     * @param key - The key to store
-     * @param value - The value to store
-     */
-    public abstract void put(String keySpace, byte[] key, byte[] value);
-
-    /**
-     * Restore the state from a previous backup.
-     */
-    public abstract void restore();
+  /**
+   * Restore the state from a previous backup.
+   */
+  public abstract void restore();
 }

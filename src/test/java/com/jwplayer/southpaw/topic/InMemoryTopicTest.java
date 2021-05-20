@@ -13,80 +13,83 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.jwplayer.southpaw.topic;
+
+import static org.junit.Assert.assertEquals;
+
 
 import com.jwplayer.southpaw.MockState;
 import com.jwplayer.southpaw.filter.BaseFilter;
 import com.jwplayer.southpaw.state.BaseState;
 import com.jwplayer.southpaw.util.ByteArray;
-import org.apache.kafka.clients.consumer.ConsumerRecord;
-import org.apache.kafka.common.serialization.Serdes;
-import org.junit.*;
-
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
-
-import static org.junit.Assert.*;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.common.serialization.Serdes;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
 
 
 public class InMemoryTopicTest {
-    private final String[] keys = {"A", "B", "C"};
-    private final String[] values = {"Badger", "Mushroom", "Snake"};
-    private BaseState state;
+  private final String[] keys = {"A", "B", "C"};
+  private final String[] values = {"Badger", "Mushroom", "Snake"};
+  private BaseState state;
 
-    @Before
-    public void setup() {
-        state = new MockState();
-        state.open();
+  @Before
+  public void setup() {
+    state = new MockState();
+    state.open();
+  }
+
+  @After
+  public void cleanup() {
+    state.delete();
+  }
+
+  public InMemoryTopic<String, String> createTopic() {
+    InMemoryTopic<String, String> topic = new InMemoryTopic<>();
+    Map<String, Object> config = new HashMap<>();
+    topic.configure(new TopicConfig<String, String>()
+        .setShortName("TestTopic")
+        .setSouthpawConfig(config)
+        .setState(state)
+        .setKeySerde(Serdes.String())
+        .setValueSerde(Serdes.String())
+        .setFilter(new BaseFilter()));
+
+    for (int i = 0; i < keys.length; i++) {
+      topic.write(keys[i], values[i]);
     }
+    return topic;
+  }
 
-    @After
-    public void cleanup() {
-        state.delete();
+  @Test
+  public void testReadNext() {
+    InMemoryTopic<String, String> topic = createTopic();
+    Iterator<ConsumerRecord<String, String>> records = topic.readNext();
+    int i = 0;
+    while (records.hasNext()) {
+      ConsumerRecord<String, String> record = records.next();
+      validateRecord(record, keys[i], values[i], (long) i + topic.firstOffset);
+      i++;
     }
+    assertEquals(3, i);
+  }
 
-    public InMemoryTopic<String, String> createTopic() {
-        InMemoryTopic<String, String> topic = new InMemoryTopic<>();
-        Map<String, Object> config = new HashMap<>();
-        topic.configure(new TopicConfig<String, String>()
-            .setShortName("TestTopic")
-            .setSouthpawConfig(config)
-            .setState(state)
-            .setKeySerde(Serdes.String())
-            .setValueSerde(Serdes.String())
-            .setFilter(new BaseFilter()));
+  @Test
+  public void testReadByPK() {
+    BaseTopic<String, String> topic = createTopic();
+    String value = topic.readByPK(new ByteArray("B"));
 
-        for(int i = 0; i < keys.length; i++) {
-            topic.write(keys[i], values[i]);
-        }
-        return topic;
-    }
+    assertEquals("Mushroom", value);
+  }
 
-    @Test
-    public void testReadNext() {
-        InMemoryTopic<String, String> topic = createTopic();
-        Iterator<ConsumerRecord<String, String>> records = topic.readNext();
-        int i = 0;
-        while(records.hasNext()) {
-            ConsumerRecord<String, String> record = records.next();
-            validateRecord(record, keys[i], values[i], (long) i + topic.firstOffset);
-            i++;
-        }
-        assertEquals(3, i);
-    }
-
-    @Test
-    public void testReadByPK() {
-        BaseTopic<String, String> topic = createTopic();
-        String value = topic.readByPK(new ByteArray("B"));
-
-        assertEquals("Mushroom", value);
-    }
-
-    public void validateRecord(ConsumerRecord<String, String> record, String key, String value, Long offset) {
-        assertEquals(key, record.key());
-        assertEquals(value, record.value());
-        assertEquals(offset, (Long) record.offset());
-    }
+  public void validateRecord(ConsumerRecord<String, String> record, String key, String value, Long offset) {
+    assertEquals(key, record.key());
+    assertEquals(value, record.value());
+    assertEquals(offset, (Long) record.offset());
+  }
 }

@@ -13,25 +13,28 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.jwplayer.southpaw.metric;
 
 import com.codahale.metrics.Gauge;
 
 /**
  * Simple gauge that we can update manually.
+ *
  * @param <T> - Type stored / reported by the Gauge
  */
 public class StaticGauge<T> implements Gauge<T> {
-    protected T value;
+  protected T value;
 
-    public StaticGauge() { }
+  public StaticGauge() {
+  }
 
-    @Override
-    public T getValue() {
-        return value;
-    }
+  @Override
+  public T getValue() {
+    return value;
+  }
 
-    public void update(T value) {
-        this.value = value;
-    }
+  public void update(T value) {
+    this.value = value;
+  }
 }

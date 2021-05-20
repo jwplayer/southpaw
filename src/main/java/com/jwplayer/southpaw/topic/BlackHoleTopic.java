@@ -13,53 +13,53 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.jwplayer.southpaw.topic;
 
 import com.jwplayer.southpaw.util.ByteArray;
-import org.apache.kafka.clients.consumer.ConsumerRecord;
-import org.apache.commons.lang.NotImplementedException;
-
 import java.util.Iterator;
+import org.apache.commons.lang.NotImplementedException;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 
 
 public class BlackHoleTopic<K, V> extends BaseTopic<K, V> {
-    @Override
-    public void commit() {
-        // noop
-    }
+  @Override
+  public void commit() {
+    // noop
+  }
 
-    @Override
-    public void flush() {
-        // noop
-    }
+  @Override
+  public void flush() {
+    // noop
+  }
 
-    @Override
-    public Long getCurrentOffset() {
-        throw new NotImplementedException();
-    }
+  @Override
+  public Long getCurrentOffset() {
+    throw new NotImplementedException();
+  }
 
-    @Override
-    public long getLag() {
-        throw new NotImplementedException();
-    }
+  @Override
+  public long getLag() {
+    throw new NotImplementedException();
+  }
 
-    @Override
-    public V readByPK(ByteArray primaryKey) {
-        throw new NotImplementedException();
-    }
+  @Override
+  public V readByPK(ByteArray primaryKey) {
+    throw new NotImplementedException();
+  }
 
-    @Override
-    public Iterator<ConsumerRecord<K, V>> readNext() {
-        throw new NotImplementedException();
-    }
+  @Override
+  public Iterator<ConsumerRecord<K, V>> readNext() {
+    throw new NotImplementedException();
+  }
 
-    @Override
-    public void resetCurrentOffset() {
-        throw new NotImplementedException();
-    }
+  @Override
+  public void resetCurrentOffset() {
+    throw new NotImplementedException();
+  }
 
-    @Override
-    public void write(K key, V value) {
-        // noop
-    }
+  @Override
+  public void write(K key, V value) {
+    // noop
+  }
 }

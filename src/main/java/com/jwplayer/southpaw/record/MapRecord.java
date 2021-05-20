@@ -13,10 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.jwplayer.southpaw.record;
 
 import com.google.common.collect.ImmutableMap;
-
 import java.util.HashMap;
 import java.util.Map;
 
@@ -25,38 +25,44 @@ import java.util.Map;
  * Wrapper record for a simple map object
  */
 public class MapRecord extends BaseRecord {
-    Map<String, ?> internalRecord;
+  Map<String, ?> internalRecord;
 
-    public MapRecord(Map<String, ?> internalRecord) {
-        this.internalRecord = internalRecord;
+  public MapRecord(Map<String, ?> internalRecord) {
+    this.internalRecord = internalRecord;
+  }
+
+  @Override
+  public Object get(String fieldName) {
+    if (internalRecord == null) {
+      return null;
+    }
+    return internalRecord.get(fieldName);
+  }
+
+  @Override
+  public Map<String, Class> getSchema() {
+    Map<String, Class> schema = new HashMap<>();
+    if (internalRecord == null) {
+      return schema;
     }
 
-    @Override
-    public Object get(String fieldName) {
-        if(internalRecord == null) return null;
-        return internalRecord.get(fieldName);
+    for (Map.Entry<String, ?> entry : internalRecord.entrySet()) {
+      schema.put(entry.getKey(), entry.getValue().getClass());
     }
 
-    @Override
-    public Map<String, Class> getSchema() {
-        Map<String, Class> schema = new HashMap<>();
-        if(internalRecord == null) return schema;
+    return schema;
+  }
 
-        for(Map.Entry<String, ?> entry: internalRecord.entrySet()) {
-            schema.put(entry.getKey(), entry.getValue().getClass());
-        }
+  @Override
+  public boolean isEmpty() {
+    return internalRecord == null || internalRecord.size() == 0;
+  }
 
-        return schema;
+  @Override
+  public Map<String, ?> toMap() {
+    if (internalRecord == null) {
+      return ImmutableMap.of();
     }
-
-    @Override
-    public boolean isEmpty() {
-        return internalRecord == null || internalRecord.size() == 0;
-    }
-
-    @Override
-    public Map<String, ?> toMap() {
-        if(internalRecord == null) return ImmutableMap.of();
-        return ImmutableMap.copyOf(internalRecord);
-    }
+    return ImmutableMap.copyOf(internalRecord);
+  }
 }
