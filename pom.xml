@@ -29,11 +29,11 @@
         <version.amazonaws>1.11.292</version.amazonaws>
         <version.apache.commons>4.1</version.apache.commons>
         <version.avro>1.8.2</version.avro>
-        <version.commons.io>2.6</version.commons.io>
+        <version.commons.io>2.7</version.commons.io>
         <version.commons.lang>2.6</version.commons.lang>
         <version.confluent>6.0.0</version.confluent>
         <version.dropwizard>4.0.2</version.dropwizard>
-        <version.guava>29.0-jre</version.guava>
+        <version.guava>30.0-jre</version.guava>
         <version.jackson>2.11.1</version.jackson>
         <version.jopt.simple>4.9</version.jopt.simple>
         <version.kafka>2.6.0</version.kafka>
@@ -45,6 +45,7 @@
 
         <!-- Testing -->
         <version.curator>5.1.0</version.curator>
+        <version.jacoco>0.8.7</version.jacoco>
         <version.junit>4.13.1</version.junit>
         <version.mockito>2.25.1</version.mockito>
         <version.s3mock>0.2.5</version.s3mock>
@@ -52,6 +53,7 @@
         <modules.argline />
 
         <!-- Plugins -->
+        <version.checkstyle.plugin>3.1.0</version.checkstyle.plugin>
         <version.compiler.plugin>3.8.1</version.compiler.plugin>
         <version.enforcer.plugin>3.0.0-M3</version.enforcer.plugin>
         <version.jsonschema2pojo.plugin>1.0.0</version.jsonschema2pojo.plugin>
@@ -187,12 +189,97 @@
             <version>${version.mockito}</version>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>org.jacoco</groupId>
+            <artifactId>org.jacoco.agent</artifactId>
+            <classifier>runtime</classifier>
+            <version>${version.jacoco}</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
     <build>
         <sourceDirectory>src/main/java</sourceDirectory>
         <testSourceDirectory>src/test/java</testSourceDirectory>
         <finalName>southpaw</finalName>
         <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-checkstyle-plugin</artifactId>
+                <version>${version.checkstyle.plugin}</version>
+                <dependencies>
+                    <dependency>
+                        <groupId>com.puppycrawl.tools</groupId>
+                        <artifactId>checkstyle</artifactId>
+                        <version>8.29</version>
+                    </dependency>
+                </dependencies>
+                <executions>
+                    <execution>
+                        <phase>verify</phase>
+                        <id>auto-checkstyle</id>
+                        <goals>
+                            <goal>checkstyle</goal>
+                            <goal>check</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <encoding>UTF-8</encoding>
+                    <configLocation>src/checkstyle/google_checks.xml</configLocation>
+                    <linkXRef>false</linkXRef>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>${version.jacoco}</version>
+                <executions>
+                    <execution>
+                        <id>default-instrument</id>
+                        <goals>
+                            <goal>instrument</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>default-restore-instrumented-classes</id>
+                        <goals>
+                            <goal>restore-instrumented-classes</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>default-report</id>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>default-check</id>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                        <configuration>
+                            <rules>
+                                <rule>
+                                    <element>BUNDLE</element>
+                                    <limits>
+                                        <limit implementation="org.jacoco.report.check.Limit">
+                                            <counter>COMPLEXITY</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>0.73</minimum>
+                                        </limit>
+                                    </limits>
+                                </rule>
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
+                <configuration>
+                    <excludes>
+                        <!-- Auto generated classes -->
+                        <exclude>com/jwplayer/southpaw/json/*</exclude>
+                    </excludes>
+                </configuration>
+            </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
@@ -242,6 +329,9 @@
                 <version>${version.surefire.plugin}</version>
                 <configuration>
                     <argLine>-Djava.awt.headless=true ${modules.argline}</argLine>
+                    <systemPropertyVariables>
+                        <jacoco-agent.destfile>target/jacoco.exec</jacoco-agent.destfile>
+                    </systemPropertyVariables>
                 </configuration>
             </plugin>
             <plugin>
@@ -265,6 +355,24 @@
             </plugin>
         </plugins>
     </build>
+
+    <reporting>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-checkstyle-plugin</artifactId>
+                <version>${version.checkstyle.plugin}</version>
+                <reportSets>
+                    <reportSet>
+                        <reports>
+                            <report>checkstyle</report>
+                        </reports>
+                    </reportSet>
+                </reportSets>
+            </plugin>
+        </plugins>
+    </reporting>
+
     <profiles>
         <profile>
             <id>jdk11</id>
