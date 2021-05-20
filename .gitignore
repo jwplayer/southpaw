@@ -25,5 +25,8 @@ relations/
 .idea/
 *.iml
 
+# Test Coverage
+jacoco.exec
+
 # jenv
 *.java-version
