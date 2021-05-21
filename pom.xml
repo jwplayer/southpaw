@@ -224,8 +224,9 @@
                     </execution>
                 </executions>
                 <configuration>
-                    <encoding>UTF-8</encoding>
                     <configLocation>src/checkstyle/google_checks.xml</configLocation>
+                    <encoding>UTF-8</encoding>
+                    <excludes>com/jwplayer/southpaw/json/*</excludes>
                     <linkXRef>false</linkXRef>
                 </configuration>
             </plugin>
