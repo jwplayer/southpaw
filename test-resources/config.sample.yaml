@@ -27,7 +27,6 @@ topics:
     filter.class: "com.jwplayer.southpaw.filter.TestFilter"
     group.id: "southpaw"
     key.serde.class: "com.jwplayer.southpaw.serde.JsonSerde"
-    poll.timeout: 100
     schema.registry.url: "http://schema-registry:8081"
     topic.class: "com.jwplayer.southpaw.topic.InMemoryTopic"
     value.serde.class: "com.jwplayer.southpaw.serde.JsonSerde"

@@ -15,28 +15,22 @@
  */
 package com.jwplayer.southpaw;
 
-import com.codahale.metrics.Timer;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableSet;
-import com.jwplayer.southpaw.filter.BaseFilter;
-import com.jwplayer.southpaw.index.BaseIndex;
-import com.jwplayer.southpaw.index.MultiIndex;
-import com.jwplayer.southpaw.index.Reversible;
-import com.jwplayer.southpaw.json.*;
-import com.jwplayer.southpaw.record.BaseRecord;
-import com.jwplayer.southpaw.serde.BaseSerde;
-import com.jwplayer.southpaw.state.BaseState;
-import com.jwplayer.southpaw.state.RocksDBState;
-import com.jwplayer.southpaw.topic.BaseTopic;
-import com.jwplayer.southpaw.util.ByteArray;
-import com.jwplayer.southpaw.util.ByteArraySet;
-import com.jwplayer.southpaw.util.FileHelper;
-import com.jwplayer.southpaw.metric.Metrics;
-import com.jwplayer.southpaw.metric.StaticGauge;
-import com.jwplayer.southpaw.topic.TopicConfig;
-import joptsimple.OptionParser;
-import joptsimple.OptionSet;
+import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.util.AbstractMap;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.stream.Collectors;
+
 import org.apache.commons.lang.ObjectUtils;
 import org.apache.commons.lang.time.StopWatch;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -45,12 +39,33 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
 
-import java.io.IOException;
-import java.lang.reflect.InvocationTargetException;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.util.*;
-import java.util.stream.Collectors;
+import com.codahale.metrics.Timer;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableSet;
+import com.jwplayer.southpaw.filter.BaseFilter;
+import com.jwplayer.southpaw.index.BaseIndex;
+import com.jwplayer.southpaw.index.MultiIndex;
+import com.jwplayer.southpaw.index.Reversible;
+import com.jwplayer.southpaw.json.ChildRecords;
+import com.jwplayer.southpaw.json.DenormalizedRecord;
+import com.jwplayer.southpaw.json.Record;
+import com.jwplayer.southpaw.json.Relation;
+import com.jwplayer.southpaw.metric.Metrics;
+import com.jwplayer.southpaw.metric.StaticGauge;
+import com.jwplayer.southpaw.record.BaseRecord;
+import com.jwplayer.southpaw.serde.BaseSerde;
+import com.jwplayer.southpaw.state.BaseState;
+import com.jwplayer.southpaw.state.RocksDBState;
+import com.jwplayer.southpaw.topic.BaseTopic;
+import com.jwplayer.southpaw.topic.ConsumerRecordIterator;
+import com.jwplayer.southpaw.topic.TopicConfig;
+import com.jwplayer.southpaw.util.ByteArray;
+import com.jwplayer.southpaw.util.ByteArraySet;
+import com.jwplayer.southpaw.util.FileHelper;
+
+import joptsimple.OptionParser;
+import joptsimple.OptionSet;
 
 
 /**
@@ -139,6 +154,13 @@ public class Southpaw {
      */
     protected BaseState state;
 
+    protected boolean topicsPrefixed;
+    private static final String TRANSACTIONS = "transactions";
+
+    protected String currentTxn;
+    protected boolean seenTxnEnd;
+    protected boolean transactional;
+
     /**
      * Base Southpaw config
      */
@@ -150,7 +172,7 @@ public class Southpaw {
         public static final String CREATE_RECORDS_TRIGGER_CONFIG = "create.records.trigger";
         public static final int CREATE_RECORDS_TRIGGER_DEFAULT = 250000;
         public static final String TOPIC_LAG_TRIGGER_CONFIG = "topic.lag.trigger";
-        public static final String TOPIC_LAG_TRIGGER_DEFAULT = "1000";
+        public static final int TOPIC_LAG_TRIGGER_DEFAULT = 1000;
 
         /**
          * Time interval (roughly) between backups
@@ -215,6 +237,13 @@ public class Southpaw {
             this.outputTopics.put(root.getDenormalizedName(), createOutputTopic(root.getDenormalizedName()));
             this.metrics.registerOutputTopic(root.getDenormalizedName());
         }
+        try {
+            this.inputTopics.put(TRANSACTIONS, createTopic(TRANSACTIONS));
+            transactional = true;
+            this.topicsPrefixed = (Boolean) rawConfig.getOrDefault("topics.prefixed", true);
+        } catch (NullPointerException e) {
+            //transactions not defined
+        }
         for(Map.Entry<String, BaseTopic<BaseRecord, BaseRecord>> entry: this.inputTopics.entrySet()) {
             this.metrics.registerInputTopic(entry.getKey());
         }
@@ -225,6 +254,13 @@ public class Southpaw {
             byte[] bytes = state.get(METADATA_KEYSPACE, createDePKEntryName(root).getBytes());
             dePKsByType.put(root, ByteArraySet.deserialize(bytes));
         }
+    }
+
+    private static class RecordHolder {
+        boolean txnTopic;
+        BaseTopic<BaseRecord, BaseRecord> inputTopic;
+        ConsumerRecordIterator<BaseRecord, BaseRecord> records;
+        String entity;
     }
 
     /**
@@ -247,70 +283,135 @@ public class Southpaw {
         List<String> rootEntities = Arrays.stream(relations).map(Relation::getEntity).collect(Collectors.toList());
         topics.sort((x, y) -> Boolean.compare(rootEntities.contains(x.getKey()), rootEntities.contains(y.getKey())));
 
-        while(processRecords) {
-            // Loop through each input topic and read a batch of records
+        Map<String, String> tablesToAlias = new HashMap<>();
+        inputTopics.entrySet().stream().forEach((e) -> {
+            String tableName = e.getValue().getTableName();
+            if (tableName == null) {
+                tableName = e.getValue().getTopicName();
+                tableName = topicsPrefixed?tableName.substring(tableName.indexOf('.')+1):tableName;
+            }
+            tablesToAlias.put(tableName, e.getKey());
+        });
+        Map<String, Integer> transactionEvents = new HashMap<>();
 
-            for (Map.Entry<String, BaseTopic<BaseRecord, BaseRecord>> entry : topics) {
-                String entity = entry.getKey();
-                BaseTopic<BaseRecord, BaseRecord> inputTopic = entry.getValue();
+        Map<String, RecordHolder> allHolders = new LinkedHashMap<String, Southpaw.RecordHolder>();
+        for (Map.Entry<String, BaseTopic<BaseRecord, BaseRecord>> entry : topics) {
+            RecordHolder holder = new RecordHolder();
+            holder.entity = entry.getKey();
+            holder.inputTopic = entry.getValue();
+            holder.records = holder.inputTopic.readNext();
+            holder.txnTopic = TRANSACTIONS.equals(holder.entity);
+            allHolders.put(holder.entity, holder);
+        }
+        Map<String, RecordHolder> toProcess = new LinkedHashMap<>(allHolders);
+
+        process: while(processRecords) {
+            // Loop through each input topic and read a batch of records
+            boolean foundAny = false;
+            for (Iterator<RecordHolder> iter = toProcess.values().iterator(); iter.hasNext();) {
+                RecordHolder holder = iter.next();
+                String entity = holder.entity;
+                BaseTopic<BaseRecord, BaseRecord> inputTopic = holder.inputTopic;
 
                 long topicLag;
                 calculateRecordsToCreate();
                 calculateTotalLag();
 
                 do {
-                    Iterator<ConsumerRecord<BaseRecord, BaseRecord>> records = inputTopic.readNext();
+                    if (!holder.records.hasNext()) {
+                        holder.records = inputTopic.readNext();
+                        if (holder.records.getApproximateCount() > 0) {
+                            foundAny = true;
+                        }
+                    } else {
+                        foundAny = true;
+                    }
                     // Loop through each record and process it
-                    while (records.hasNext()) {
-                        ConsumerRecord<BaseRecord, BaseRecord> newRecord = records.next();
-                        ByteArray primaryKey = newRecord.key().toByteArray();
-                        for (Relation root : relations) {
-                            Set<ByteArray> dePrimaryKeys = dePKsByType.get(root);
-                            if (root.getEntity().equals(entity)) {
-                                // The top level relation is the relation of the input record
-                                dePrimaryKeys.add(primaryKey);
-                            } else {
-                                // Check the child relations instead
-                                AbstractMap.SimpleEntry<Relation, Relation> child = getRelation(root, entity);
-                                if (child != null && child.getValue() != null) {
-                                    BaseIndex<BaseRecord, BaseRecord, Set<ByteArray>> parentIndex =
-                                            fkIndices.get(createParentIndexName(root, child.getKey(), child.getValue()));
-                                    ByteArray newParentKey = null;
-                                    Set<ByteArray> oldParentKeys;
-                                    if (newRecord.value() != null) {
-                                        newParentKey = ByteArray.toByteArray(newRecord.value().get(child.getValue().getJoinKey()));
+                    while (holder.records.hasNext()) {
+                        if (transactional) {
+                            BaseRecord baseRecord = holder.records.peekValue();
+                            String txn = null;
+                            if (holder.txnTopic) {
+                                String status = (String)baseRecord.get("status");
+                                txn = (String)baseRecord.get("id");
+                                if ("BEGIN".equals(status)) {
+                                    if(logger.isDebugEnabled()) {
+                                        logger.debug("starting transaction {}", txn);
                                     }
-                                    BaseIndex<BaseRecord, BaseRecord, Set<ByteArray>> joinIndex =
-                                            fkIndices.get(createJoinIndexName(child.getValue()));
-                                    oldParentKeys = ((Reversible) joinIndex).getForeignKeys(primaryKey);
-
-                                    // Create the denormalized records
-                                    if (oldParentKeys != null) {
-                                        for (ByteArray oldParentKey : oldParentKeys) {
-                                            if (!ObjectUtils.equals(oldParentKey, newParentKey)) {
-                                                Set<ByteArray> primaryKeys = parentIndex.getIndexEntry(oldParentKey);
-                                                if (primaryKeys != null) {
-                                                    dePrimaryKeys.addAll(primaryKeys);
-                                                }
-                                            }
+                                    transactionEvents.clear();
+                                    if (currentTxn != null) {
+                                        throw new AssertionError("Unexpected begin of transaction");
+                                    }
+                                    currentTxn = txn;
+                                    toProcess.clear();
+                                    toProcess.putAll(allHolders);
+                                    iter = toProcess.values().iterator();
+                                } else if ("END".equals(status)) {
+                                    if (!txn.equals(currentTxn)) {
+                                        throw new AssertionError("Unexpected end of transaction");
+                                    }
+                                    List<Map<String, ?>> dataCollections = (List<Map<String, ?>>) baseRecord.get("data_collections");
+                                    toProcess.clear();
+                                    for (Map<String, ?> dataCollection : dataCollections) {
+                                        String topic = (String)dataCollection.get("data_collection");
+                                        String alias = tablesToAlias.get(topic);
+                                        if (alias == null) {
+                                            continue; //not involved
+                                        }
+                                        int eventCount = ((Number)dataCollection.get("event_count")).intValue();
+                                        if (!seenTxnEnd) {
+                                            accumulateEventCount(transactionEvents, alias, -eventCount);
+                                        }
+                                        if (transactionEvents.containsKey(alias)) {
+                                            logger.debug("waiting for {}", alias);
+                                            toProcess.put(alias, allHolders.get(alias));
                                         }
                                     }
-                                    if (newParentKey != null) {
-                                        Set<ByteArray> primaryKeys = parentIndex.getIndexEntry(newParentKey);
-                                        if (primaryKeys != null) {
-                                            dePrimaryKeys.addAll(primaryKeys);
-                                        }
+                                    seenTxnEnd = true;
+                                    if (!toProcess.isEmpty()) {
+                                        continue process;
                                     }
-                                    // Update the join index
-                                    updateJoinIndex(child.getValue(), primaryKey, newRecord);
+                                    toProcess.putAll(allHolders);
+                                    iter = toProcess.values().iterator();
+                                    //commit
+                                    currentTxn = null;
+                                    seenTxnEnd = false;
+                                    if(logger.isDebugEnabled()) {
+                                        logger.debug("ending transaction {}", txn);
+                                    }
+                                    flushDenormalized();
+                                }
+                            } else if (baseRecord != null) {
+                                Map<String, ?> metadata = baseRecord.getMetadata();
+                                if (metadata != null) {
+                                    Map<String, ?> transaction = (Map<String, ?>) metadata.get("transaction");
+                                    if (transaction != null) {
+                                        txn = (String)transaction.get("id");
+                                    }
+                                }
+                                if (txn != null) {
+                                    if (currentTxn != null && txn.equals(currentTxn)) {
+                                        accumulateEventCount(transactionEvents, entity, 1);
+                                        if (transactionEvents.isEmpty()) {
+                                            //remove myself from the processing list and wait for txn event
+                                            toProcess.remove(entity);
+                                            toProcess.put(TRANSACTIONS, allHolders.get(TRANSACTIONS));
+                                            iter = toProcess.values().iterator();
+                                            //consume the event
+                                        }
+                                    } else {
+                                        //remove myself from the processing list and wait for txn event
+                                        toProcess.remove(entity);
+                                        toProcess.put(TRANSACTIONS, allHolders.get(TRANSACTIONS));
+                                        continue process;
+                                    }
                                 }
                             }
-                            int size = dePrimaryKeys.size();
-                            if(size > config.createRecordsTrigger) {
-                                createDenormalizedRecords(root, dePrimaryKeys);
-                                dePrimaryKeys.clear();
-                            }
-                            metrics.denormalizedRecordsToCreateByTopic.get(root.getDenormalizedName()).update((long) size);
+                        }
+                        ConsumerRecord<BaseRecord, BaseRecord> newRecord = holder.records.next();
+
+                        if (!holder.txnTopic) {
+                            processRecord(entity, newRecord);
                         }
                         metrics.recordsConsumed.mark(1);
                         metrics.recordsConsumedByTopic.get(entity).mark(1);
@@ -322,39 +423,138 @@ public class Southpaw {
                     reportRecordsToCreate();
                     reportTotalLag();
 
-                    if(
-                            (config.backupTimeS > 0 && backupWatch.getTime() > config.backupTimeS * 1000)
-                            || (runWatch.getTime() > runTimeS * 1000 && runTimeS > 0)) {
-                        try(Timer.Context context = metrics.backupsCreated.time()) {
-                            logger.info("Performing a backup after a full commit");
-                            calculateRecordsToCreate();
-                            calculateTotalLag();
-                            commit();
-                            state.backup();
-                            backupWatch.reset();
-                            backupWatch.start();
-                            if (runWatch.getTime() > runTimeS * 1000 && runTimeS > 0) return;
-                        }
-                    } else if(config.commitTimeS > 0 && commitWatch.getTime() > config.commitTimeS * 1000) {
-                        try(Timer.Context context = metrics.stateCommitted.time()) {
-                            logger.info("Performing a full commit");
-                            calculateRecordsToCreate();
-                            calculateTotalLag();
-                            commit();
-                            commitWatch.reset();
-                            commitWatch.start();
+                    if (currentTxn == null) {
+                        if(
+                                (config.backupTimeS > 0 && backupWatch.getTime() > config.backupTimeS * 1000)
+                                || (runWatch.getTime() > runTimeS * 1000 && runTimeS > 0)) {
+                            try(Timer.Context context = metrics.backupsCreated.time()) {
+                                logger.info("Performing a backup after a full commit");
+                                calculateRecordsToCreate();
+                                calculateTotalLag();
+                                commit();
+                                state.backup();
+                                backupWatch.reset();
+                                backupWatch.start();
+                                if (runWatch.getTime() > runTimeS * 1000 && runTimeS > 0) return;
+                            }
+                        } else if(config.commitTimeS > 0 && commitWatch.getTime() > config.commitTimeS * 1000) {
+                            try(Timer.Context context = metrics.stateCommitted.time()) {
+                                logger.info("Performing a full commit");
+                                calculateRecordsToCreate();
+                                calculateTotalLag();
+                                commit();
+                                commitWatch.reset();
+                                commitWatch.start();
+                            }
                         }
                     }
                 } while (topicLag > config.topicLagTrigger);
             }
 
-            // Create the denormalized records that have been queued up
-            for(Map.Entry<Relation, ByteArraySet> entry: dePKsByType.entrySet()) {
-                createDenormalizedRecords(entry.getKey(), entry.getValue());
-                entry.getValue().clear();
+            if (!foundAny) {
+                try {
+                    Thread.sleep(5);
+                } catch (InterruptedException e) {
+                    Thread.interrupted();
+                    throw new RuntimeException(e);
+                }
+                continue;
             }
+
+            // Create the denormalized records that have been queued up
+            flushDenormalized();
         }
         commit();
+    }
+
+    /**
+     * Accumulate the running total - a 0 total is removed from the map.
+     * @param transactionEvents the map of events
+     * @param alias short name
+     * @param eventCount the count to accumulate
+     */
+    private void accumulateEventCount(Map<String, Integer> transactionEvents, String alias, int eventCount) {
+        transactionEvents.compute(alias, (k, v)->{
+            if (v==null) {
+                return eventCount;
+            }
+            int i = v+eventCount;
+            if (i == 0) {
+                return null;
+            }
+            return i;
+        });
+    }
+
+    /**
+     * Write out all pending denormalized
+     */
+    private void flushDenormalized() {
+        if (currentTxn != null) {
+            return;
+        }
+        for(Map.Entry<Relation, ByteArraySet> entry: dePKsByType.entrySet()) {
+            createDenormalizedRecords(entry.getKey(), entry.getValue());
+            entry.getValue().clear();
+        }
+    }
+
+    /**
+     * Process a single record
+     * @param entity topic short name
+     * @param newRecord the record to process
+     */
+    private void processRecord(String entity, ConsumerRecord<BaseRecord, BaseRecord> newRecord) {
+        ByteArray primaryKey = newRecord.key().toByteArray();
+        for (Relation root : relations) {
+            Set<ByteArray> dePrimaryKeys = dePKsByType.get(root);
+            if (root.getEntity().equals(entity)) {
+                // The top level relation is the relation of the input record
+                dePrimaryKeys.add(primaryKey);
+            } else {
+                // Check the child relations instead
+                AbstractMap.SimpleEntry<Relation, Relation> child = getRelation(root, entity);
+                if (child != null && child.getValue() != null) {
+                    BaseIndex<BaseRecord, BaseRecord, Set<ByteArray>> parentIndex =
+                            fkIndices.get(createParentIndexName(root, child.getKey(), child.getValue()));
+                    ByteArray newParentKey = null;
+                    Set<ByteArray> oldParentKeys;
+                    if (newRecord.value() != null) {
+                        newParentKey = ByteArray.toByteArray(newRecord.value().get(child.getValue().getJoinKey()));
+                    }
+                    BaseIndex<BaseRecord, BaseRecord, Set<ByteArray>> joinIndex =
+                            fkIndices.get(createJoinIndexName(child.getValue()));
+                    oldParentKeys = ((Reversible) joinIndex).getForeignKeys(primaryKey);
+
+                    // Create the denormalized records
+                    if (oldParentKeys != null) {
+                        for (ByteArray oldParentKey : oldParentKeys) {
+                            if (!ObjectUtils.equals(oldParentKey, newParentKey)) {
+                                Set<ByteArray> primaryKeys = parentIndex.getIndexEntry(oldParentKey);
+                                if (primaryKeys != null) {
+                                    dePrimaryKeys.addAll(primaryKeys);
+                                }
+                            }
+                        }
+                    }
+                    if (newParentKey != null) {
+                        Set<ByteArray> primaryKeys = parentIndex.getIndexEntry(newParentKey);
+                        if (primaryKeys != null) {
+                            dePrimaryKeys.addAll(primaryKeys);
+                        }
+                    }
+                    // Update the join index
+                    updateJoinIndex(child.getValue(), primaryKey, newRecord);
+                }
+            }
+            int size = dePrimaryKeys.size();
+            if(currentTxn == null && size > config.createRecordsTrigger) {
+                createDenormalizedRecords(root, dePrimaryKeys);
+                dePrimaryKeys.clear();
+                size = 0;
+            }
+            metrics.denormalizedRecordsToCreateByTopic.get(root.getDenormalizedName()).update((long) size);
+        }
     }
 
     /**
@@ -489,6 +689,10 @@ public class Southpaw {
     protected void createDenormalizedRecords(
             Relation root,
             Set<ByteArray> rootRecordPKs) {
+        if (rootRecordPKs.isEmpty()) {
+            return;
+        }
+        logger.info("creating {} {}", rootRecordPKs.size(), root.getEntity());
         for(ByteArray dePrimaryKey: rootRecordPKs) {
             if(dePrimaryKey != null) {
                 BaseTopic<byte[], DenormalizedRecord> outputTopic = outputTopics.get(root.getDenormalizedName());
@@ -697,7 +901,7 @@ public class Southpaw {
             .setValueSerde(valueSerde)
             .setFilter(filter)
             .setMetrics(metrics));
-        
+
         return topic;
     }
 

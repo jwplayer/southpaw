@@ -15,10 +15,10 @@
  */
 package com.jwplayer.southpaw.record;
 
-import com.google.common.collect.ImmutableMap;
-
 import java.util.HashMap;
 import java.util.Map;
+
+import com.google.common.collect.ImmutableMap;
 
 
 /**
@@ -57,6 +57,6 @@ public class MapRecord extends BaseRecord {
     @Override
     public Map<String, ?> toMap() {
         if(internalRecord == null) return ImmutableMap.of();
-        return ImmutableMap.copyOf(internalRecord);
+        return internalRecord;
     }
 }

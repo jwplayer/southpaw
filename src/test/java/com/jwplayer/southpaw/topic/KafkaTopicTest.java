@@ -15,21 +15,27 @@
  */
 package com.jwplayer.southpaw.topic;
 
-import com.jwplayer.southpaw.MockState;
-import com.jwplayer.southpaw.filter.BaseFilter;
-import com.jwplayer.southpaw.state.BaseState;
-import com.jwplayer.southpaw.util.ByteArray;
-import com.jwplayer.southpaw.util.KafkaTestServer;
-import org.apache.kafka.clients.consumer.ConsumerConfig;
-import org.apache.kafka.clients.consumer.ConsumerRecord;
-import org.apache.kafka.common.serialization.Serdes;
-import org.junit.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 
-import static org.junit.Assert.*;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.common.serialization.Serdes;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
+
+import com.jwplayer.southpaw.MockState;
+import com.jwplayer.southpaw.filter.BaseFilter;
+import com.jwplayer.southpaw.state.BaseState;
+import com.jwplayer.southpaw.util.ByteArray;
+import com.jwplayer.southpaw.util.KafkaTestServer;
 
 
 public class KafkaTopicTest {
@@ -42,6 +48,7 @@ public class KafkaTopicTest {
     public KafkaTopic<String, String> createTopic(String topicName) {
         kafkaServer.createTopic(topicName, 1);
         KafkaTopic<String, String> topic = new KafkaTopic<>();
+        topic.setPollTimeout(100);
         Map<String, Object> config = new HashMap<>();
         config.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaServer.getConnectionString());
         config.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);

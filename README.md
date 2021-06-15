@@ -195,7 +195,6 @@ Similar to the state, Southpaw is built around Kafka for the log store. The topi
 
 * jackson.serde.class - The full class name of the deserialized object created by the JacksonSerde class
 * key.serde.class - The full name of the serde class for the record key
-* poll.timeout - The Kafka consumer poll() timeout in milliseconds
 * topic.class - The full class name of the class used by the topic
 * topic.name - The name of the topic (not the entity name for this topic!)
 * value.serde.class - The full name of the serde class for the record value
@@ -224,7 +223,6 @@ Similar to the state, Southpaw is built around Kafka for the log store. The topi
         client.id: "southpaw"
         enable.auto.commit: false
         key.serde.class: "com.jwplayer.southpaw.serde.AvroSerde"
-        poll.timeout: 100
         schema.registry.url: "http://my-schema-registry:8081"
         topic.class: "com.jwplayer.southpaw.topic.KafkaTopic"
         value.serde.class: "com.jwplayer.southpaw.serde.AvroSerde"

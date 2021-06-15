@@ -15,12 +15,17 @@
  */
 package com.jwplayer.southpaw.topic;
 
-import com.jwplayer.southpaw.record.BaseRecord;
-import com.jwplayer.southpaw.util.ByteArray;
-import com.jwplayer.southpaw.filter.BaseFilter.FilterMode;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Random;
+
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 
-import java.util.*;
+import com.jwplayer.southpaw.filter.BaseFilter.FilterMode;
+import com.jwplayer.southpaw.record.BaseRecord;
+import com.jwplayer.southpaw.util.ByteArray;
 
 
 /**
@@ -93,13 +98,35 @@ public final class InMemoryTopic<K, V> extends BaseTopic<K, V> {
     }
 
     @Override
-    public Iterator<ConsumerRecord<K, V>> readNext() {
+    public ConsumerRecordIterator<K, V> readNext() {
         List<ConsumerRecord<K, V>> retVal = new ArrayList<>();
         while(records.size() + firstOffset > currentOffset + 1) {
             currentOffset++;
             retVal.add(records.get(((Long) (currentOffset - firstOffset)).intValue()));
         }
-        return retVal.iterator();
+        return new ConsumerRecordIterator<K, V>() {
+            int index = 0;
+
+            @Override
+            public int getApproximateCount() {
+                return retVal.size();
+            }
+
+            @Override
+            public boolean hasNext() {
+                return index < retVal.size();
+            }
+
+            @Override
+            public ConsumerRecord<K, V> next() {
+                return retVal.get(index++);
+            }
+
+            @Override
+            public V peekValue() {
+                return retVal.get(index).value();
+            }
+        };
     }
 
     @Override
