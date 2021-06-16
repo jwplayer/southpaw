@@ -7,7 +7,9 @@
     "Relation": {
       "javaType": "com.jwplayer.southpaw.json.Relation",
       "type": "object",
-      "required": ["Entity"],
+      "required": [
+        "Entity"
+      ],
       "properties": {
         "DenormalizedName": {
           "description": "The name of the denormalized object created (e.g. feed), should be null if this is a child relation",

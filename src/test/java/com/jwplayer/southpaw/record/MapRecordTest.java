@@ -13,42 +13,45 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.jwplayer.southpaw.record;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+
+
+import java.util.Map;
 import org.junit.Before;
 import org.junit.Test;
 
-import java.util.Map;
-
-import static org.junit.Assert.*;
-
 
 public class MapRecordTest {
-    private BaseRecord record;
+  private BaseRecord record;
 
-    @Before
-    public void setup() {
-        record = new MapRecord(null);
-    }
+  @Before
+  public void setup() {
+    record = new MapRecord(null);
+  }
 
-    @Test
-    public void testGetWithNullInternalRecord() {
-        assertNull(record.get("SomeField"));
-    }
+  @Test
+  public void testGetWithNullInternalRecord() {
+    assertNull(record.get("SomeField"));
+  }
 
-    @Test
-    public void testGetSchemaWithNullInternalRecord() {
-        Map<String, Class> schema = record.getSchema();
+  @Test
+  public void testGetSchemaWithNullInternalRecord() {
+    Map<String, Class> schema = record.getSchema();
 
-        assertNotNull(schema);
-        assertEquals(0, schema.size());
-    }
+    assertNotNull(schema);
+    assertEquals(0, schema.size());
+  }
 
-    @Test
-    public void testToMapWithNullInternalRecord() {
-        Map<String, ?> map = record.toMap();
+  @Test
+  public void testToMapWithNullInternalRecord() {
+    Map<String, ?> map = record.toMap();
 
-        assertNotNull(map);
-        assertEquals(0, map.size());
-    }
+    assertNotNull(map);
+    assertEquals(0, map.size());
+  }
 }

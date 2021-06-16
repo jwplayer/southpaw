@@ -13,14 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.jwplayer.southpaw;
 
 import com.jwplayer.southpaw.index.BaseIndex;
-import com.jwplayer.southpaw.json.*;
+import com.jwplayer.southpaw.json.Record;
+import com.jwplayer.southpaw.json.Relation;
 import com.jwplayer.southpaw.record.BaseRecord;
 import com.jwplayer.southpaw.topic.BaseTopic;
 import com.jwplayer.southpaw.util.ByteArray;
-
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.net.URI;
@@ -35,42 +36,45 @@ import java.util.Set;
  * 'Mock' Southpaw class that gives us access to its protected methods for testing.
  */
 public class MockSouthpaw extends Southpaw {
-    public MockSouthpaw(Map<String, Object> config, List<URI> uris)
-            throws ClassNotFoundException, IllegalAccessException, InstantiationException, IOException, URISyntaxException, NoSuchMethodException, InvocationTargetException {
-        super(config, uris);
-    }
+  public MockSouthpaw(Map<String, Object> config, List<URI> uris)
+      throws ClassNotFoundException, IllegalAccessException, InstantiationException, IOException, URISyntaxException,
+      NoSuchMethodException, InvocationTargetException {
+    super(config, uris);
+  }
 
-    public void createDenormalizedRecords(
-            Relation root,
-            Set<ByteArray> rootRecordPKs) {
-        super.createDenormalizedRecords(root, rootRecordPKs);
-    }
+  public void createDenormalizedRecords(
+      Relation root,
+      Set<ByteArray> rootRecordPKs) {
+    super.createDenormalizedRecords(root, rootRecordPKs);
+  }
 
-    public Record createInternalRecord(BaseRecord inputRecord) {
-        return super.createInternalRecord(inputRecord);
-    }
+  public Record createInternalRecord(BaseRecord inputRecord) {
+    return super.createInternalRecord(inputRecord);
+  }
 
-    public Map<String, Object> createTopicConfig(String configName) {
-        return super.createTopicConfig(configName);
-    }
+  public Map<String, Object> createTopicConfig(String configName) {
+    return super.createTopicConfig(configName);
+  }
 
-    public AbstractMap.SimpleEntry<Relation, Relation> getRelation(Relation relation, String entity) {
-        return super.getRelation(relation, entity);
-    }
+  public AbstractMap.SimpleEntry<Relation, Relation> getRelation(Relation relation, String entity) {
+    return super.getRelation(relation, entity);
+  }
 
-    /**
-     * Accessor for the FK indices used by Southpaw
-     * @return Southpaw's FK indices
-     */
-    public Map<String, BaseIndex<BaseRecord, BaseRecord, Set<ByteArray>>> getFkIndices() {
-        return fkIndices;
-    }
+  /**
+   * Accessor for the FK indices used by Southpaw
+   *
+   * @return Southpaw's FK indices
+   */
+  public Map<String, BaseIndex<BaseRecord, BaseRecord, Set<ByteArray>>> getFkIndices() {
+    return fkIndices;
+  }
 
-    /**
-     * Accessor for the normalized topics used by Southpaw
-     * @return Southpaw's normalized topics
-     */
-    public Map<String, BaseTopic<BaseRecord, BaseRecord>> getNormalizedTopics() {
-        return inputTopics;
-    }
+  /**
+   * Accessor for the normalized topics used by Southpaw
+   *
+   * @return Southpaw's normalized topics
+   */
+  public Map<String, BaseTopic<BaseRecord, BaseRecord>> getNormalizedTopics() {
+    return inputTopics;
+  }
 }

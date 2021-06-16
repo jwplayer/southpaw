@@ -13,39 +13,41 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.jwplayer.southpaw.filter;
 
 import com.jwplayer.southpaw.record.BaseRecord;
 
 public class TestFilter extends BaseFilter {
-    String DELETED = "deleted";
-    String SKIP = "skip";
-    String INVALID = "INVALID";
+  String DELETED = "deleted";
+  String SKIP = "skip";
+  String INVALID = "INVALID";
 
-    public TestFilter() {}
+  public TestFilter() {
+  }
 
-    @Override
-    public FilterMode customFilter(String entity, BaseRecord record, BaseRecord oldRecord) {
-        FilterMode mode = FilterMode.UPDATE;
-        switch(entity) {
-            case "media":
-                if (DELETED.equals(record.get("status"))) {
-                    mode = FilterMode.DELETE;
-                }
-                break;
-            case "playlist_custom_params":
-                if (INVALID.equals(record.get("value"))) {
-                    mode = FilterMode.DELETE;
-                }
-                break;
-            case "user":
-                if (SKIP.equals(record.get("name"))) {
-                    mode = FilterMode.SKIP;
-                }
-                break;
-            default:
-                mode = FilterMode.UPDATE;
+  @Override
+  public FilterMode customFilter(String entity, BaseRecord record, BaseRecord oldRecord) {
+    FilterMode mode = FilterMode.UPDATE;
+    switch (entity) {
+      case "media":
+        if (DELETED.equals(record.get("status"))) {
+          mode = FilterMode.DELETE;
         }
-        return mode;
+        break;
+      case "playlist_custom_params":
+        if (INVALID.equals(record.get("value"))) {
+          mode = FilterMode.DELETE;
+        }
+        break;
+      case "user":
+        if (SKIP.equals(record.get("name"))) {
+          mode = FilterMode.SKIP;
+        }
+        break;
+      default:
+        mode = FilterMode.UPDATE;
     }
+    return mode;
+  }
 }

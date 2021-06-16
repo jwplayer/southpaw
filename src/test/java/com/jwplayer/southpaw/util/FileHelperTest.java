@@ -13,9 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.jwplayer.southpaw.util;
 
-import org.junit.Test;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNotSame;
+
 
 import java.io.File;
 import java.io.IOException;
@@ -23,34 +27,33 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.file.Paths;
 import java.util.Set;
-
-import static org.junit.Assert.*;
+import org.junit.Test;
 
 
 public class FileHelperTest {
-    @Test
-    public void testRelativeURI() throws IOException, URISyntaxException {
-        URI uri = new URI("test-resources/config.sample.yaml");
-        String text = FileHelper.loadFileAsString(uri);
+  @Test
+  public void testRelativeURI() throws IOException, URISyntaxException {
+    URI uri = new URI("test-resources/config.sample.yaml");
+    String text = FileHelper.loadFileAsString(uri);
 
-        assertNotNull(text);
-        assertNotSame(text, "");
-    }
+    assertNotNull(text);
+    assertNotSame(text, "");
+  }
 
-    @Test
-    public void testFileURI() throws IOException, URISyntaxException {
-        URI currentPath = Paths.get("").toAbsolutePath().toUri();
-        URI uri = new URI(currentPath + "test-resources/config.sample.yaml");
-        String text = FileHelper.loadFileAsString(uri);
+  @Test
+  public void testFileURI() throws IOException, URISyntaxException {
+    URI currentPath = Paths.get("").toAbsolutePath().toUri();
+    URI uri = new URI(currentPath + "test-resources/config.sample.yaml");
+    String text = FileHelper.loadFileAsString(uri);
 
-        assertNotNull(text);
-        assertNotSame(text, "");
-    }
+    assertNotNull(text);
+    assertNotSame(text, "");
+  }
 
-    @Test
-    public void testGetFiles() throws URISyntaxException {
-        Set<File> files = FileHelper.listFiles(new URI("test-resources"));
+  @Test
+  public void testGetFiles() throws URISyntaxException {
+    Set<File> files = FileHelper.listFiles(new URI("test-resources"));
 
-        assertEquals(14, files.size());
-    }
+    assertEquals(14, files.size());
+  }
 }
