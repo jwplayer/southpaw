@@ -16,10 +16,10 @@
 package com.jwplayer.southpaw.topic;
 
 import com.jwplayer.southpaw.util.ByteArray;
-import com.jwplayer.southpaw.topic.TopicConfig;
 import com.jwplayer.southpaw.filter.BaseFilter;
 import com.jwplayer.southpaw.state.BaseState;
 import com.jwplayer.southpaw.metric.Metrics;
+import java.util.Map;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.serialization.Serde;
 
@@ -76,13 +76,7 @@ public abstract class BaseTopic<K, V> {
 
     /**
      * Configures the topic object. Should be called after instantiation.
-     * @param shortName - The short name for this topic, could be the entity stored in this topic and used in indices (e.g. user)
      * @param config - This topic configuration
-     * @param state - The state where we store the offsets for this topic
-     * @param keySerde - The serde for (de)serializing Kafka record keys
-     * @param valueSerde - The serde for (de)serializing Kafka record values
-     * @param filter - The filter used to filter out consumed records, treating them like a tombstone
-     * @param metrics - The Southpaw Metrics object
      */
     public void configure(TopicConfig<K, V> config) {
         // Store the configuration for this topic
@@ -103,7 +97,7 @@ public abstract class BaseTopic<K, V> {
      * Accessor for the current offset.
      * @return Current (long) offset.
      */
-    public abstract Long getCurrentOffset();
+    public abstract Map<Integer, Long> getCurrentOffsets();
 
     /**
      * Accessor for the key serde.
@@ -181,9 +175,9 @@ public abstract class BaseTopic<K, V> {
     public abstract Iterator<ConsumerRecord<K, V>> readNext();
 
     /**
-     * Resets the current offset to the beginning of the topic.
+     * Resets the current offsets to the beginning of the topic.
      */
-    public abstract void resetCurrentOffset();
+    public abstract void resetCurrentOffsets();
 
     /**
      * Gives a nicely formatted string representation of this object. Useful for the Intellij debugger.
@@ -191,10 +185,10 @@ public abstract class BaseTopic<K, V> {
      */
     public String toString() {
         return String.format(
-                "{shortName=%s,topicName=%s,currentOffset=%s,keySerde=%s,valueSerde=%s}",
+                "{shortName=%s,topicName=%s,currentOffsets=%s,keySerde=%s,valueSerde=%s}",
                 this.topicConfig.shortName,
                 topicName,
-                getCurrentOffset(),
+                getCurrentOffsets(),
                 this.topicConfig.keySerde.getClass().getName(),
                 this.topicConfig.valueSerde.getClass().getName()
         );

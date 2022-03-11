@@ -78,7 +78,7 @@ public class MultiIndexTest {
         keySerde.configure(config, true);
         JsonSerde valueSerde = new JsonSerde();
         valueSerde.configure(config, true);
-        BaseTopic<BaseRecord, BaseRecord> indexedTopic = new InMemoryTopic<>(0);
+        BaseTopic<BaseRecord, BaseRecord> indexedTopic = new InMemoryTopic<>();
         indexedTopic.configure(new TopicConfig<BaseRecord, BaseRecord>()
             .setShortName("IndexedTopic")
             .setSouthpawConfig(config)
@@ -99,7 +99,7 @@ public class MultiIndexTest {
             ConsumerRecord<BaseRecord, BaseRecord> record = records.next();
             index.add(ByteArray.toByteArray(record.value().get("JoinKey")), record.key().toByteArray());
         }
-        index.getIndexedTopic().resetCurrentOffset();
+        index.getIndexedTopic().resetCurrentOffsets();
         index.flush();
         return index;
     }

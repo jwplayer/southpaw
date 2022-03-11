@@ -15,10 +15,12 @@
  */
 package com.jwplayer.southpaw.topic;
 
+import com.google.common.collect.Lists;
 import com.jwplayer.southpaw.MockState;
 import com.jwplayer.southpaw.filter.BaseFilter;
 import com.jwplayer.southpaw.state.BaseState;
 import com.jwplayer.southpaw.util.ByteArray;
+import java.util.List;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.serialization.Serdes;
 import org.junit.*;
@@ -31,8 +33,8 @@ import static org.junit.Assert.*;
 
 
 public class InMemoryTopicTest {
-    private final String[] keys = {"A", "B", "C"};
-    private final String[] values = {"Badger", "Mushroom", "Snake"};
+    private final List<String> keys = Lists.newArrayList("A", "B", "C", "A");
+    private final List<String> values = Lists.newArrayList("Badger", "Mushroom", "Snake", "Surprise!");
     private BaseState state;
 
     @Before
@@ -57,8 +59,8 @@ public class InMemoryTopicTest {
             .setValueSerde(Serdes.String())
             .setFilter(new BaseFilter()));
 
-        for(int i = 0; i < keys.length; i++) {
-            topic.write(keys[i], values[i]);
+        for(int i = 0; i < keys.size(); i++) {
+            topic.write(keys.get(i), values.get(i));
         }
         return topic;
     }
@@ -69,24 +71,28 @@ public class InMemoryTopicTest {
         Iterator<ConsumerRecord<String, String>> records = topic.readNext();
         int i = 0;
         while(records.hasNext()) {
+            assertEquals(keys.size() - i, topic.getLag());
             ConsumerRecord<String, String> record = records.next();
-            validateRecord(record, keys[i], values[i], (long) i + topic.firstOffset);
+            assertTrue(values.contains(record.value()));
+            int index = values.indexOf(record.value());
+            assertEquals(keys.get(index), record.key());
+            assertEquals(values.get(index), record.value());
             i++;
         }
-        assertEquals(3, i);
+        assertEquals(0, topic.getLag());
+        assertEquals(keys.size(), i);
     }
 
     @Test
     public void testReadByPK() {
         BaseTopic<String, String> topic = createTopic();
-        String value = topic.readByPK(new ByteArray("B"));
+        Iterator<ConsumerRecord<String, String>> records = topic.readNext();
+        while(records.hasNext()) {
+            records.next();
+        }
 
-        assertEquals("Mushroom", value);
-    }
-
-    public void validateRecord(ConsumerRecord<String, String> record, String key, String value, Long offset) {
-        assertEquals(key, record.key());
-        assertEquals(value, record.value());
-        assertEquals(offset, (Long) record.offset());
+        assertEquals("Surprise!", topic.readByPK(new ByteArray("A")));
+        assertEquals("Mushroom", topic.readByPK(new ByteArray("B")));
+        assertEquals("Snake", topic.readByPK(new ByteArray("C")));
     }
 }

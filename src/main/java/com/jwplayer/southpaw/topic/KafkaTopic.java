@@ -21,10 +21,13 @@ import com.google.common.primitives.Longs;
 import com.jwplayer.southpaw.filter.BaseFilter.FilterMode;
 import com.jwplayer.southpaw.record.BaseRecord;
 import com.jwplayer.southpaw.util.ByteArray;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import org.apache.commons.lang.ObjectUtils;
 import org.apache.commons.lang.time.StopWatch;
 import org.apache.kafka.clients.consumer.*;
 import org.apache.kafka.clients.producer.*;
+import org.apache.kafka.common.PartitionInfo;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.serialization.Serdes;
 import org.slf4j.Logger;
@@ -107,7 +110,7 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
                 record = iter.next();
                 // The current offset is one ahead of the last read one. 
                 // This copies what Kafka would return as the current offset.
-                topic.setCurrentOffset(record.offset() + 1L);
+                topic.setCurrentOffset(record.partition(), record.offset() + 1L);
 
                 key = topic.getKeySerde().deserializer().deserialize(record.topic(), record.key());
                 value = topic.getValueSerde().deserializer().deserialize(record.topic(), record.value());
@@ -243,13 +246,13 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
      */
     private KafkaConsumer<byte[], byte[]> consumer;
     /**
-     * The last read offset using the read next method.
+     * The last read offset by partition using the read next method.
      */
-    private Long currentOffset;
+    private Map<Integer, Long> currentOffsets = new HashMap<>();
     /**
      * The end offset for this topic. Cached for performance reasons
      */
-    private Long endOffset;
+    private Map<Integer, Long> endOffsets;
     /**
      * Stop watch used to determine when to refresh the end offset
      */
@@ -258,6 +261,10 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
      * A count of all currently in flight async writes to Kafka
      */
     private AtomicLong inflightRecords = new AtomicLong();
+    /**
+     * Number of partitions in the topic
+     */
+    private Integer numPartitions;
     /**
      * The timeout for each poll call to Kafka
      */
@@ -274,8 +281,13 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
     @Override
     public void commit() {
         commitData();
-        if(currentOffset != null) {
-            this.getState().put(this.getShortName() + "-" + OFFSETS, Ints.toByteArray(0), Longs.toByteArray(currentOffset));
+        for(Map.Entry<Integer, Long> offset: currentOffsets.entrySet()) {
+            if(offset.getValue() != null) {
+                this.getState().put(
+                    this.getShortName() + "-" + OFFSETS,
+                    Ints.toByteArray(offset.getKey()),
+                    Longs.toByteArray(offset.getValue()));
+            }
         }
         this.getState().flush(this.getShortName() + "-" + OFFSETS);
     }
@@ -298,19 +310,24 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
             logger.warn("Since Southpaw handles its own offsets, the auto offset reset config is ignored. If there are no existing offsets, we will always start at the beginning.");
         }
         consumer = new KafkaConsumer<>(spConfig, Serdes.ByteArray().deserializer(), Serdes.ByteArray().deserializer());
-        if(consumer.partitionsFor(topicName).size() > 1) {
-            throw new RuntimeException(String.format("Topic '%s' has more than one partition. Southpaw currently only supports topics with a single partition.", topicName));
-        }
         // Subscribe is lazy and requires a poll() call, which we don't want to require, so we do this instead
-        consumer.assign(Collections.singleton(new TopicPartition(topicName, 0)));
-        byte[] bytes = this.getState().get(this.getShortName() + "-" + OFFSETS, Ints.toByteArray(0));
-        if(bytes == null) {
-            consumer.seekToBeginning(Collections.singleton(new TopicPartition(topicName, 0)));
-            logger.info(String.format("No offsets found for topic %s, seeking to beginning.", this.getShortName()));
-        } else {
-            currentOffset = Longs.fromByteArray(bytes);
-            consumer.seek(new TopicPartition(topicName, 0), currentOffset);
-            logger.info(String.format("Topic %s starting with offset %s.", this.getShortName(), currentOffset));
+        Set<TopicPartition> partitionsToAssign = consumer.partitionsFor(topicName).stream()
+            .map(partitionInfo -> new TopicPartition(topicName, partitionInfo.partition()))
+            .collect(Collectors.toSet());
+        numPartitions = partitionsToAssign.size();
+        consumer.assign(partitionsToAssign);
+        for(TopicPartition partition: partitionsToAssign) {
+            byte[] bytes = this.getState()
+                .get(this.getShortName() + "-" + OFFSETS, Ints.toByteArray(partition.partition()));
+            if (bytes == null) {
+                consumer.seekToBeginning(Collections.singleton(partition));
+                logger.info(String.format("No offsets found for topic %s and partition %s, seeking to beginning.", this.getShortName(), partition.partition()));
+            } else {
+                Long offset = Longs.fromByteArray(bytes);
+                currentOffsets.put(partition.partition(), offset);
+                consumer.seek(new TopicPartition(topicName, 0), offset);
+                logger.info(String.format("Topic %s starting with offset %s.", this.getShortName(), offset));
+            }
         }
         endOffsetWatch = new StopWatch();
         endOffsetWatch.start();
@@ -337,22 +354,32 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
     }
 
     @Override
-    public Long getCurrentOffset() {
-        return currentOffset;
+    public Map<Integer, Long> getCurrentOffsets() {
+        return Collections.unmodifiableMap(currentOffsets);
     }
 
     @Override
     public long getLag() {
         // Periodically cache the end offset
-        if(endOffset == null || endOffsetWatch.getTime() > END_OFFSET_REFRESH_MS_DEFAULT) {
-            Map<TopicPartition, Long> offsets = consumer.endOffsets(Collections.singletonList(new TopicPartition(topicName, 0)));
-            endOffset = offsets.get(new TopicPartition(topicName, 0));
+        if (endOffsets == null || endOffsetWatch.getTime() > END_OFFSET_REFRESH_MS_DEFAULT) {
+            Set<TopicPartition> partitionsToCheck = IntStream.range(0, numPartitions)
+                .mapToObj(partition -> new TopicPartition(topicName, partition))
+                .collect(Collectors.toSet());
+            Map<TopicPartition, Long> offsets = consumer.endOffsets(partitionsToCheck);
+            endOffsets = offsets.entrySet().stream().collect(
+                Collectors.toMap(entry -> entry.getKey().partition(), Map.Entry::getValue));
             endOffsetWatch.reset();
             endOffsetWatch.start();
         }
-        // Because the end offset is only updated periodically, it's possible to see negative lag. Send 0 instead.
-        long lag = endOffset - (getCurrentOffset() == null ? 0 : getCurrentOffset());
-        return lag < 0 ? 0 : lag;
+        long lag = 0;
+        for(Map.Entry<Integer, Long> entry: endOffsets.entrySet()) {
+            // Because the end offset is only updated periodically, it's possible to see negative lag. Send 0 instead.
+            long currentOffset = currentOffsets.get(entry.getKey()) == null ? 0: currentOffsets.get(entry.getKey());
+            long endOffset = entry.getValue() == null ? 0: entry.getValue();
+            long partitionLag = endOffset - currentOffset < 0 ? 0: endOffset - currentOffset;
+            lag += partitionLag;
+        }
+        return lag;
     }
 
     @Override
@@ -372,19 +399,22 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
     }
 
     @Override
-    public void resetCurrentOffset() {
+    public void resetCurrentOffsets() {
         logger.info(String.format("Resetting offsets for topic %s, seeking to beginning.", this.getShortName()));
-        this.getState().delete(this.getShortName() + "-" + OFFSETS, Ints.toByteArray(0));
-        consumer.seekToBeginning(ImmutableList.of(new TopicPartition(topicName, 0)));
-        currentOffset = null;
+        for(PartitionInfo info: consumer.partitionsFor(this.topicName)) {
+            this.getState().delete(this.getShortName() + "-" + OFFSETS, Ints.toByteArray(info.partition()));
+            consumer.seekToBeginning(ImmutableList.of(new TopicPartition(topicName, 0)));
+        }
+        currentOffsets = new HashMap<>();
     }
 
     /**
      * Method so the iterator returned by readNext() can set the current offset of this topic.
+     * @param partition - The partition to set the offset for
      * @param offset - The new current offset
      */
-    private void setCurrentOffset(long offset) {
-        currentOffset = offset;
+    private void setCurrentOffset(int partition, long offset) {
+        currentOffsets.put(partition, offset);
     }
 
     @Override
@@ -396,7 +426,7 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
 
         inflightRecords.incrementAndGet();
 
-        producer.send(new ProducerRecord<>(topicName, 0, key, value), producerCallback);
+        producer.send(new ProducerRecord<>(topicName, key, value), producerCallback);
     }
 
     private void checkCallbackExceptions() throws RuntimeException {

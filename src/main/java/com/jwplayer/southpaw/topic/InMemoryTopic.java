@@ -30,32 +30,72 @@ import java.util.*;
  */
 public final class InMemoryTopic<K, V> extends BaseTopic<K, V> {
     /**
-     * The last read offset using the read next method.
+     * Internal iterator class
      */
-    protected long currentOffset;
+    private static class IMTIterator<K, V> implements Iterator<ConsumerRecord<K, V>> {
+        int currentPartition = 0;
+        InMemoryTopic<K, V> topic;
+
+        public IMTIterator(InMemoryTopic<K, V> topic) {
+            this.topic = topic;
+        }
+
+        @Override
+        public boolean hasNext() {
+            return topic.getLag() > 0;
+        }
+
+        @Override
+        public ConsumerRecord<K, V> next() {
+            if(!hasNext()) {
+                throw new NoSuchElementException();
+            }
+            for(int partitionsChecked = 0; partitionsChecked < NUM_PARTITIONS; partitionsChecked++) {
+                if(topic.getPartitionLag(currentPartition) > 0) {
+                    long currentOffset = topic.currentOffsets.get(currentPartition);
+                    long firstOffset = topic.firstOffsets.get(currentPartition);
+                    ConsumerRecord<K, V> record
+                        = topic.records.get(currentPartition).get((int) (currentOffset - firstOffset));
+                    topic.currentOffsets.put(currentPartition, currentOffset + 1);
+                    topic.recordsByPK.put(topic.getParsedKey(record.key()), record);
+                    currentPartition = (currentPartition + 1) % NUM_PARTITIONS;
+                    return record;
+                }
+                currentPartition = (currentPartition + 1) % NUM_PARTITIONS;
+            }
+            // We should never get here
+            throw new NoSuchElementException();
+        }
+    }
+
+    public static final int NUM_PARTITIONS = 3;
     /**
-     * The first offset for this topic. Used so not all topics start at offset 0 to prevent subtle, hard to debug
-     * errors in testing.
+     * The last read offsets by partition using the read next method.
      */
-    public final long firstOffset;
+    protected Map<Integer, Long> currentOffsets = new HashMap<>();
+    /**
+     * The first offsets by partition for this topic. Used so not all topics start at offset 0 to prevent subtle, hard
+     * to debug errors in testing.
+     */
+    protected final Map<Integer, Long> firstOffsets;
     /**
      * The internal records
      */
-    private List<ConsumerRecord<K, V>> records = new ArrayList<>();
+    private final Map<Integer, List<ConsumerRecord<K, V>>> records = new HashMap<>();
     /**
      * The internal records stored by PK
      */
-    private Map<ByteArray, ConsumerRecord<K, V>> recordsByPK = new HashMap<>();
+    private final Map<ByteArray, ConsumerRecord<K, V>> recordsByPK = new HashMap<>();
 
     public InMemoryTopic() {
         Random random = new Random();
-        this.firstOffset = Math.abs(random.nextInt(50));
-        this.currentOffset = firstOffset - 1;
-    }
-
-    public InMemoryTopic(long firstOffset) {
-        this.firstOffset = firstOffset;
-        this.currentOffset = firstOffset - 1;
+        this.firstOffsets = new HashMap<>();
+        for(int i = 0; i < NUM_PARTITIONS; i++) {
+            long offset = Math.abs(random.nextInt(50));
+            this.currentOffsets.put(i, offset);
+            this.firstOffsets.put(i, offset);
+            this.records.put(i, new ArrayList<>());
+        }
     }
 
     @Override
@@ -69,13 +109,29 @@ public final class InMemoryTopic<K, V> extends BaseTopic<K, V> {
     }
 
     @Override
-    public Long getCurrentOffset() {
-        return currentOffset;
+    public Map<Integer, Long> getCurrentOffsets() {
+        return this.currentOffsets;
     }
 
     @Override
     public long getLag() {
-        return records.size() - getCurrentOffset() + firstOffset;
+        long lag = 0;
+        for(int i = 0; i < NUM_PARTITIONS; i++) {
+            lag += getPartitionLag(i);
+        }
+        return lag;
+    }
+
+    protected ByteArray getParsedKey(K key) {
+        if(key instanceof BaseRecord) {
+            return ((BaseRecord) key).toByteArray();
+        } else {
+            return ByteArray.toByteArray(key);
+        }
+    }
+
+    protected long getPartitionLag(int partition) {
+        return records.get(partition).size() + firstOffsets.get(partition) - currentOffsets.get(partition);
     }
 
     @Override
@@ -94,17 +150,14 @@ public final class InMemoryTopic<K, V> extends BaseTopic<K, V> {
 
     @Override
     public Iterator<ConsumerRecord<K, V>> readNext() {
-        List<ConsumerRecord<K, V>> retVal = new ArrayList<>();
-        while(records.size() + firstOffset > currentOffset + 1) {
-            currentOffset++;
-            retVal.add(records.get(((Long) (currentOffset - firstOffset)).intValue()));
-        }
-        return retVal.iterator();
+        return new IMTIterator<>(this);
     }
 
     @Override
-    public void resetCurrentOffset() {
-        currentOffset = firstOffset - 1;
+    public void resetCurrentOffsets() {
+        for(Map.Entry<Integer, Long> entry: firstOffsets.entrySet()) {
+            this.currentOffsets.put(entry.getKey(), entry.getValue());
+        }
     }
 
     @Override
@@ -115,26 +168,22 @@ public final class InMemoryTopic<K, V> extends BaseTopic<K, V> {
         if (value instanceof BaseRecord) {
             filterMode = this.getFilter().filter(this.getShortName(), (BaseRecord) value, null);
         }
+        V parsedValue;
 
         switch (filterMode) {
             case DELETE:
-                record = new ConsumerRecord<>(topicName, 0, records.size() + firstOffset, key, null);
+                parsedValue = null;
                 break;
             case UPDATE:
-                record = new ConsumerRecord<>(topicName, 0, records.size() + firstOffset, key, value);
+                parsedValue = value;
                 break;
             case SKIP:
             default:
-                record = null;
+                return;
         }
-
-        if (record != null) {
-            records.add(record);
-            if(key instanceof BaseRecord) {
-                recordsByPK.put(((BaseRecord) key).toByteArray(), record);
-            } else {
-                recordsByPK.put(ByteArray.toByteArray(key), record);
-            }
-        }
+        int partition = getParsedKey(key).hashCode() % NUM_PARTITIONS;
+        long newOffset = records.get(partition).size() + firstOffsets.get(partition);
+        record = new ConsumerRecord<>(topicName, partition, newOffset, key, parsedValue);
+        records.get(partition).add(record);
     }
 }

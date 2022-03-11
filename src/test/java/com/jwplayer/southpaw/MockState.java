@@ -24,7 +24,7 @@ import java.util.Map;
 
 public class MockState extends BaseState {
 
-    private Map<ByteArray, Map<ByteArray, byte[]>> dataBatches;
+    private Map<ByteArray, Map<ByteArray, byte[]>> dataBatches = new HashMap<>();
 
     @Override
     public void backup() {
@@ -38,13 +38,14 @@ public class MockState extends BaseState {
 
     @Override
     public void open() {
-        dataBatches = new HashMap<>();
         super.open();
     }
 
     @Override
     public void createKeySpace(String keySpace) {
-        dataBatches.put(new ByteArray(keySpace), new HashMap<>());
+        if(!dataBatches.containsKey(new ByteArray(keySpace))) {
+            dataBatches.put(new ByteArray(keySpace), new HashMap<>());
+        }
     }
 
     @Override
