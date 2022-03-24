@@ -43,9 +43,7 @@ public class MockState extends BaseState {
 
     @Override
     public void createKeySpace(String keySpace) {
-        if(!dataBatches.containsKey(new ByteArray(keySpace))) {
-            dataBatches.put(new ByteArray(keySpace), new HashMap<>());
-        }
+        dataBatches.putIfAbsent(new ByteArray(keySpace), new HashMap<>());
     }
 
     @Override
