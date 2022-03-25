@@ -7,7 +7,7 @@
     <groupId>com.jwplayer</groupId>
     <artifactId>southpaw</artifactId>
     <packaging>jar</packaging>
-    <version>0.6.1</version>
+    <version>0.7.0</version>
     <name>southpaw</name>
     <repositories>
         <repository>
