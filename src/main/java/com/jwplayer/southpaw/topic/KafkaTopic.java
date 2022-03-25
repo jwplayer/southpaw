@@ -284,16 +284,16 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
         for(Map.Entry<Integer, Long> offset: currentOffsets.entrySet()) {
             if(offset.getValue() != null) {
                 this.getState().put(
-                    this.getShortName() + "-" + OFFSETS,
+                    offsetKeyspaceName,
                     Ints.toByteArray(offset.getKey()),
                     Longs.toByteArray(offset.getValue()));
             }
         }
-        this.getState().flush(this.getShortName() + "-" + OFFSETS);
+        this.getState().flush(offsetKeyspaceName);
     }
 
     protected void commitData() {
-        this.getState().flush(this.getShortName() + "-" + DATA);
+        this.getState().flush(dataKeyspaceName);
     }
 
     @Override
@@ -317,8 +317,7 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
         numPartitions = partitionsToAssign.size();
         consumer.assign(partitionsToAssign);
         for(TopicPartition partition: partitionsToAssign) {
-            byte[] bytes = this.getState()
-                .get(this.getShortName() + "-" + OFFSETS, Ints.toByteArray(partition.partition()));
+            byte[] bytes = this.getState().get(offsetKeyspaceName, Ints.toByteArray(partition.partition()));
             if (bytes == null) {
                 consumer.seekToBeginning(Collections.singleton(partition));
                 logger.info(String.format("No offsets found for topic %s and partition %s, seeking to beginning.", this.getShortName(), partition.partition()));
@@ -388,7 +387,7 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
         if(primaryKey == null) {
             return null;
         } else {
-            bytes = this.getState().get(this.getShortName() + "-" + DATA, primaryKey.getBytes());
+            bytes = this.getState().get(dataKeyspaceName, primaryKey.getBytes());
         }
         return this.getValueSerde().deserializer().deserialize(topicName, bytes);
     }
@@ -402,7 +401,7 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
     public void resetCurrentOffsets() {
         logger.info(String.format("Resetting offsets for topic %s, seeking to beginning.", this.getShortName()));
         for(PartitionInfo info: consumer.partitionsFor(this.topicName)) {
-            this.getState().delete(this.getShortName() + "-" + OFFSETS, Ints.toByteArray(info.partition()));
+            this.getState().delete(offsetKeyspaceName, Ints.toByteArray(info.partition()));
             consumer.seekToBeginning(ImmutableList.of(new TopicPartition(topicName, 0)));
         }
         currentOffsets = new HashMap<>();

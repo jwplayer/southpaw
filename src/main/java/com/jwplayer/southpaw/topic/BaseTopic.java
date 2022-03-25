@@ -60,6 +60,14 @@ public abstract class BaseTopic<K, V> {
             "Config option for specifying the value serde class for an input record";
 
     /**
+     The name of the state keyspace where offsets are stored
+     */
+    protected String dataKeyspaceName;
+    /**
+     The name of the state keyspace where offsets are stored
+     */
+    protected String offsetKeyspaceName;
+    /**
      * Configuration object
      */
     protected TopicConfig<K, V> topicConfig;
@@ -82,10 +90,14 @@ public abstract class BaseTopic<K, V> {
         // Store the configuration for this topic
         this.topicConfig = config;
 
+        // Set keyspace names
+        dataKeyspaceName = this.getShortName() + "-" + DATA;
+        offsetKeyspaceName = this.getShortName() + "-" + OFFSETS;
+
         // Initialize topic
         this.topicName = this.topicConfig.southpawConfig.getOrDefault(TOPIC_NAME_CONFIG, "").toString();
-        this.topicConfig.state.createKeySpace(this.getShortName() + "-" + DATA);
-        this.topicConfig.state.createKeySpace(this.getShortName() + "-" + OFFSETS);
+        this.topicConfig.state.createKeySpace(dataKeyspaceName);
+        this.topicConfig.state.createKeySpace(offsetKeyspaceName);
     }
 
     /**
