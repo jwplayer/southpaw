@@ -16,6 +16,7 @@
 package com.jwplayer.southpaw.topic;
 
 import com.jwplayer.southpaw.util.ByteArray;
+import java.util.Map;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.commons.lang.NotImplementedException;
 
@@ -34,7 +35,7 @@ public class BlackHoleTopic<K, V> extends BaseTopic<K, V> {
     }
 
     @Override
-    public Long getCurrentOffset() {
+    public Map<Integer, Long> getCurrentOffsets() {
         throw new NotImplementedException();
     }
 
@@ -54,7 +55,7 @@ public class BlackHoleTopic<K, V> extends BaseTopic<K, V> {
     }
 
     @Override
-    public void resetCurrentOffset() {
+    public void resetCurrentOffsets() {
         throw new NotImplementedException();
     }
 

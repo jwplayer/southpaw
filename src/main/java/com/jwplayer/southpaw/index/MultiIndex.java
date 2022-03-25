@@ -23,6 +23,8 @@ import com.jwplayer.southpaw.util.ByteArraySet;
 import org.apache.commons.collections4.map.LRUMap;
 
 import java.util.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -41,6 +43,10 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
      * are not guaranteed to be immediately gettable without flushing.
      */
     public static final String INDEX_WRITE_BATCH_SIZE = "index.write.batch.size";
+    /**
+     * Logger
+     */
+    private static final Logger LOGGER =  LoggerFactory.getLogger(MultiIndex.class);
     /**
      * The size threshold for an index entry to be put into the LRU cache.
      */
@@ -289,7 +295,7 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
      * @return A string representation set of reverse index entry keys that are missing from the regular index.
      */
     public Set<String> verifyIndexState() {
-        System.out.println("Verifying reverse index: " + reverseIndexName + " against index: " + indexName);
+        LOGGER.info("Verifying reverse index: " + reverseIndexName + " against index: " + indexName);
         Set<String> missingKeys = new HashSet<>();
         BaseState.Iterator iter = state.iterate(reverseIndexName);
         while (iter.hasNext()) {
@@ -316,7 +322,7 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
      * @return A string representation set of regular index entry keys that are missing from the reverse index.
      */
     public Set<String> verifyReverseIndexState() {
-        System.out.println("Verifying index: " + indexName + " against reverse index: " + reverseIndexName);
+        LOGGER.info("Verifying index: " + indexName + " against reverse index: " + reverseIndexName);
         Set<String> missingKeys = new HashSet<>();
         BaseState.Iterator iter = state.iterate(indexName);
         while (iter.hasNext()) {

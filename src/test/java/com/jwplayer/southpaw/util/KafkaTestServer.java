@@ -21,30 +21,26 @@ import kafka.server.KafkaServerStartable;
 import kafka.utils.ZkUtils;
 import org.apache.curator.test.InstanceSpec;
 
-import java.io.File;
 import java.util.*;
 
 
 public class KafkaTestServer {
     public static final String HOST = "localhost";
 
-    private KafkaServerStartable kafkaServer;
-    private Integer port;
-    private ZookeeperTestServer zkServer;
-    private ZkUtils zkUtils;
+    private final KafkaServerStartable kafkaServer;
+    private final Integer port;
+    private final ZookeeperTestServer zkServer;
+    private final ZkUtils zkUtils;
 
-    public KafkaTestServer() {
+    public KafkaTestServer(String logDir) {
         zkServer = new ZookeeperTestServer();
         zkUtils = zkServer.getZkUtils();
         port = InstanceSpec.getRandomPort();
-        File logDir;
-        logDir = new File(System.getProperty("java.io.tmpdir"), "kafka/logs/log-" + port.toString());
-        logDir.deleteOnExit();
         Properties kafkaProperties = new Properties();
         kafkaProperties.setProperty(KafkaConfig.BrokerIdProp(), "0");
         kafkaProperties.setProperty(KafkaConfig.ZkConnectProp(), zkServer.getConnectionString());
         kafkaProperties.setProperty(KafkaConfig.PortProp(), port.toString());
-        kafkaProperties.setProperty(KafkaConfig.LogDirProp(), logDir.getAbsolutePath());
+        kafkaProperties.setProperty(KafkaConfig.LogDirProp(), logDir);
         kafkaProperties.setProperty(KafkaConfig.DefaultReplicationFactorProp(), "1");
         kafkaProperties.setProperty(KafkaConfig.OffsetsTopicReplicationFactorProp(), "1");
         kafkaServer = new KafkaServerStartable(new KafkaConfig(kafkaProperties));

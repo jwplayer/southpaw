@@ -20,8 +20,6 @@ import org.apache.commons.lang.NotImplementedException;
 import org.junit.Before;
 import org.junit.Test;
 
-import static org.junit.Assert.*;
-
 public class BlackHoleTopicTest {
     public BlackHoleTopic<Object, Object> topic;
 
@@ -42,7 +40,7 @@ public class BlackHoleTopicTest {
 
     @Test(expected = NotImplementedException.class)
     public void testGetCurrentOffset() {
-        topic.getCurrentOffset();
+        topic.getCurrentOffsets();
     }
 
     @Test(expected = NotImplementedException.class)
@@ -62,7 +60,7 @@ public class BlackHoleTopicTest {
 
     @Test(expected = NotImplementedException.class)
     public void testResetCurrentOffset() {
-        topic.resetCurrentOffset();
+        topic.resetCurrentOffsets();
     }
 
     @Test

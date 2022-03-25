@@ -62,8 +62,8 @@ public class ConsoleTopicTest {
     }
 
     @Test(expected = NotImplementedException.class)
-    public void testGetCurrentOffset() {
-        topic.getCurrentOffset();
+    public void testGetCurrentOffsets() {
+        topic.getCurrentOffsets();
     }
 
     @Test(expected = NotImplementedException.class)
@@ -82,8 +82,8 @@ public class ConsoleTopicTest {
     }
 
     @Test(expected = NotImplementedException.class)
-    public void testResetCurrentOffset() {
-        topic.resetCurrentOffset();
+    public void testResetCurrentOffsets() {
+        topic.resetCurrentOffsets();
     }
 
     @Test

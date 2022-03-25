@@ -119,7 +119,7 @@ public class SouthpawEndToEndTest {
                 if(!denormalizedRecords.containsKey(entry.getKey())) {
                     denormalizedRecords.put(entry.getKey(), new HashMap<>());
                 }
-                entry.getValue().resetCurrentOffset();
+                entry.getValue().resetCurrentOffsets();
                 Iterator<ConsumerRecord<byte[], DenormalizedRecord>> iter = entry.getValue().readNext();
                 while(iter.hasNext()) {
                     ConsumerRecord<byte[], DenormalizedRecord> record = iter.next();
