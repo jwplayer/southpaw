@@ -1,5 +1,16 @@
 # Change log
 
+## 0.6.2
+March 25th, 2022
+
+### New Features
+* Adds support for multi-partition topics [#102](https://github.com/jwplayer/southpaw/pull/102)
+
+### Bug Fixes
+* Bump Guava from 29.0-jre to 30.0-jre [#92](https://github.com/jwplayer/southpaw/pull/92) 
+* Bump commons-io from 2.6 to 2.7 [#96](https://github.com/jwplayer/southpaw/pull/96)
+* Bump snakeyaml from 1.20 to 1.26 [#101](https://github.com/jwplayer/southpaw/pull/101)
+
 ## 0.6.1
 November 20th, 2020
 
