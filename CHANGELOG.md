@@ -1,7 +1,10 @@
 # Change log
 
-## 0.6.2
+## 0.7.0
 March 25th, 2022
+
+### Upgrade Notes:
+* The support for multi-partition topics is not a breaking change. Existing states are still supported.
 
 ### New Features
 * Adds support for multi-partition topics [#102](https://github.com/jwplayer/southpaw/pull/102)
