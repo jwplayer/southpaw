@@ -25,6 +25,7 @@ import com.jwplayer.southpaw.util.KafkaTestServer;
 import java.util.Collections;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.serialization.Serdes;
 import org.junit.*;
 
@@ -149,25 +150,30 @@ public class KafkaTopicTest {
     @Test
     public void testGetPreexistingOffsetsMultiPartition() {
         String keyspace = "testGetPreexistingOffsetsMultiPartition-offsets";
+        String topicName = "testGetPreexistingOffsetsMultiPartition";
         state.createKeySpace(keyspace);
         state.put(keyspace, Ints.toByteArray(0), Longs.toByteArray(3));
         state.put(keyspace, Ints.toByteArray(1), Longs.toByteArray(20));
-        KafkaTopic<String, String> topic = createTopic("testGetPreexistingOffsetsMultiPartition", 3);
+        KafkaTopic<String, String> topic = createTopic(topicName, 3);
         Map<Integer, Long> expectedOffsets = new HashMap<>();
         expectedOffsets.put(0, 3L);
         expectedOffsets.put(1, 20L);
         assertEquals(expectedOffsets, topic.getCurrentOffsets());
+        assertEquals(3L, topic.consumer.position(new TopicPartition(topicName, 0)));
+        assertEquals(20L, topic.consumer.position(new TopicPartition(topicName, 1)));
     }
 
     @Test
     public void testGetPreexistingOffsetsSinglePartition() {
         String keyspace = "testGetPreexistingOffsetsSinglePartition-offsets";
+        String topicName = "testGetPreexistingOffsetsSinglePartition";
         state.createKeySpace(keyspace);
         state.put(keyspace, Ints.toByteArray(0), Longs.toByteArray(2));
-        KafkaTopic<String, String> topic = createTopic("testGetPreexistingOffsetsSinglePartition", 1);
+        KafkaTopic<String, String> topic = createTopic(topicName, 1);
         Map<Integer, Long> expectedOffsets = new HashMap<>();
         expectedOffsets.put(0, 2L);
         assertEquals(expectedOffsets, topic.getCurrentOffsets());
+        assertEquals(2L, topic.consumer.position(new TopicPartition(topicName, 0)));
     }
 
     @Test
@@ -175,7 +181,7 @@ public class KafkaTopicTest {
         KafkaTopic<String, String> topic = createTopic("testGetTopicName");
         assertEquals("testGetTopicName", topic.getTopicName());
     }
-
+    
     @Test
     public void testReadByPK() {
         KafkaTopic<String, String> topic = createTopic("testReadByPK");

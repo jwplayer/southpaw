@@ -244,7 +244,7 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
     /**
      * The Kafka consumer this abstraction wraps around
      */
-    private KafkaConsumer<byte[], byte[]> consumer;
+    protected KafkaConsumer<byte[], byte[]> consumer;
     /**
      * The last read offset by partition using the read next method.
      */
@@ -324,8 +324,8 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
             } else {
                 Long offset = Longs.fromByteArray(bytes);
                 currentOffsets.put(partition.partition(), offset);
-                consumer.seek(new TopicPartition(topicName, 0), offset);
-                logger.info(String.format("Topic %s starting with offset %s.", this.getShortName(), offset));
+                consumer.seek(new TopicPartition(topicName, partition.partition()), offset);
+                logger.info(String.format("Topic %s and partition %s starting with offset %s.", this.getShortName(), partition.partition(), offset));
             }
         }
         endOffsetWatch = new StopWatch();
