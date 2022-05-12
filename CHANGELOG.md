@@ -1,5 +1,11 @@
 # Change log
 
+## 0.7.1
+May 12th, 2022
+
+### Bug Fixes
+* Fixes a bug where the Kafka consumer was not correctly seeking past the beginning on multi-partition topics if there were pre-existing offsets [#104](https://github.com/jwplayer/southpaw/pull/104)
+
 ## 0.7.0
 March 25th, 2022
 
