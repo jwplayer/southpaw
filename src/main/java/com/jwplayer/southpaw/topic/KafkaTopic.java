@@ -21,6 +21,8 @@ import com.google.common.primitives.Longs;
 import com.jwplayer.southpaw.filter.BaseFilter.FilterMode;
 import com.jwplayer.southpaw.record.BaseRecord;
 import com.jwplayer.southpaw.util.ByteArray;
+
+import java.time.Duration;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.apache.commons.lang.ObjectUtils;
@@ -394,7 +396,7 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
 
     @Override
     public Iterator<ConsumerRecord<K, V>> readNext() {
-        return new KafkaTopicIterator<>(consumer.poll(pollTimeout).iterator(), this);
+        return new KafkaTopicIterator<>(consumer.poll(Duration.ofMillis(pollTimeout)).iterator(), this);
     }
 
     @Override

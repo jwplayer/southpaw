@@ -52,7 +52,7 @@ public class AvroSerde implements BaseSerde<BaseRecord> {
         }
 
         public GenericRecord deserialize(String topic, boolean isKey, byte[] bytes) {
-            return (GenericRecord) this.deserialize(true, topic, isKey, bytes, null);
+            return (GenericRecord) this.deserialize(topic, isKey, bytes, null);
         }
     }
 
