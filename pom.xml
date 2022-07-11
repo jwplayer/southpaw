@@ -27,6 +27,8 @@
         <release>8</release>
 
         <!-- These Kafka dependencies need to be kept in sync -->
+        <!-- As well as the TestContainer Kafka image version found in -->
+        <!-- src/test/java/com/jwplayer/southpaw/topic/KafkaTopicTest.java -->
         <version.confluent>7.1.1</version.confluent>
         <version.kafka>3.1.1</version.kafka>
 
