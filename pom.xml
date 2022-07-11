@@ -47,11 +47,11 @@
         <version.xml.bind>2.3.1</version.xml.bind>
 
         <!-- Testing -->
-        <version.curator>2.12.0</version.curator>
         <version.jacoco>0.8.7</version.jacoco>
         <version.junit>4.13.1</version.junit>
         <version.mockito>2.25.1</version.mockito>
         <version.s3mock>0.2.5</version.s3mock>
+        <version.testcontainers>1.17.3</version.testcontainers>
 
         <modules.argline />
 
@@ -175,12 +175,6 @@
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>org.apache.curator</groupId>
-            <artifactId>curator-test</artifactId>
-            <version>${version.curator}</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
             <groupId>io.findify</groupId>
             <artifactId>s3mock_2.12</artifactId>
             <version>${version.s3mock}</version>
@@ -197,6 +191,12 @@
             <artifactId>org.jacoco.agent</artifactId>
             <classifier>runtime</classifier>
             <version>${version.jacoco}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>kafka</artifactId>
+            <version>${version.testcontainers}</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
