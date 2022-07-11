@@ -33,7 +33,6 @@ import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.serialization.Serdes;
 import org.junit.*;
 
-import org.junit.rules.TemporaryFolder;
 import org.testcontainers.containers.KafkaContainer;
 import org.testcontainers.shaded.com.google.common.collect.ImmutableList;
 import org.testcontainers.utility.DockerImageName;
@@ -50,10 +49,6 @@ public class KafkaTopicTest {
     public static KafkaContainer kafkaContainer = new KafkaContainer(DockerImageName.parse("confluentinc/cp-kafka:7.1.1"));
     private static BaseState state;
     private static AdminClient adminClient;
-
-    @Rule
-    public TemporaryFolder logDir = new TemporaryFolder();
-
     public KafkaTopic<String, String> createTopic(String topicName) {
         return createTopic(topicName, 3);
     }
