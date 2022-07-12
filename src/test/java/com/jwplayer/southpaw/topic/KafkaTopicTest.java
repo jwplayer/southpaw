@@ -21,38 +21,43 @@ import com.jwplayer.southpaw.MockState;
 import com.jwplayer.southpaw.filter.BaseFilter;
 import com.jwplayer.southpaw.state.BaseState;
 import com.jwplayer.southpaw.util.ByteArray;
-import com.jwplayer.southpaw.util.KafkaTestServer;
-import java.util.Collections;
+
+
+import org.apache.kafka.clients.admin.AdminClient;
+import org.apache.kafka.clients.admin.AdminClientConfig;
+import org.apache.kafka.clients.admin.CreateTopicsResult;
+import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.serialization.Serdes;
 import org.junit.*;
 
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Map;
-import org.junit.rules.TemporaryFolder;
+import org.testcontainers.containers.KafkaContainer;
+import org.testcontainers.shaded.com.google.common.collect.ImmutableList;
+import org.testcontainers.utility.DockerImageName;
+
+import java.util.*;
 
 import static org.junit.Assert.*;
 
 
 public class KafkaTopicTest {
-    private static KafkaTestServer kafkaServer;
-    private static BaseState state;
+
 
     @ClassRule
-    public static TemporaryFolder logDir = new TemporaryFolder();
-
+    public static KafkaContainer kafkaContainer = new KafkaContainer(DockerImageName.parse("confluentinc/cp-kafka:7.1.1"));
+    private static BaseState state;
+    private static AdminClient adminClient;
     public KafkaTopic<String, String> createTopic(String topicName) {
         return createTopic(topicName, 3);
     }
 
     public KafkaTopic<String, String> createTopic(String topicName, int partitions) {
-        kafkaServer.createTopic(topicName, partitions);
+        createKafkaTopic(topicName, partitions);
         KafkaTopic<String, String> topic = new KafkaTopic<>();
         Map<String, Object> config = new HashMap<>();
-        config.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaServer.getConnectionString());
+        config.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaContainer.getBootstrapServers());
         config.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
         config.put(ConsumerConfig.GROUP_ID_CONFIG, "test-group");
         config.put(KafkaTopic.TOPIC_NAME_CONFIG, topicName);
@@ -84,13 +89,16 @@ public class KafkaTopicTest {
     public static void setup() {
         state = new MockState();
         state.open();
-        kafkaServer = new KafkaTestServer(logDir.getRoot().getAbsolutePath());
+
+        Properties properties = new Properties();
+        properties.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaContainer.getBootstrapServers());
+        adminClient = AdminClient.create(properties);
     }
 
     @AfterClass
     public static void cleanup() {
-        kafkaServer.shutdown();
         state.delete();
+        adminClient.close();
     }
 
     @Test
@@ -225,5 +233,16 @@ public class KafkaTopicTest {
     public void testToString() {
         KafkaTopic<String, String> topic = createTopic("testToString");
         assertNotNull(topic.toString());
+    }
+
+    private void createKafkaTopic(String topicName, int partitions) {
+        NewTopic newTopic = new NewTopic(topicName, partitions,  (short) 1);
+        try {
+            final CreateTopicsResult result = adminClient.createTopics(ImmutableList.of(newTopic));
+            result.all().get();
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to create topic: " + topicName, e);
+        }
+
     }
 }
