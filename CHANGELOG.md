@@ -1,5 +1,12 @@
 # Change log
 
+## 0.7.2
+July 12, 2022
+
+### Bug Fixes
+* Bump jackson-databind from 2.11.1 to 2.12.6.1 [#106](https://github.com/jwplayer/southpaw/pull/106)
+* Upgrades Kafka dependencies and adds Testcontainers to tests [#107](https://github.com/jwplayer/southpaw/pull/107)
+
 ## 0.7.1
 May 12th, 2022
 
