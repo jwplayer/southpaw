@@ -1,7 +1,13 @@
 # Change log
 
+## 0.7.3
+September 26th, 2022
+
+### Bug Fixes
+* Bump snakeyaml from 1.31 to 1.32 [#110](https://github.com/jwplayer/southpaw/pull/110)
+
 ## 0.7.2
-July 12, 2022
+July 12th, 2022
 
 ### Bug Fixes
 * Bump jackson-databind from 2.11.1 to 2.12.6.1 [#106](https://github.com/jwplayer/southpaw/pull/106)
