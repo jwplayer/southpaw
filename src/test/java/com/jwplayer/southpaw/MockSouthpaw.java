@@ -20,6 +20,7 @@ import com.jwplayer.southpaw.json.*;
 import com.jwplayer.southpaw.record.BaseRecord;
 import com.jwplayer.southpaw.topic.BaseTopic;
 import com.jwplayer.southpaw.util.ByteArray;
+import com.jwplayer.southpaw.util.ByteArraySet;
 
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
@@ -42,7 +43,7 @@ public class MockSouthpaw extends Southpaw {
 
     public void createDenormalizedRecords(
             Relation root,
-            Set<ByteArray> rootRecordPKs) {
+            ByteArraySet rootRecordPKs) {
         super.createDenormalizedRecords(root, rootRecordPKs);
     }
 
@@ -62,7 +63,7 @@ public class MockSouthpaw extends Southpaw {
      * Accessor for the FK indices used by Southpaw
      * @return Southpaw's FK indices
      */
-    public Map<String, BaseIndex<BaseRecord, BaseRecord, Set<ByteArray>>> getFkIndices() {
+    public Map<String, BaseIndex<BaseRecord, BaseRecord, ByteArraySet>> getFkIndices() {
         return fkIndices;
     }
 

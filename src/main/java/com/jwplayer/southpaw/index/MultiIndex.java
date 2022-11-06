@@ -33,7 +33,7 @@ import org.slf4j.LoggerFactory;
  * @param <K> - The type of the key stored in the indexed topic
  * @param <V> - The type of the value stored in the indexed topic
  */
-public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements Reversible {
+public class MultiIndex<K, V> extends BaseIndex<K, V, ByteArraySet> implements Reversible {
     /**
      * Size of the LRU cache for storing the index entries containing more than one key
      */
