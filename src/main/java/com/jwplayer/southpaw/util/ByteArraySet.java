@@ -37,7 +37,7 @@ public class ByteArraySet implements Set<ByteArray> {
         SINGLE_CHUNK((byte) 2),
         MULTI_CHUNK((byte) 3);
 
-        private byte value;
+        private final byte value;
 
         FORMAT(byte value) {
             this.value = value;
@@ -103,6 +103,9 @@ public class ByteArraySet implements Set<ByteArray> {
          */
         public Chunk(int chunkSize) {
             this.bytes = new byte[chunkSize];
+            this.entries = 0;
+            this.max = null;
+            this.min = null;
             this.size = 0;
         }
 
@@ -152,7 +155,7 @@ public class ByteArraySet implements Set<ByteArray> {
             int index = 0;
             byte[] baBytes = byteArray.getBytes();
             while(index < size) {
-                int baSize = (int) bytes[index];
+                int baSize = bytes[index];
                 int i;
                 index++;
                 if(baSize == baBytes.length) {
@@ -175,16 +178,16 @@ public class ByteArraySet implements Set<ByteArray> {
          */
         public static Chunk deserialize(byte[] bytes, int from, int to) {
             int size = Ints.fromBytes(bytes[to - 3], bytes[to - 2], bytes[to - 1], bytes[to]);
-            int maxSize = (int) bytes[to - 4];
+            int maxSize = bytes[to - 4];
             ByteArray max = new ByteArray(Arrays.copyOfRange(bytes, to - 4 - maxSize, to - 4));
-            int minSize = (int) bytes[to - 5 - maxSize];
+            int minSize = bytes[to - 5 - maxSize];
             ByteArray min = new ByteArray(Arrays.copyOfRange(bytes, to - 5 - maxSize - minSize, to - 5 - maxSize));
             size = size - 2 - minSize - maxSize - Integer.BYTES;
             int entries = 0;
             int index = 0;
             byte[] chunkBytes = Arrays.copyOfRange(bytes, from, from + size);
             while(index < size) {
-                int baSize = (int) chunkBytes[index];
+                int baSize = chunkBytes[index];
                 if(baSize != 0) entries++;
                 index += 1 + baSize;
             }
@@ -205,7 +208,7 @@ public class ByteArraySet implements Set<ByteArray> {
             ByteArray min = null;
             ByteArray max = null;
             while(index < chunkBytes.length) {
-                int baSize = (int) chunkBytes[index];
+                int baSize = chunkBytes[index];
                 index++;
                 if(baSize != 0) {
                     entries++;
@@ -219,59 +222,104 @@ public class ByteArraySet implements Set<ByteArray> {
 
         /**
          * Removes the given ByteArray from this chunk by filling in its section of the chunk with 0s
-         * @param byteArray - The ByteArray to remove
+         * @param valToRemove - The ByteArray to remove
          * @return True if the value was removed, otherwise false.
          */
-        public boolean remove(ByteArray byteArray) {
-            if(entries == 0 || byteArray == null || byteArray.size() == 0) return false;
-            if(min.compareTo(byteArray) > 0 || max.compareTo(byteArray) < 0) return false;
+        public boolean remove(ByteArray valToRemove) {
+            if(entries == 0 || valToRemove == null || valToRemove.size() == 0) return false;
+            if(min.compareTo(valToRemove) > 0 || max.compareTo(valToRemove) < 0) return false;
             int index = 0;
-            byte[] baBytes = byteArray.getBytes();
             while(index < size) {
-                int baSize = (int) bytes[index];
-                int i;
-                index++;
-                if(baSize == baBytes.length) {
-                    for(i = 0; i < baSize; i++) {
-                        if(baBytes[i] != bytes[index + i]) break;
+                int entrySize = bytes[index];
+                if(entrySize == valToRemove.size() && valToRemove.compareTo(bytes, index + 1, entrySize) == 0) {
+                    Arrays.fill(bytes, index, index + entrySize + 1, (byte) 0);
+                    entries--;
+                    if (min.equals(valToRemove) || max.equals(valToRemove)) {
+                        resetMinAndMax();
                     }
-                    if(i == baSize) {
-                        bytes[index - 1] = 0;
-                        for(i = 0; i < baSize; i++) {
-                            bytes[index + i] = 0;
-                        }
-                        entries--;
-                        if(entries > 0) {
-                            if(min.equals(byteArray)) {
-                                index = 0;
-                                while(index < size) {
-                                    baSize = (int) bytes[index];
-                                    index++;
-                                    if(baSize != 0) {
-                                        min = new ByteArray(Arrays.copyOfRange(bytes, index, index + baSize));
-                                        break;
-                                    }
-                                    index += baSize;
-                                }
-                            }
-                            if(max.equals(byteArray)) {
-                                index = 0;
-                                while(index < size) {
-                                    baSize = (int) bytes[index];
-                                    index++;
-                                    if(baSize != 0) {
-                                        max = new ByteArray(Arrays.copyOfRange(bytes, index, index + baSize));
-                                    }
-                                    index += baSize;
-                                }
-                            }
-                        }
-                        return true;
-                    }
+                    return true;
                 }
-                index += baSize;
+                index += entrySize + 1;
             }
             return false;
+        }
+
+        /**
+         * Removes the given ByteArrays from this chunk by filling in its section of the chunk with 0s.
+         * @param valsToRemove - The ByteArrays to remove
+         * @return True if any value was removed, otherwise false
+         */
+        public boolean removeAll(Set<ByteArray> valsToRemove) {
+            if(entries == 0) return false;
+
+            int index = 0;
+            boolean valsRemoved = false;
+            for(ByteArray valToRemove: valsToRemove) {
+                if(valToRemove != null && valToRemove.size() > 0 &&
+                        min.compareTo(valToRemove) <= 0 && max.compareTo(valToRemove) >= 0) {
+                    while(index < size) {
+                        int entrySize = bytes[index];
+                        if(entrySize == 0) {
+                            // This is a previously deleted value, so move the index forward
+                            index++;
+                            continue;
+                        }
+                        int comparison = valToRemove.compareTo(bytes, index + 1, entrySize);
+                        if(comparison < 0) {
+                            // valToRemove is less than the current index, so move to the next valToRemove
+                            break;
+                        } else if(comparison == 0) {
+                            Arrays.fill(bytes, index, index + entrySize + 1, (byte) 0);
+                            entries--;
+                            index += entrySize + 1;
+                            valsRemoved = true;
+                            break;
+                        } else {
+                            // valToRemove is greater than the current index, so move to the next index
+                            index += entrySize + 1;
+                        }
+                    }
+                }
+            }
+            if(valsToRemove.contains(min) || valsToRemove.contains(max)) {
+                resetMinAndMax();
+            }
+
+            return valsRemoved;
+        }
+
+        /**
+         * Searches for and resets the min and max entries starting at index 0
+         */
+        public void resetMinAndMax() {
+            if(entries == 0) {
+                max = null;
+                min = null;
+                size = 0;
+            } else {
+                int entrySize = 0;
+                int index = 0;
+                while (index < size) {
+                    entrySize = bytes[index];
+                    if (entrySize != 0) {
+                        min = new ByteArray(Arrays.copyOfRange(bytes, index + 1, index + entrySize + 1));
+                        break;
+                    }
+                    index++;
+                }
+                Integer maxIndex = null;
+                while (index < size) {
+                    entrySize = bytes[index];
+                    if (entrySize != 0) {
+                        maxIndex = index;
+                        index+= entrySize;
+                    }
+                    index++;
+                }
+                if (maxIndex != null) {
+                    max = new ByteArray(Arrays.copyOfRange(bytes, maxIndex + 1, maxIndex + bytes[maxIndex] + 1));
+                }
+            }
         }
 
         /**
@@ -293,48 +341,54 @@ public class ByteArraySet implements Set<ByteArray> {
     }
 
     protected class ChunksIterator implements Iterator<ByteArray> {
-        protected Chunk currentChunk = null;
+        protected Chunk currentChunk;
         protected int currentOffset = 0;
+        protected ByteArray nextValue;
         protected Iterator<Chunk> chunksIter;
 
         protected ChunksIterator() {
             this.chunksIter = chunks.iterator();
-            if(chunksIter.hasNext()) currentChunk = chunksIter.next();
+            currentChunk = getNextChunk();
+            nextValue = getNextValue();
+        }
+
+        protected Chunk getNextChunk() {
+            if (chunksIter.hasNext()) {
+                return chunksIter.next();
+            } else {
+                return null;
+            }
+        }
+
+        protected ByteArray getNextValue() {
+            while(currentChunk != null) {
+                while(currentOffset < currentChunk.size) {
+                    int size = currentChunk.bytes[currentOffset];
+                    if (size == 0) {
+                        currentOffset += 1;
+                    } else {
+                        byte[] retVal = Arrays.copyOfRange(currentChunk.bytes, currentOffset + 1, currentOffset + size + 1);
+                        currentOffset += 1 + size;
+                        return new ByteArray(retVal);
+                    }
+                }
+                currentChunk = getNextChunk();
+                currentOffset = 0;
+            }
+            return null;
         }
 
         @Override
         public boolean hasNext() {
-            return currentChunk != null && currentOffset < currentChunk.size;
+            return nextValue != null;
         }
 
         @Override
         public ByteArray next() {
-            int size = (int) currentChunk.bytes[currentOffset];
-            /*
-             * Regardless of the size of the current value, we must update
-             * the state of the iterator (current chunk/offset). Not doing
-             * so would lead to data loss on serialization/deserialization.
-             */
-            if(size == 0) {
-                currentOffset += 1;
-                updateState();
-                return null;
-            }
-            byte[] retVal = Arrays.copyOfRange(currentChunk.bytes, currentOffset + 1, currentOffset + size + 1);
-            currentOffset += 1 + size;
-            updateState();
-            return new ByteArray(retVal);
-        }
+            ByteArray retVal = nextValue;
+            nextValue = getNextValue();
+            return retVal;
 
-        private void updateState() {
-            if(currentOffset >= currentChunk.size) {
-                if(chunksIter.hasNext()) {
-                    currentChunk = chunksIter.next();
-                    currentOffset = 0;
-                } else {
-                    currentChunk = null;
-                }
-            }
         }
     }
 
@@ -522,7 +576,10 @@ public class ByteArraySet implements Set<ByteArray> {
             return frontingSet.remove(o);
         } else {
             for(Chunk chunk: chunks) {
-                if(chunk.remove((ByteArray) o)) return true;
+                if(chunk.remove((ByteArray) o)) {
+                    if(chunk.entries == 0) chunks.remove(chunk);
+                    return true;
+                }
             }
         }
         return false;
@@ -530,11 +587,53 @@ public class ByteArraySet implements Set<ByteArray> {
 
     @Override
     public boolean removeAll(Collection<?> c) {
-        boolean retVal = false;
-        for(Object o: c) {
-            retVal = remove(o) || retVal;
+        // Get a sorted set of the vals to remove
+        ByteArraySet valsToRemove;
+        if(c instanceof ByteArraySet) {
+            valsToRemove = (ByteArraySet) c;
+        } else {
+            valsToRemove = new ByteArraySet();
+            for (Object val : c) {
+                Preconditions.checkArgument(val instanceof ByteArray);
+                valsToRemove.add((ByteArray) val);
+            }
         }
-        return retVal;
+        if(valsToRemove.chunks.size() > 0) {
+            valsToRemove.merge();
+        }
+
+        // Efficiently remove the vals
+        Set<ByteArray> chunkedValuesToRemove = new TreeSet<>();
+        Chunk currentChunk = null;
+        Iterator<Chunk> chunkIter = chunks.iterator();
+        if(chunkIter.hasNext()) currentChunk = chunkIter.next();
+        boolean valsRemoved = false;
+        for(ByteArray val: valsToRemove) {
+            if(val != null && val.size() > 0) {
+                if(frontingSet.contains(val)) {
+                    valsRemoved = frontingSet.remove(val);
+                } else if(currentChunk != null) {
+                    if(currentChunk.min.compareTo(val) <= 0 && currentChunk.max.compareTo(val) >= 0) {
+                        chunkedValuesToRemove.add(val);
+                    } else {
+                        valsRemoved = currentChunk.removeAll(chunkedValuesToRemove) || valsRemoved;
+                        chunkedValuesToRemove.clear();
+                        chunkedValuesToRemove.add(val);
+                        if(chunkIter.hasNext()) {
+                            currentChunk = chunkIter.next();
+                        } else {
+                            currentChunk = null;
+                        }
+                    }
+                }
+            }
+        }
+        if(currentChunk != null) {
+            valsRemoved = currentChunk.removeAll(chunkedValuesToRemove) || valsRemoved;
+        }
+        chunks.removeIf(chunk -> chunk.entries == 0);
+
+        return valsRemoved;
     }
 
     /**

@@ -87,6 +87,17 @@ public class ByteArray implements Comparable<ByteArray>, Serializable {
     }
 
     /**
+     * Allows comparing this byte array to a segment of another byte array
+     * @param bytes - The byte array to compare to
+     * @param offset - The offset to start the comparison at
+     * @param length - The number of bytes to compare against
+     * @return Standard comparison value based on this byte array and the provided byte array
+     */
+    public int compareTo(byte[] bytes, int offset, int length) {
+        return comparator.compare(this.getBytes(), 0, this.getBytes().length, bytes, offset, length);
+    }
+
+    /**
      * Concatenates another byte array to this one
      * @param byteArray - The byte array to concatenate to this one
      */
