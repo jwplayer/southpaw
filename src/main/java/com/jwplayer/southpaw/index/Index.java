@@ -17,7 +17,6 @@ package com.jwplayer.southpaw.index;
 
 import com.google.common.base.Preconditions;
 import com.jwplayer.southpaw.state.BaseState;
-import com.jwplayer.southpaw.topic.BaseTopic;
 import com.jwplayer.southpaw.util.ByteArray;
 import com.jwplayer.southpaw.util.ByteArraySet;
 import org.apache.commons.collections4.map.LRUMap;
@@ -28,12 +27,10 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * Simple Index class that lets you store multiple primary keys (in a Set) per foreign key. This index
+ * Simple index class that lets you store multiple primary keys (in a Set) per foreign key. This index
  * also has 'reverse index' functionality where you can get the foreign keys for a given primary key.
- * @param <K> - The type of the key stored in the indexed topic
- * @param <V> - The type of the value stored in the indexed topic
  */
-public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements Reversible {
+public class Index {
     /**
      * Size of the LRU cache for storing the index entries containing more than one key
      */
@@ -46,28 +43,41 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
     /**
      * Logger
      */
-    private static final Logger LOGGER =  LoggerFactory.getLogger(MultiIndex.class);
+    private static final Logger LOGGER =  LoggerFactory.getLogger(Index.class);
     /**
      * The size threshold for an index entry to be put into the LRU cache.
      */
     public static final int LRU_CACHE_THRESHOLD = 10;
 
+    protected LRUMap<ByteArray, ByteArraySet> entryCache;
+    protected LRUMap<ByteArray, ByteArraySet> entryRICache;
     /**
      * Size of the LRU cache for storing the index entries containing more than one key
      */
     protected int indexLRUCacheSize;
     /**
+     * The name of the index. Only used internally to generate the index hash that IDs entries for this index in
+     * the index topic.
+     */
+    protected String indexName;
+    /**
      * Size of pending writes for index entries held in memory. Keeps pressure of the state since puts to the state
      * are not guaranteed to be immediately gettable without flushing.
      */
     protected int indexWriteBatchSize;
-    protected LRUMap<ByteArray, ByteArraySet> entryCache;
-    protected LRUMap<ByteArray, ByteArraySet> entryRICache;
-    protected Map<ByteArray, ByteArraySet> pendingWrites = new HashMap<>();
     protected Map<ByteArray, ByteArraySet> pendingRIWrites = new HashMap<>();
+    protected Map<ByteArray, ByteArraySet> pendingWrites = new HashMap<>();
     protected String reverseIndexName;
+    /**
+     * State for storing the indices and other data
+     */
+    protected BaseState state;
 
-    @Override
+    /**
+     * Adds or updates an index entry for the given foreign key with the given record PK to the indexed topic.
+     * @param foreignKey - The foreign key to add/update an index entry for
+     * @param primaryKey - The PK to the record
+     */
     public void add(ByteArray foreignKey, ByteArray primaryKey) {
         Preconditions.checkNotNull(foreignKey);
         ByteArraySet pks = getIndexEntry(foreignKey);
@@ -95,22 +105,28 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
         }
     }
 
-    @Override
-    public void configure(
-            String indexName,
-            Map<String, Object> config,
-            BaseState state,
-            BaseTopic<K, V> indexedTopic) {
-        super.configure(indexName, config, state, indexedTopic);
+    /**
+     * Configure the index
+     * @param indexName - The name of the index
+     * @param config - Configuration object containing index config
+     * @param state - State used to store the index
+     */
+    public void configure(String indexName, Map<String, Object> config, BaseState state) {
         this.indexLRUCacheSize = (int) Preconditions.checkNotNull(config.get(INDEX_LRU_CACHE_SIZE));
         this.entryCache = new LRUMap<>(this.indexLRUCacheSize);
         this.entryRICache = new LRUMap<>(this.indexLRUCacheSize);
+        this.indexName = Preconditions.checkNotNull(indexName);
         this.indexWriteBatchSize = (int) Preconditions.checkNotNull(config.get(INDEX_WRITE_BATCH_SIZE));
-        reverseIndexName = indexName + "-reverse";
-        state.createKeySpace(reverseIndexName);
+        this.reverseIndexName = indexName + "-reverse";
+        this.state = state;
+        this.state.createKeySpace(this.indexName);
+        this.state.createKeySpace(this.reverseIndexName);
     }
 
-    @Override
+    /**
+     * Flushes any changes to the topic. Useful for efficiently batching together writes when you need to make
+     * a bunch of changes to the index.
+     */
     public void flush() {
         for(Map.Entry<ByteArray, ByteArraySet> entry: pendingWrites.entrySet()) {
             writeToState(entry.getKey(), entry.getValue());
@@ -124,7 +140,11 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
         state.flush(reverseIndexName);
     }
 
-    @Override
+    /**
+     * Get the foreign keys for the given primary key.
+     * @param primaryKey - The primary key to lookup
+     * @return The keys for the given primary key or null if no corresponding entry exists
+     */
     public ByteArraySet getForeignKeys(ByteArray primaryKey) {
         if(entryRICache.containsKey(primaryKey)) {
             return entryRICache.get(primaryKey);
@@ -142,7 +162,11 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
         }
     }
 
-    @Override
+    /**
+     * Accessor for the index entry
+     * @param foreignKey - The key of the index entry
+     * @return The index entry for the given key
+     */
     public ByteArraySet getIndexEntry(ByteArray foreignKey) {
         Preconditions.checkNotNull(foreignKey);
         if(entryCache.containsKey(foreignKey)) {
@@ -164,7 +188,7 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
     /**
      * Method for keeping pending writes manageable by auto-flushing once it reaches a certain size.
      */
-    public void putToState(ByteArray key, ByteArraySet value) {
+    protected void putToState(ByteArray key, ByteArraySet value) {
         if(value.size() > LRU_CACHE_THRESHOLD) entryCache.put(key, value);
         pendingWrites.put(key, value);
         if(pendingWrites.size() > indexWriteBatchSize) {
@@ -178,7 +202,7 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
     /**
      * Method for keeping RI pending writes manageable by auto-flushing once it reaches a certain size.
      */
-    public void putRIToState(ByteArray key, ByteArraySet value) {
+    protected void putRIToState(ByteArray key, ByteArraySet value) {
         if(value.size() > LRU_CACHE_THRESHOLD) entryRICache.put(key, value);
         pendingRIWrites.put(key, value);
         if(pendingRIWrites.size() > indexWriteBatchSize) {
@@ -187,36 +211,6 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
             }
             pendingRIWrites.clear();
         }
-    }
-
-    @Override
-    public Iterator<AbstractMap.SimpleEntry<ByteArray, V>> readRecords(ByteArray foreignKey) {
-        Preconditions.checkNotNull(foreignKey);
-        ByteArraySet primaryKeys = getIndexEntry(foreignKey);
-        if(primaryKeys != null) {
-            List<AbstractMap.SimpleEntry<ByteArray, V>> records = new ArrayList<>(primaryKeys.size());
-            for(ByteArray primaryKey: primaryKeys) {
-                records.add(new AbstractMap.SimpleEntry<>(primaryKey, indexedTopic.readByPK(primaryKey)));
-            }
-            return records.iterator();
-        }
-
-        return Collections.emptyListIterator();
-    }
-
-    @Override
-    public ByteArraySet remove(ByteArray foreignKey) {
-        Preconditions.checkNotNull(foreignKey);
-        ByteArraySet primaryKeys = getIndexEntry(foreignKey);
-        if(primaryKeys != null) {
-            state.delete(indexName, foreignKey.getBytes());
-            entryCache.remove(foreignKey);
-            pendingWrites.remove(foreignKey);
-            for(ByteArray primaryKey: primaryKeys) {
-                removeRI(foreignKey, primaryKey);
-            }
-        }
-        return primaryKeys;
     }
 
     /**
@@ -238,7 +232,11 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
         }
     }
 
-    @Override
+    /**
+     * Removes the given primary key from the given foreign key entry, assuming both exist.
+     * @param foreignKey - The key of the index entry.
+     * @param primaryKey - The primary key to remove.
+     */
     public boolean remove(ByteArray foreignKey, ByteArray primaryKey) {
         Preconditions.checkNotNull(foreignKey);
         removeRI(foreignKey, primaryKey);
@@ -259,6 +257,14 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
         } else {
             return false;
         }
+    }
+
+    /**
+     * Gives a nicely formatted string representation of this object. Useful for the Intellij debugger.
+     * @return Formatted string representation of this object
+     */
+    public String toString() {
+        return String.format("{indexName=%s}", indexName);
     }
 
     /**
@@ -330,10 +336,9 @@ public class MultiIndex<K, V> extends BaseIndex<K, V, Set<ByteArray>> implements
             ByteArray indexPrimaryKey = new ByteArray(pair.getKey());
             ByteArraySet indexForeignKeySet = ByteArraySet.deserialize(pair.getValue());
             for (ByteArray revIndexPrimaryKey : indexForeignKeySet) {
-                ByteArraySet revIndexforeignKeySet = getForeignKeys(revIndexPrimaryKey);
-
-                if(revIndexforeignKeySet != null) {
-                    if(revIndexforeignKeySet.contains(indexPrimaryKey)) {
+                ByteArraySet revIndexForeignKeySet = getForeignKeys(revIndexPrimaryKey);
+                if(revIndexForeignKeySet != null) {
+                    if(revIndexForeignKeySet.contains(indexPrimaryKey)) {
                         continue;
                     }
                 }

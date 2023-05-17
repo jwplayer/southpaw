@@ -19,12 +19,35 @@ import com.jwplayer.southpaw.state.BaseState;
 import com.jwplayer.southpaw.util.ByteArray;
 import org.apache.commons.lang.NotImplementedException;
 
+import java.util.AbstractMap;
 import java.util.HashMap;
 import java.util.Map;
 
 public class MockState extends BaseState {
+    public static class Iterator extends BaseState.Iterator {
+        java.util.Iterator<Map.Entry<com.jwplayer.southpaw.util.ByteArray,byte[]>> innerIter;
 
-    private Map<ByteArray, Map<ByteArray, byte[]>> dataBatches = new HashMap<>();
+        public Iterator(java.util.Iterator<Map.Entry<com.jwplayer.southpaw.util.ByteArray,byte[]>> innerIter) {
+            this.innerIter = innerIter;
+        }
+
+        @Override
+        public void close() {
+        }
+
+        @Override
+        public boolean hasNext() {
+            return innerIter.hasNext();
+        }
+
+        @Override
+        public AbstractMap.SimpleEntry<byte[], byte[]> next() {
+            Map.Entry<ByteArray, byte[]> nextValue = innerIter.next();
+            return new AbstractMap.SimpleEntry<>(nextValue.getKey().getBytes(), nextValue.getValue());
+        }
+    }
+
+    private final Map<ByteArray, Map<ByteArray, byte[]>> dataBatches = new HashMap<>();
 
     @Override
     public void backup() {
@@ -63,12 +86,10 @@ public class MockState extends BaseState {
 
     @Override
     public void flush() {
-
     }
 
     @Override
     public void flush(String keySpace) {
-
     }
 
     @Override
@@ -78,7 +99,7 @@ public class MockState extends BaseState {
 
     @Override
     public Iterator iterate(String keySpace) {
-        return null;
+        return new Iterator(dataBatches.get(new ByteArray(keySpace)).entrySet().iterator());
     }
 
     @Override

@@ -90,11 +90,6 @@ public abstract class BaseState {
          * Close the iterator after use.
          */
         public abstract void close();
-
-        /**
-         * Reset the iterator so it may be reused.
-         */
-        public abstract void reset();
     }
 
     /**

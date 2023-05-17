@@ -18,11 +18,8 @@ package com.jwplayer.southpaw;
 import com.codahale.metrics.Timer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableSet;
 import com.jwplayer.southpaw.filter.BaseFilter;
-import com.jwplayer.southpaw.index.BaseIndex;
-import com.jwplayer.southpaw.index.MultiIndex;
-import com.jwplayer.southpaw.index.Reversible;
+import com.jwplayer.southpaw.index.Indices;
 import com.jwplayer.southpaw.json.*;
 import com.jwplayer.southpaw.record.BaseRecord;
 import com.jwplayer.southpaw.serde.BaseSerde;
@@ -34,6 +31,7 @@ import com.jwplayer.southpaw.util.ByteArraySet;
 import com.jwplayer.southpaw.util.FileHelper;
 import com.jwplayer.southpaw.metric.Metrics;
 import com.jwplayer.southpaw.topic.TopicConfig;
+import com.jwplayer.southpaw.util.RelationHelper;
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
 import org.apache.commons.lang.time.StopWatch;
@@ -63,17 +61,9 @@ import java.util.stream.Collectors;
  */
 public class Southpaw {
     /**
-     * Join key, the key in the child record used in joins (PaK == JK)
-     */
-    public static final String JK = "JK";
-    /**
      * The name of the state keyspace for Southpaw's metadata
      */
     public static final String METADATA_KEYSPACE = "__southpaw.metadata";
-    /**
-     * Parent key, the key in the parent record used in joins (PaK == JK)
-     */
-    public static final String PaK = "PaK";
     /**
      * Primary key
      */
@@ -108,11 +98,9 @@ public class Southpaw {
      */
     protected Map<Relation, ByteArraySet> dePKsByType = new HashMap<>();
     /**
-     * A map of foreign key indices needed by Southpaw. This includes parent indices (points at the root
-     * records) and join indices (points at the child records). The key is the index name. Multiple offsets
-     * can be stored per key.
+     * The indices used by Southpaw
      */
-    protected final Map<String, BaseIndex<BaseRecord, BaseRecord, Set<ByteArray>>> fkIndices = new HashMap<>();
+    protected Indices indices;
     /**
      * A map of all input topics needed by Southpaw. The key is the short name of the topic.
      */
@@ -213,7 +201,7 @@ public class Southpaw {
      */
     public Southpaw(Map<String, Object> rawConfig, List<URI> relations)
             throws ClassNotFoundException, IllegalAccessException, InstantiationException, IOException, URISyntaxException, NoSuchMethodException, InvocationTargetException {
-        this(rawConfig, loadRelations(Preconditions.checkNotNull(relations)));
+        this(rawConfig, RelationHelper.loadRelations(Preconditions.checkNotNull(relations)));
     }
 
     /**
@@ -223,7 +211,7 @@ public class Southpaw {
      */
     public Southpaw(Map<String, Object> rawConfig, Relation[] relations)
             throws ClassNotFoundException, IllegalAccessException, InstantiationException, NoSuchMethodException, InvocationTargetException {
-        validateRootRelations(relations);
+        RelationHelper.validateRootRelations(relations);
 
         this.rawConfig = Preconditions.checkNotNull(rawConfig);
         this.config = new Config(rawConfig);
@@ -241,18 +229,19 @@ public class Southpaw {
         for(Map.Entry<String, BaseTopic<BaseRecord, BaseRecord>> entry: this.inputTopics.entrySet()) {
             this.metrics.registerInputTopic(entry.getKey());
         }
-        createIndices();
+        this.indices = new Indices(rawConfig, this.state);
+        this.indices.createIndices(relations);
 
         // Load any previous denormalized record PKs that have yet to be created
         for (Relation root : relations) {
-            byte[] bytes = state.get(METADATA_KEYSPACE, createDePKEntryName(root).getBytes());
-            dePKsByType.put(root, ByteArraySet.deserialize(bytes));
+            byte[] bytes = this.state.get(METADATA_KEYSPACE, createDePKEntryName(root).getBytes());
+            this.dePKsByType.put(root, ByteArraySet.deserialize(bytes));
         }
 
         // Start the global timers
-        backupWatch.start();
-        commitWatch.start();
-        metricsWatch.start();
+        this.backupWatch.start();
+        this.commitWatch.start();
+        this.metricsWatch.start();
     }
 
     /**
@@ -315,9 +304,7 @@ public class Southpaw {
             for(Map.Entry<String, BaseTopic<byte[], DenormalizedRecord>> topic: outputTopics.entrySet()) {
                 topic.getValue().flush();
             }
-            for(Map.Entry<String, BaseIndex<BaseRecord, BaseRecord, Set<ByteArray>>> index: fkIndices.entrySet()) {
-                index.getValue().flush();
-            }
+            indices.flush();
             for(Map.Entry<Relation, ByteArraySet> entry: dePKsByType.entrySet()) {
                 state.put(METADATA_KEYSPACE, createDePKEntryName(entry.getKey()).getBytes(), entry.getValue().serialize());
                 state.flush(METADATA_KEYSPACE);
@@ -328,30 +315,6 @@ public class Southpaw {
             state.flush();
             commitWatch.reset();
             commitWatch.start();
-        }
-    }
-
-    /**
-     * Create all indices for the given child relation and its children.
-     * @param root - The root relation to create the indices for
-     * @param parent - The parent relation to create the indices for
-     * @param child - The child relation to create the indices for
-     */
-    protected void createChildIndices(
-            Relation root,
-            Relation parent,
-            Relation child) {
-        // Create this child's indices
-        String joinIndexName = createJoinIndexName(child);
-        fkIndices.put(joinIndexName, createFkIndex(joinIndexName, child.getEntity()));
-        String parentIndexName = createParentIndexName(root, parent, child);
-        fkIndices.put(parentIndexName, createFkIndex(parentIndexName, root.getEntity()));
-
-        // Add its children's indices
-        if(child.getChildren() != null) {
-            for(Relation grandchild: child.getChildren()) {
-                createChildIndices(root, child, grandchild);
-            }
         }
     }
 
@@ -379,12 +342,11 @@ public class Southpaw {
             ChildRecords childRecords = new ChildRecords();
             denormalizedRecord.setChildren(childRecords);
             for (Relation child : relation.getChildren()) {
-                ByteArray newParentKey = ByteArray.toByteArray(relationRecord.get(child.getParentKey()));
-                updateParentIndex(root, relation, child, rootPrimaryKey, newParentKey);
+                ByteArray joinKey = ByteArray.toByteArray(relationRecord.get(child.getParentKey()));
+                indices.updateParentIndex(root, relation, child, rootPrimaryKey, joinKey);
                 Map<ByteArray, DenormalizedRecord> records = new TreeMap<>();
-                if (newParentKey != null) {
-                    BaseIndex<BaseRecord, BaseRecord, Set<ByteArray>> joinIndex = fkIndices.get(createJoinIndexName(child));
-                    Set<ByteArray> childPKs = joinIndex.getIndexEntry(newParentKey);
+                if (joinKey != null) {
+                    Set<ByteArray> childPKs = indices.getRelationPKs(child, joinKey);
                     if (childPKs != null) {
                         for (ByteArray childPK : childPKs) {
                             DenormalizedRecord deChildRecord = createDenormalizedRecord(root, child, rootPrimaryKey, childPK);
@@ -415,7 +377,7 @@ public class Southpaw {
         for(ByteArray dePrimaryKey: rootRecordPKs) {
             if(dePrimaryKey != null) {
                 BaseTopic<byte[], DenormalizedRecord> outputTopic = outputTopics.get(root.getDenormalizedName());
-                scrubParentIndices(root, root, dePrimaryKey);
+                indices.scrubParentIndices(root, root, dePrimaryKey);
                 DenormalizedRecord newDeRecord = createDenormalizedRecord(root, root, dePrimaryKey, dePrimaryKey);
                 if (logger.isDebugEnabled()) {
                     try {
@@ -452,33 +414,6 @@ public class Southpaw {
     }
 
     /**
-     * Simple class for creating a FK multi index
-     * @param indexName - The name of the index to create
-     * @param indexedTopicName - The name of the indexed topic
-     * @return A brand new, shiny index
-     */
-    protected BaseIndex<BaseRecord, BaseRecord, Set<ByteArray>> createFkIndex(
-            String indexName,
-            String indexedTopicName) {
-        MultiIndex<BaseRecord, BaseRecord> index = new MultiIndex<>();
-        index.configure(indexName, rawConfig, state, inputTopics.get(indexedTopicName));
-        return index;
-    }
-
-    /**
-     * Creates all indices for all relations provided to Southpaw. Note: indices to the input records
-     * can be shared between top level relations.
-     */
-    protected void createIndices() {
-        for(Relation root: relations) {
-            // Children - PK, parent key and join key indices for the input topics
-            for(Relation child: root.getChildren()) {
-                createChildIndices(root, root, child);
-            }
-        }
-    }
-
-    /**
      * Creates an internal record for a denormalized record based on the input record
      * @param inputRecord - The input record used to generate the internal record
      * @return The internal record of the denormalized record that contains the actual values for the input record
@@ -491,15 +426,6 @@ public class Southpaw {
         }
 
         return internalRecord;
-    }
-
-    /**
-     * Creates the join index name from the child relation
-     * @param child - The child relation to create the join index name for
-     * @return The join index name
-     */
-    protected String createJoinIndexName(Relation child) {
-        return String.join(SEP, JK, child.getEntity(), child.getJoinKey());
     }
 
     /**
@@ -548,16 +474,7 @@ public class Southpaw {
         );
     }
 
-    /**
-     * Creates the parent index name from the parent and child relations
-     * @param root - The root relation to create the join index name for
-     * @param parent - The parent relation to create the join index name for
-     * @param child - The child relation to create the join index name for
-     * @return The join index name
-     */
-    protected String createParentIndexName(Relation root, Relation parent, Relation child) {
-        return String.join(SEP, PaK, root.getEntity(), parent.getEntity(), child.getParentKey());
-    }
+
 
     /**
      * Creates a new topic with the given short name. Pulls the key and value serde classes from the configuration,
@@ -664,25 +581,6 @@ public class Southpaw {
     }
 
     /**
-     * Searches for the relation for the given child entity.
-     * @param relation - The relation (and its children) to search
-     * @param childEntity - The child entity to search for
-     * @return The relation for the given child entity and it's parent, or null if it doesn't exist. Returned as a
-     * Pair<Parent, Child> object. If the child entity found is the root entity, the Parent is null.
-     */
-    protected AbstractMap.SimpleEntry<Relation, Relation> getRelation(Relation relation, String childEntity) {
-        Preconditions.checkNotNull(relation);
-        if(relation.getEntity().equals(childEntity)) return new AbstractMap.SimpleEntry<>(null, relation);
-        if(relation.getChildren() == null) return null;
-        for(Relation child: relation.getChildren()) {
-            if(child.getEntity().equals(childEntity)) return new AbstractMap.SimpleEntry<>(relation, child);
-            AbstractMap.SimpleEntry<Relation, Relation> retVal = getRelation(child, childEntity);
-            if(retVal != null) return retVal;
-        }
-        return null;
-    }
-
-    /**
      * Handles the various timers for backups, commits, etc.
      */
     protected void handleTimers() {
@@ -705,21 +603,6 @@ public class Southpaw {
             metricsWatch.reset();
             metricsWatch.start();
         }
-    }
-
-    /**
-     * Loads all top level relations from the given URIs. Needs to fit the relations JSON schema.
-     * @param uris - The URIs to load
-     * @return Top level relations from the given URIs
-     * @throws IOException -
-     * @throws URISyntaxException -
-     */
-    protected static Relation[] loadRelations(List<URI> uris) throws IOException, URISyntaxException {
-        List<Relation> retVal = new ArrayList<>();
-        for(URI uri: uris) {
-            retVal.addAll(Arrays.asList(mapper.readValue(FileHelper.loadFileAsString(uri), Relation[].class)));
-        }
-        return retVal.toArray(new Relation[0]);
     }
 
     public static void main(String[] args) throws Exception {
@@ -760,7 +643,7 @@ public class Southpaw {
         if(options.has(VERIFY_STATE)) {
             Southpaw southpaw = new Southpaw(config, relURIs);
             try{
-                southpaw.verifyState();
+                southpaw.indices.verifyIndices();
             } finally {
                 southpaw.close();
             }
@@ -806,27 +689,23 @@ public class Southpaw {
             newDePKs.add(newRecordPK);
         } else {
             // Check the child relations instead
-            AbstractMap.SimpleEntry<Relation, Relation> child = getRelation(root, entity);
+            AbstractMap.SimpleEntry<Relation, Relation> child = RelationHelper.getRelation(root, entity);
             if (child != null && child.getValue() != null) {
                 // Get join keys
-                BaseIndex<BaseRecord, BaseRecord, Set<ByteArray>> joinIndex =
-                        fkIndices.get(createJoinIndexName(child.getValue()));
-                Set<ByteArray> joinKeys = ((Reversible) joinIndex).getForeignKeys(newRecordPK);
+                Set<ByteArray> joinKeys = indices.getRelationJKs(child.getValue(), newRecordPK);
                 if(joinKeys == null) joinKeys = new ByteArraySet();
                 if (inputRecord.value() != null) {
                     joinKeys.add(ByteArray.toByteArray(inputRecord.value().get(child.getValue().getJoinKey())));
                 }
                 // Get the PKs for the denormalized records to create
-                BaseIndex<BaseRecord, BaseRecord, Set<ByteArray>> parentIndex =
-                        fkIndices.get(createParentIndexName(root, child.getKey(), child.getValue()));
                 for (ByteArray joinKey : joinKeys) {
-                    Set<ByteArray> primaryKeys = parentIndex.getIndexEntry(joinKey);
+                    Set<ByteArray> primaryKeys = indices.getRootPKs(root, child.getKey(), child.getValue(), joinKey);
                     if (primaryKeys != null) {
                         newDePKs.addAll(primaryKeys);
                     }
                 }
                 // Update the join index
-                updateJoinIndex(child.getValue(), inputRecord);
+                indices.updateJoinIndex(child.getValue(), inputRecord);
             }
         }
         return newDePKs;
@@ -898,157 +777,5 @@ public class Southpaw {
      */
     public void run(long runTimeMS) {
         build(runTimeMS);
-    }
-
-    /**
-     * Scrubs the parent indices of the given root primary key starting at the given relation. This is needed when a
-     * tombstone record is seen for the root so that we remove all references to the now defunct root PK so we no
-     * longer try to create (empty) records for it.
-     * @param root - The root relation of the parent relation
-     * @param parent  - The parent relation of the parent index to scrub
-     * @param rootPrimaryKey - The primary key of the root record prior to the tombstone triggering this scrubbing
-     */
-    protected void scrubParentIndices(Relation root, Relation parent, ByteArray rootPrimaryKey) {
-        Preconditions.checkNotNull(root);
-        Preconditions.checkNotNull(parent);
-
-        if(parent.getChildren() != null && rootPrimaryKey != null) {
-            for(Relation child: parent.getChildren()) {
-                BaseIndex<BaseRecord, BaseRecord, Set<ByteArray>> parentIndex =
-                        fkIndices.get(createParentIndexName(root, parent, child));
-                Set<ByteArray> oldForeignKeys = ((Reversible) parentIndex).getForeignKeys(rootPrimaryKey);
-                if(oldForeignKeys != null) {
-                    for(ByteArray oldForeignKey: ImmutableSet.copyOf(oldForeignKeys)) {
-                        parentIndex.remove(oldForeignKey, rootPrimaryKey);
-                    }
-                }
-                scrubParentIndices(root, child, rootPrimaryKey);
-            }
-        }
-    }
-
-    /**
-     * Updates the join index for the given child relation using the new record and the old PK index entry.
-     * @param relation - The child relation of the join index
-     * @param newRecord - The new version of the child record. May technically not be the latest version of a
-     *                  record, but that is ok, since the index will eventually be updated with the latest
-     *                  record.
-     */
-    protected void updateJoinIndex(
-            Relation relation,
-            ConsumerRecord<BaseRecord, BaseRecord> newRecord) {
-        Preconditions.checkNotNull(relation.getJoinKey());
-        Preconditions.checkNotNull(newRecord);
-        ByteArray newRecordPK = newRecord.key().toByteArray();
-        BaseIndex<BaseRecord, BaseRecord, Set<ByteArray>> joinIndex = fkIndices.get(createJoinIndexName(relation));
-        Set<ByteArray> oldJoinKeys = ((Reversible) joinIndex).getForeignKeys(newRecordPK);
-        ByteArray newJoinKey = null;
-        if(newRecord.value() != null) {
-            newJoinKey = ByteArray.toByteArray(newRecord.value().get(relation.getJoinKey()));
-        }
-        if (oldJoinKeys != null && oldJoinKeys.size() > 0) {
-            for(ByteArray oldJoinKey: oldJoinKeys) {
-                if(!oldJoinKey.equals(newJoinKey)) {
-                    joinIndex.remove(oldJoinKey, newRecordPK);
-                }
-            }
-        }
-        if (newJoinKey != null) {
-            joinIndex.add(newJoinKey, newRecordPK);
-        }
-    }
-
-    /**
-     * Updates the parent index of the given relations.
-     * @param root - The root relation of the parent relation
-     * @param parent - The parent relation of the parent index
-     * @param child - The child relation of the parent index
-     * @param rootPrimaryKey - The primary key of the new root record
-     * @param newParentKey - The new parent key (may or may not differ from the old one)
-     */
-    protected void updateParentIndex(
-            Relation root,
-            Relation parent,
-            Relation child,
-            ByteArray rootPrimaryKey,
-            ByteArray newParentKey
-    ) {
-        Preconditions.checkNotNull(root);
-        Preconditions.checkNotNull(parent);
-        Preconditions.checkNotNull(child);
-        Preconditions.checkNotNull(rootPrimaryKey);
-
-        BaseIndex<BaseRecord, BaseRecord, Set<ByteArray>> parentIndex =
-                fkIndices.get(createParentIndexName(root, parent, child));
-        if (newParentKey != null) parentIndex.add(newParentKey, rootPrimaryKey);
-    }
-
-    /**
-     * Validates the given child relation.
-     * @param relation - The child relation to validate
-     */
-    protected static void validateChildRelation(Relation relation) {
-        Preconditions.checkNotNull(
-                relation.getEntity(),
-                "A child relation must correspond to an input record"
-        );
-        Preconditions.checkNotNull(
-                relation.getJoinKey(),
-                String.format("Child relation '%s' must have a join key", relation.getEntity())
-        );
-        Preconditions.checkNotNull(
-                relation.getParentKey(),
-                String.format("Child relation '%s' must have a parent key", relation.getEntity())
-        );
-    }
-
-    /**
-     * Validates that the given root relations are properly constructed.
-     * @param relations - The relations to validate
-     */
-    protected static void validateRootRelations(Relation[] relations) {
-        for(Relation relation: relations) {
-            Preconditions.checkNotNull(
-                    relation.getDenormalizedName(),
-                    "A root relation must have a denormalized object name"
-            );
-            Preconditions.checkNotNull(
-                    relation.getEntity(),
-                    String.format("Top level relation '%s' must correspond to an input record type", relation.getDenormalizedName())
-            );
-            Preconditions.checkNotNull(
-                    relation.getChildren(),
-                    String.format("Top level relation '%s' must have children", relation.getDenormalizedName())
-            );
-
-            for(Relation child: relation.getChildren()) {
-                validateChildRelation(child);
-            }
-        }
-    }
-
-    /**
-     * Utility command to verify all indices and reverse indices in the State are in sync with each other. Keys that
-     * are not set properly in the index and reverse index are logged to error.
-     * <b>Note: this requires a full scan of each index dataset. This could be an expensive operation on larger datasets</b>
-     */
-    protected void verifyState() {
-        for(Map.Entry<String, BaseIndex<BaseRecord, BaseRecord, Set<ByteArray>>> index: fkIndices.entrySet()) {
-            logger.info("Verifying index state integrity: " + index.getValue().getIndexedTopic().getShortName());
-            Set<String> missingIndexKeys = ((MultiIndex<?, ?>)index.getValue()).verifyIndexState();
-            if(missingIndexKeys.isEmpty()){
-                logger.info("Index " + index.getValue().getIndexedTopic().getShortName() +  " integrity check complete");
-            } else {
-                logger.error("Index " + index.getValue().getIndexedTopic().getShortName() + " check failed for the following " + missingIndexKeys.size() + " keys: " + missingIndexKeys);
-            }
-
-            logger.info("Verifying reverse index state integrity: " + index.getValue().getIndexedTopic().getShortName());
-            Set<String> missingReverseIndexKeys = ((MultiIndex<?, ?>)index.getValue()).verifyReverseIndexState();
-            if(missingReverseIndexKeys.isEmpty()){
-                logger.info("Reverse index " + index.getValue().getIndexedTopic().getShortName() +  " integrity check complete");
-            } else {
-                logger.error("Reverse index " + index.getValue().getIndexedTopic().getShortName() + " check failed for the following " + missingReverseIndexKeys.size() + " keys: " + missingReverseIndexKeys);
-            }
-        }
     }
 }

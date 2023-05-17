@@ -43,7 +43,7 @@ public class SouthpawEndToEndTest {
     private static final String RELATIONS_PATH3 = "test-resources/relations3.sample.json";
     private static final String TOPIC_DATA_PATH = "test-resources/topic/";
 
-    private MockSouthpaw southpaw;
+    private Southpaw southpaw;
     private Map<String, Object> config;
 
     @Rule
@@ -58,7 +58,7 @@ public class SouthpawEndToEndTest {
         config = yaml.load(FileHelper.getInputStream(new URI(CONFIG_PATH)));
         config.put(RocksDBState.URI_CONFIG, dbFolder.getRoot().toURI().toString());
         config.put(RocksDBState.BACKUP_URI_CONFIG, backupFolder.getRoot().toURI().toString());
-        southpaw = new MockSouthpaw(
+        southpaw = new Southpaw(
                 config,
                 Arrays.asList(new URI(RELATIONS_PATH), new URI(RELATIONS_PATH2), new URI(RELATIONS_PATH3))
         );
@@ -96,7 +96,7 @@ public class SouthpawEndToEndTest {
         // Generate the actual results
         int maxRecords = 0;
 
-        Map<String, BaseTopic<BaseRecord, BaseRecord>> normalizedTopics = southpaw.getNormalizedTopics();
+        Map<String, BaseTopic<BaseRecord, BaseRecord>> normalizedTopics = southpaw.inputTopics;
         Map<String, String[]> records = new HashMap<>();
         for(Map.Entry<String, BaseTopic<BaseRecord, BaseRecord>> entry: normalizedTopics.entrySet()) {
             records.put(entry.getKey(), FileHelper.loadFileAsString(new URI(TOPIC_DATA_PATH + entry.getKey() + ".json")).split("\n"));

@@ -15,11 +15,11 @@
  */
 package com.jwplayer.southpaw.index;
 
+import com.jwplayer.southpaw.MockState;
 import com.jwplayer.southpaw.filter.BaseFilter;
 import com.jwplayer.southpaw.record.BaseRecord;
 import com.jwplayer.southpaw.serde.JsonSerde;
 import com.jwplayer.southpaw.state.BaseState;
-import com.jwplayer.southpaw.state.RocksDBState;
 import com.jwplayer.southpaw.topic.BaseTopic;
 import com.jwplayer.southpaw.topic.InMemoryTopic;
 import com.jwplayer.southpaw.topic.TopicConfig;
@@ -37,8 +37,9 @@ import java.util.*;
 import static org.junit.Assert.*;
 
 
-public class MultiIndexTest {
-    private MultiIndex<BaseRecord, BaseRecord> index;
+public class IndexTest {
+    private Map<String, Object> config;
+    private Index index;
     private BaseState state;
 
     @Rule
@@ -49,19 +50,11 @@ public class MultiIndexTest {
 
     @Before
     public void setup() {
-        Map<String, Object> config = new HashMap<>();
-        config.put(RocksDBState.BACKUP_URI_CONFIG, backupFolder.getRoot().toURI().toString());
-        config.put(RocksDBState.BACKUPS_TO_KEEP_CONFIG, 1);
-        config.put(RocksDBState.COMPACTION_READ_AHEAD_SIZE_CONFIG, 1048675);
-        config.put(RocksDBState.MEMTABLE_SIZE, 1048675);
-        config.put(RocksDBState.PARALLELISM_CONFIG, 4);
-        config.put(RocksDBState.PUT_BATCH_SIZE, 1);
-        config.put(RocksDBState.URI_CONFIG, dbFolder.getRoot().toURI().toString());
-
-        state = new RocksDBState(config);
-        state.open();
-
-        index = createEmptyIndex(state);
+        config = new HashMap<>();
+        config.put(Index.INDEX_LRU_CACHE_SIZE, 2);
+        config.put(Index.INDEX_WRITE_BATCH_SIZE, 5);
+        state = createState();
+        index = createEmptyIndex(config, state);
     }
 
     @After
@@ -70,43 +63,47 @@ public class MultiIndexTest {
         state.delete();
     }
 
-    private MultiIndex<BaseRecord, BaseRecord> createEmptyIndex(BaseState state) {
-        Map<String, Object> config = new HashMap<>();
-        config.put(MultiIndex.INDEX_LRU_CACHE_SIZE, 2);
-        config.put(MultiIndex.INDEX_WRITE_BATCH_SIZE, 5);
+    private Index createEmptyIndex(Map<String, Object> config, BaseState state) {
+        Index index = new Index();
+        index.configure("TestIndex", config, state);
+        return index;
+    }
+
+    private BaseState createState() {
+        BaseState state = new MockState();
+        state.open();
+        return state;
+    }
+
+    private BaseTopic<BaseRecord, BaseRecord> createTopic(Map<String, Object> config) {
         JsonSerde keySerde = new JsonSerde();
         keySerde.configure(config, true);
         JsonSerde valueSerde = new JsonSerde();
         valueSerde.configure(config, true);
-        BaseTopic<BaseRecord, BaseRecord> indexedTopic = new InMemoryTopic<>();
-        indexedTopic.configure(new TopicConfig<BaseRecord, BaseRecord>()
-            .setShortName("IndexedTopic")
-            .setSouthpawConfig(config)
-            .setState(state)
-            .setKeySerde(keySerde)
-            .setValueSerde(valueSerde)
-            .setFilter(new BaseFilter()));
-        MultiIndex<BaseRecord, BaseRecord> index = new MultiIndex<>();
-        index.configure("TestIndex", config, state, indexedTopic);
-        return index;
+        BaseTopic<BaseRecord, BaseRecord> topic = new InMemoryTopic<>();
+        topic.configure(new TopicConfig<BaseRecord, BaseRecord>()
+                .setShortName("IndexedTopic")
+                .setSouthpawConfig(config)
+                .setState(state)
+                .setKeySerde(keySerde)
+                .setValueSerde(valueSerde)
+                .setFilter(new BaseFilter()));
+        return topic;
     }
 
-    private MultiIndex<BaseRecord, BaseRecord> createMultiIndex() throws Exception {
-        String TOPIC_DATA_PATH = "test-resources/topic/slim_entity.json";
-        populateTopic(index.getIndexedTopic(), new URI(TOPIC_DATA_PATH));
-        Iterator<ConsumerRecord<BaseRecord, BaseRecord>> records = index.getIndexedTopic().readNext();
+    private void populateIndex(BaseTopic<BaseRecord, BaseRecord> topic) {
+        Iterator<ConsumerRecord<BaseRecord, BaseRecord>> records = topic.readNext();
         while(records.hasNext()) {
             ConsumerRecord<BaseRecord, BaseRecord> record = records.next();
             index.add(ByteArray.toByteArray(record.value().get("JoinKey")), record.key().toByteArray());
         }
-        index.getIndexedTopic().resetCurrentOffsets();
+        topic.resetCurrentOffsets();
         index.flush();
-        return index;
     }
 
-    private void populateTopic(BaseTopic<BaseRecord, BaseRecord> topic, URI uri)
-            throws Exception {
-        String[] json = FileHelper.loadFileAsString(uri).split("\n");
+    private void populateTopic(BaseTopic<BaseRecord, BaseRecord> topic) throws Exception {
+        String TOPIC_DATA_PATH = "test-resources/topic/slim_entity.json";
+        String[] json = FileHelper.loadFileAsString(new URI(TOPIC_DATA_PATH)).split("\n");
         for(int i = 0; i < json.length / 2; i++) {
             topic.write(
                     topic.getKeySerde().deserializer().deserialize(null, json[2 * i].getBytes()),
@@ -132,21 +129,6 @@ public class MultiIndexTest {
     @Test
     public void testEmptyIndexGetOffsets() {
         Set<ByteArray> primaryKeys = index.getIndexEntry(new ByteArray("A"));
-
-        assertNull(primaryKeys);
-    }
-
-    @Test
-    public void testEmptyIndexReadRecords() {
-        Iterator<AbstractMap.SimpleEntry<ByteArray, BaseRecord>> records = index.readRecords(new ByteArray("A"));
-
-        assertNotNull(records);
-        assertFalse(records.hasNext());
-    }
-
-    @Test
-    public void testEmptyIndexRemove() {
-        Set<ByteArray> primaryKeys = index.remove(new ByteArray("A"));
 
         assertNull(primaryKeys);
     }
@@ -218,7 +200,9 @@ public class MultiIndexTest {
 
     @Test
     public void testMultiIndexAdd() throws Exception {
-        MultiIndex<BaseRecord, BaseRecord> index = createMultiIndex();
+        BaseTopic<BaseRecord, BaseRecord> topic = createTopic(config);
+        populateTopic(topic);
+        populateIndex(topic);
         index.add(new ByteArray("B"), new ByteArray(9L));
         Set<ByteArray> primaryKeys = index.getIndexEntry(new ByteArray("B"));
 
@@ -233,7 +217,9 @@ public class MultiIndexTest {
 
     @Test
     public void testMultiIndexGetIndexEntry() throws Exception {
-        MultiIndex<BaseRecord, BaseRecord> index = createMultiIndex();
+        BaseTopic<BaseRecord, BaseRecord> topic = createTopic(config);
+        populateTopic(topic);
+        populateIndex(topic);
         Set<ByteArray> primaryKeys = index.getIndexEntry(new ByteArray("A"));
 
         assertNotNull(primaryKeys);
@@ -256,39 +242,10 @@ public class MultiIndexTest {
     }
 
     @Test
-    public void testMultiIndexReadRecords() throws Exception {
-        MultiIndex<BaseRecord, BaseRecord> index = createMultiIndex();
-        Iterator<AbstractMap.SimpleEntry<ByteArray, BaseRecord>> iter = index.readRecords(new ByteArray("C"));
-        Map<ByteArray, BaseRecord> records = new HashMap<>();
-
-        while(iter.hasNext()) {
-            AbstractMap.SimpleEntry<ByteArray, BaseRecord> pair = iter.next();
-            records.put(pair.getKey(), pair.getValue());
-        }
-
-        assertEquals(3, records.size());
-        assertTrue(records.containsKey(new ByteArray(1)));
-        assertEquals("Jamie", records.get(new ByteArray(1)).get("Field3"));
-        assertTrue(records.containsKey(new ByteArray(2)));
-        assertEquals("Tywin", records.get(new ByteArray(2)).get("Field3"));
-        assertTrue(records.containsKey(new ByteArray(5)));
-        assertEquals("Cersei", records.get(new ByteArray(5)).get("Field3"));
-    }
-
-    @Test
-    public void testMultiIndexRemove() throws Exception {
-        MultiIndex<BaseRecord, BaseRecord> index = createMultiIndex();
-        Set<ByteArray> primaryKeys = index.remove(new ByteArray("B"));
-
-        assertNotNull(primaryKeys);
-        assertEquals(1, primaryKeys.size());
-        assertTrue(primaryKeys.contains(new ByteArray(4)));
-        assertNull(index.getForeignKeys(new ByteArray(4)));
-    }
-
-    @Test
     public void testMultiIndexRemove2() throws Exception {
-        MultiIndex<BaseRecord, BaseRecord> index = createMultiIndex();
+        BaseTopic<BaseRecord, BaseRecord> topic = createTopic(config);
+        populateTopic(topic);
+        populateIndex(topic);
 
         assertFalse(index.remove(new ByteArray("A"), new ByteArray(9)));
         assertTrue(index.remove(new ByteArray("A"), new ByteArray(1)));
@@ -304,7 +261,9 @@ public class MultiIndexTest {
 
     @Test
     public void testMultiIndexToString() throws Exception {
-        MultiIndex<BaseRecord, BaseRecord> index = createMultiIndex();
+        BaseTopic<BaseRecord, BaseRecord> topic = createTopic(config);
+        populateTopic(topic);
+        populateIndex(topic);
         String string = index.toString();
         assertNotNull(string);
     }
@@ -435,42 +394,42 @@ public class MultiIndexTest {
         index.add(new ByteArray("C"), new ByteArray(4L));
         index.add(new ByteArray("C"), new ByteArray(5L));
 
-        //Flush RocksDB state
+        // Flush the state
         state.flush();
 
-        //Create a new MultiIndex object to simulate an unhealthy restart to wipe in memory, non-persisted data structures
-        index = createEmptyIndex(state);
+        // Create a new MultiIndex object to simulate an unhealthy restart to wipe in memory, non-persisted data structures
+        index = createEmptyIndex(config, state);
 
-        //Ensure setup is correct and we have lossed data in our index
+        // Ensure setup is correct and that we have lost data in our index
         Set<ByteArray> actualKeys;
         actualKeys = index.getIndexEntry(new ByteArray("A"));
         assertNull(actualKeys);
 
-        //Ensure setup is correct and we can retrieve an expected foreign key from reverse index state
+        // Ensure setup is correct and that we can retrieve an expected foreign key from reverse index state
         actualKeys = index.getForeignKeys(new ByteArray(0L));
         assertNotNull(actualKeys);
         assertEquals(1, actualKeys.size());
         assertEquals(new ByteArray("A"), actualKeys.toArray(new ByteArray[1])[0]);
 
-        //Attempt to remove key
+        // Attempt to remove key
         index.remove(new ByteArray("A"), new ByteArray(0L));
 
-        //Flush the index to persist all in memory data
+        // Flush the index to persist all in memory data
         index.flush();
 
-        //The primary key should still not exist
+        // The primary key should still not exist
         actualKeys = index.getIndexEntry(new ByteArray("A"));
         assertNull(actualKeys);
 
-        //The foreign key should no longer exist
+        // The foreign key should no longer exist
         actualKeys = index.getForeignKeys(new ByteArray(0L));
         assertNull(actualKeys);
     }
 
     @Test
     public void testMultiIndexRemoveIndexConsistency() {
-        //Configuration assumes index batch size of 5 records to trigger writes to state
-        //Add 6 unique primary keys with 4 unique foreign keys in order to trigger only index writes
+        // Configuration assumes index batch size of 5 records to trigger writes to state
+        // Add 6 unique primary keys with 4 unique foreign keys in order to trigger only index writes
         index.add(new ByteArray("A"), new ByteArray(0L));
         index.add(new ByteArray("B"), new ByteArray(1L));
         index.add(new ByteArray("C"), new ByteArray(2L));
@@ -478,34 +437,34 @@ public class MultiIndexTest {
         index.add(new ByteArray("E"), new ByteArray(1L));
         index.add(new ByteArray("F"), new ByteArray(3L));
 
-        //Flush RocksDB state
+        // Flush the state
         state.flush();
 
-        //Create a new MultiIndex object to simulate an unhealthy restart to wipe in memory, non-persisted data structures
-        index = createEmptyIndex(state);
+        // Create a new MultiIndex object to simulate an unhealthy restart to wipe in memory, non-persisted data structures
+        index = createEmptyIndex(config, state);
 
-        //Ensure setup is correct and we can retrieve an expected primary key from state
+        // Ensure setup is correct and that we can retrieve an expected primary key from state
         Set<ByteArray> actualKeys;
         actualKeys = index.getIndexEntry(new ByteArray("A"));
         assertNotNull(actualKeys);
         assertEquals(1, actualKeys.size());
         assertEquals(new ByteArray(0L), actualKeys.toArray(new ByteArray[1])[0]);
 
-        //Ensure setup is correct and we have lossed data in our reverse index
+        // Ensure setup is correct and that we have lost data in our reverse index
         actualKeys = index.getForeignKeys(new ByteArray(0L));
         assertNull(actualKeys);
 
-        //Attempt to remove key
+        // Attempt to remove key
         index.remove(new ByteArray("A"), new ByteArray(0L));
 
-        //Flush the index to persist all in memory data
+        // Flush the index to persist all in memory data
         index.flush();
 
-        //The key should not exist in our index anymore
+        // The key should not exist in our index anymore
         actualKeys = index.getIndexEntry(new ByteArray("A"));
         assertNull(actualKeys);
 
-        //The foreign key should still not exist
+        // The foreign key should still not exist
         actualKeys = index.getForeignKeys(new ByteArray(0L));
         assertNull(actualKeys);
     }

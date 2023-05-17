@@ -118,11 +118,6 @@ public class RocksDBState extends BaseState {
             innerIter.next();
             return retVal;
         }
-
-        @Override
-        public void reset() {
-            innerIter.seekToFirst();
-        }
     }
 
     /**
