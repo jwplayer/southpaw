@@ -33,11 +33,9 @@ import com.jwplayer.southpaw.util.ByteArray;
 import com.jwplayer.southpaw.util.ByteArraySet;
 import com.jwplayer.southpaw.util.FileHelper;
 import com.jwplayer.southpaw.metric.Metrics;
-import com.jwplayer.southpaw.metric.StaticGauge;
 import com.jwplayer.southpaw.topic.TopicConfig;
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
-import org.apache.commons.lang.ObjectUtils;
 import org.apache.commons.lang.time.StopWatch;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.serialization.Serde;
@@ -94,6 +92,14 @@ public class Southpaw {
     private static final ObjectMapper mapper = new ObjectMapper();
 
     /**
+     * Timer used to track when to back up
+     */
+    protected final StopWatch backupWatch = new StopWatch();
+    /**
+     * Timer used to track when to commit
+     */
+    protected final StopWatch commitWatch = new StopWatch();
+    /**
      * Parsed Southpaw config
      */
     protected final Config config;
@@ -115,6 +121,10 @@ public class Southpaw {
      * Simple metrics class for Southpaw
      */
     protected final Metrics metrics = new Metrics();
+    /**
+     * Timer used to track when to calculate and report certain metrics
+     */
+    protected final StopWatch metricsWatch = new StopWatch();
     /**
      * A map of the output topics needed where the denormalized records are written. The key is the short name of
      * the topic.
@@ -147,8 +157,12 @@ public class Southpaw {
         public static final int BACKUP_TIME_S_DEFAULT = 1800;
         public static final String COMMIT_TIME_S_CONFIG = "commit.time.s";
         public static final int COMMIT_TIME_S_DEFAULT = 0;
+        public static final String CREATE_RECORDS_TIME_S_CONFIG = "create.records.time.s";
+        public static final int CREATE_RECORDS_TIME_S_DEFAULT = 10;
         public static final String CREATE_RECORDS_TRIGGER_CONFIG = "create.records.trigger";
         public static final int CREATE_RECORDS_TRIGGER_DEFAULT = 250000;
+        public static final String METRICS_REPORT_TIME_S_CONFIG = "metrics.report.time.s";
+        public static final int METRICS_REPORT_TIME_S_DEFAULT = 30;
         public static final String TOPIC_LAG_TRIGGER_CONFIG = "topic.lag.trigger";
         public static final String TOPIC_LAG_TRIGGER_DEFAULT = "1000";
 
@@ -156,26 +170,35 @@ public class Southpaw {
          * Time interval (roughly) between backups
          */
         public int backupTimeS;
-
         /**
          * Time interval (roughly) between commits
          */
         public int commitTimeS;
-
+        /**
+         * Time interval (roughly) that controls how long denormalized records will be created before Southpaw will
+         * stop to perform other actions such as metrics reporting and committing state.
+         */
+        public int createRecordsTimeS;
         /**
          * Config for when to create denormalized records once the number of records to create has exceeded a certain amount
          */
         public int createRecordsTrigger;
-
+        /**
+         * Time interval (roughly) that controls how often certain metrics are calculated and reported. These are
+         * metrics that require calculations that we don't want to constantly perform. For example, topic lag.
+         */
+        public int metricsReportTimeS;
         /**
          * Config for when to switch from one topic to the next (or to stop processing a topic entirely), when lag drops below this value
          */
         public int topicLagTrigger;
 
-        public Config(Map<String, Object> rawConfig) throws ClassNotFoundException {
+        public Config(Map<String, Object> rawConfig) {
             this.backupTimeS = (int) rawConfig.getOrDefault(BACKUP_TIME_S_CONFIG, BACKUP_TIME_S_DEFAULT);
             this.commitTimeS = (int) rawConfig.getOrDefault(COMMIT_TIME_S_CONFIG, COMMIT_TIME_S_DEFAULT);
+            this.createRecordsTimeS = (int) rawConfig.getOrDefault(CREATE_RECORDS_TIME_S_CONFIG, CREATE_RECORDS_TIME_S_DEFAULT);
             this.createRecordsTrigger = (int) rawConfig.getOrDefault(CREATE_RECORDS_TRIGGER_CONFIG, CREATE_RECORDS_TRIGGER_DEFAULT);
+            this.metricsReportTimeS = (int) rawConfig.getOrDefault(METRICS_REPORT_TIME_S_CONFIG, METRICS_REPORT_TIME_S_DEFAULT);
             this.topicLagTrigger = (int) rawConfig.getOrDefault(TOPIC_LAG_TRIGGER_CONFIG, TOPIC_LAG_TRIGGER_DEFAULT);
         }
     }
@@ -225,163 +248,54 @@ public class Southpaw {
             byte[] bytes = state.get(METADATA_KEYSPACE, createDePKEntryName(root).getBytes());
             dePKsByType.put(root, ByteArraySet.deserialize(bytes));
         }
+
+        // Start the global timers
+        backupWatch.start();
+        commitWatch.start();
+        metricsWatch.start();
     }
 
     /**
      * Reads batches of new records from each of the input topics and creates the appropriate denormalized
      * records according to the top level relations. Performs a full commit and backup before returning.
-     * @param runTimeS - Sets an amount of time in seconds for this method to run. The method will not run this amount
-     *                of time exactly, but will stop after processing the latest batch of records. If set to 0,
-     *                it will run until interrupted. Probably most useful for testing.
+     * @param runTimeMS - Sets an amount of time in milliseconds for this method to run. The method will not run this
+     *                amount of time exactly, but will stop after processing the latest batch of records. If set to 0,
+     *                it will run until interrupted. Useful for testing.
      */
-    protected void build(int runTimeS) {
+    protected void build(long runTimeMS) {
         logger.info("Building denormalized records");
-        StopWatch backupWatch = new StopWatch();
-        backupWatch.start();
         StopWatch runWatch = new StopWatch();
         runWatch.start();
-        StopWatch commitWatch = new StopWatch();
-        commitWatch.start();
 
         List<Map.Entry<String, BaseTopic<BaseRecord, BaseRecord>>> topics = new ArrayList<>(inputTopics.entrySet());
         List<String> rootEntities = Arrays.stream(relations).map(Relation::getEntity).collect(Collectors.toList());
         topics.sort((x, y) -> Boolean.compare(rootEntities.contains(x.getKey()), rootEntities.contains(y.getKey())));
 
         while(processRecords) {
-            // Loop through each input topic and read a batch of records
-
             for (Map.Entry<String, BaseTopic<BaseRecord, BaseRecord>> entry : topics) {
-                String entity = entry.getKey();
                 BaseTopic<BaseRecord, BaseRecord> inputTopic = entry.getValue();
-
-                long topicLag;
-                calculateRecordsToCreate();
-                calculateTotalLag();
-
                 do {
+                    String entity = entry.getKey();
                     Iterator<ConsumerRecord<BaseRecord, BaseRecord>> records = inputTopic.readNext();
-                    // Loop through each record and process it
                     while (records.hasNext()) {
-                        ConsumerRecord<BaseRecord, BaseRecord> newRecord = records.next();
-                        ByteArray primaryKey = newRecord.key().toByteArray();
+                        ConsumerRecord<BaseRecord, BaseRecord> inputRecord = records.next();
                         for (Relation root : relations) {
-                            Set<ByteArray> dePrimaryKeys = dePKsByType.get(root);
-                            if (root.getEntity().equals(entity)) {
-                                // The top level relation is the relation of the input record
-                                dePrimaryKeys.add(primaryKey);
-                            } else {
-                                // Check the child relations instead
-                                AbstractMap.SimpleEntry<Relation, Relation> child = getRelation(root, entity);
-                                if (child != null && child.getValue() != null) {
-                                    BaseIndex<BaseRecord, BaseRecord, Set<ByteArray>> parentIndex =
-                                            fkIndices.get(createParentIndexName(root, child.getKey(), child.getValue()));
-                                    ByteArray newParentKey = null;
-                                    Set<ByteArray> oldParentKeys;
-                                    if (newRecord.value() != null) {
-                                        newParentKey = ByteArray.toByteArray(newRecord.value().get(child.getValue().getJoinKey()));
-                                    }
-                                    BaseIndex<BaseRecord, BaseRecord, Set<ByteArray>> joinIndex =
-                                            fkIndices.get(createJoinIndexName(child.getValue()));
-                                    oldParentKeys = ((Reversible) joinIndex).getForeignKeys(primaryKey);
-
-                                    // Create the denormalized records
-                                    if (oldParentKeys != null) {
-                                        for (ByteArray oldParentKey : oldParentKeys) {
-                                            if (!ObjectUtils.equals(oldParentKey, newParentKey)) {
-                                                Set<ByteArray> primaryKeys = parentIndex.getIndexEntry(oldParentKey);
-                                                if (primaryKeys != null) {
-                                                    dePrimaryKeys.addAll(primaryKeys);
-                                                }
-                                            }
-                                        }
-                                    }
-                                    if (newParentKey != null) {
-                                        Set<ByteArray> primaryKeys = parentIndex.getIndexEntry(newParentKey);
-                                        if (primaryKeys != null) {
-                                            dePrimaryKeys.addAll(primaryKeys);
-                                        }
-                                    }
-                                    // Update the join index
-                                    updateJoinIndex(child.getValue(), primaryKey, newRecord);
-                                }
-                            }
-                            int size = dePrimaryKeys.size();
-                            if(size > config.createRecordsTrigger) {
-                                createDenormalizedRecords(root, dePrimaryKeys);
-                                dePrimaryKeys.clear();
-                            }
-                            metrics.denormalizedRecordsToCreateByTopic.get(root.getDenormalizedName()).update((long) size);
-                        }
-                        metrics.recordsConsumed.mark(1);
-                        metrics.recordsConsumedByTopic.get(entity).mark(1);
-                    }
-
-                    metrics.timeSinceLastBackup.update(backupWatch.getTime());
-                    topicLag = inputTopic.getLag();
-                    metrics.topicLagByTopic.get(entity).update(topicLag);
-                    reportRecordsToCreate();
-                    reportTotalLag();
-
-                    if(
-                            (config.backupTimeS > 0 && backupWatch.getTime() > config.backupTimeS * 1000)
-                            || (runWatch.getTime() > runTimeS * 1000 && runTimeS > 0)) {
-                        try(Timer.Context context = metrics.backupsCreated.time()) {
-                            logger.info("Performing a backup after a full commit");
-                            calculateRecordsToCreate();
-                            calculateTotalLag();
-                            commit();
-                            state.backup();
-                            backupWatch.reset();
-                            backupWatch.start();
-                            if (runWatch.getTime() > runTimeS * 1000 && runTimeS > 0) return;
-                        }
-                    } else if(config.commitTimeS > 0 && commitWatch.getTime() > config.commitTimeS * 1000) {
-                        try(Timer.Context context = metrics.stateCommitted.time()) {
-                            logger.info("Performing a full commit");
-                            calculateRecordsToCreate();
-                            calculateTotalLag();
-                            commit();
-                            commitWatch.reset();
-                            commitWatch.start();
+                            Set<ByteArray> newDePKs = processInputRecord(root, entity, inputRecord);
+                            queueDenormalizedPKs(root, newDePKs);
+                            handleTimers();
                         }
                     }
-                } while (topicLag > config.topicLagTrigger);
+                } while (inputTopic.getLag() > config.topicLagTrigger);
             }
 
-            // Create the denormalized records that have been queued up
-            for(Map.Entry<Relation, ByteArraySet> entry: dePKsByType.entrySet()) {
-                createDenormalizedRecords(entry.getKey(), entry.getValue());
-                entry.getValue().clear();
+            processDenormalizedPKs();
+            handleTimers();
+            if (runTimeMS > 0 && runWatch.getTime() > runTimeMS) {
+                logger.info("Stopping due to run time");
+                break;
             }
         }
         commit();
-    }
-
-    /**
-     * Calculates and reports the total number of denormalized records to create
-     */
-    public void calculateRecordsToCreate() {
-        long totalRecords = 0;
-        for(Map.Entry<Relation, ByteArraySet> entry: dePKsByType.entrySet()) {
-            long records = entry.getValue().size();
-            totalRecords += records;
-            metrics.denormalizedRecordsToCreateByTopic.get(entry.getKey().getDenormalizedName()).update(records);
-        }
-        metrics.denormalizedRecordsToCreate.update(totalRecords);
-    }
-
-    /**
-     * Calculates and reports the total lag for all input topics
-     */
-    public void calculateTotalLag() {
-        long topicLag;
-        long totalLag = 0;
-        for(Map.Entry<String, BaseTopic<BaseRecord, BaseRecord>> entry: inputTopics.entrySet()) {
-            topicLag = entry.getValue().getLag();
-            totalLag += topicLag;
-            metrics.topicLagByTopic.get(entry.getKey()).update(topicLag);
-        }
-        metrics.topicLag.update(totalLag);
     }
 
     /**
@@ -396,21 +310,25 @@ public class Southpaw {
      * Commit / flush offsets and data for the normalized topics and indices
      */
     public void commit() {
-        // Commit / flush changes
-        for(Map.Entry<String, BaseTopic<byte[], DenormalizedRecord>> topic: outputTopics.entrySet()) {
-            topic.getValue().flush();
+        try(Timer.Context ignored = metrics.stateCommitted.time()) {
+            logger.info("Performing a full commit");
+            for(Map.Entry<String, BaseTopic<byte[], DenormalizedRecord>> topic: outputTopics.entrySet()) {
+                topic.getValue().flush();
+            }
+            for(Map.Entry<String, BaseIndex<BaseRecord, BaseRecord, Set<ByteArray>>> index: fkIndices.entrySet()) {
+                index.getValue().flush();
+            }
+            for(Map.Entry<Relation, ByteArraySet> entry: dePKsByType.entrySet()) {
+                state.put(METADATA_KEYSPACE, createDePKEntryName(entry.getKey()).getBytes(), entry.getValue().serialize());
+                state.flush(METADATA_KEYSPACE);
+            }
+            for(Map.Entry<String, BaseTopic<BaseRecord, BaseRecord>> entry: inputTopics.entrySet()) {
+                entry.getValue().commit();
+            }
+            state.flush();
+            commitWatch.reset();
+            commitWatch.start();
         }
-        for(Map.Entry<String, BaseIndex<BaseRecord, BaseRecord, Set<ByteArray>>> index: fkIndices.entrySet()) {
-            index.getValue().flush();
-        }
-        for(Map.Entry<Relation, ByteArraySet> entry: dePKsByType.entrySet()) {
-            state.put(METADATA_KEYSPACE, createDePKEntryName(entry.getKey()).getBytes(), entry.getValue().serialize());
-            state.flush(METADATA_KEYSPACE);
-        }
-        for(Map.Entry<String, BaseTopic<BaseRecord, BaseRecord>> entry: inputTopics.entrySet()) {
-            entry.getValue().commit();
-        }
-        state.flush();
     }
 
     /**
@@ -482,42 +400,46 @@ public class Southpaw {
     }
 
     /**
-     * Creates a set of denormalized records and writes them to the appropriate output topic.
+     * Creates a set of denormalized records and writes them to the appropriate output topic. Not all records are
+     * guaranteed to be created because this method will only run for config.createRecordsTimeS seconds. Any records
+     * that were created will be removed from the input set of PKs.
      * @param root - The top level relation defining the structure and relations of the denormalized records to create
      * @param rootRecordPKs - The primary keys of the root input records to create denormalized records for
      */
     protected void createDenormalizedRecords(
             Relation root,
             Set<ByteArray> rootRecordPKs) {
+        Set<ByteArray> createdDePKs = new ByteArraySet();
+        StopWatch timer = new StopWatch();
+        timer.start();
         for(ByteArray dePrimaryKey: rootRecordPKs) {
             if(dePrimaryKey != null) {
                 BaseTopic<byte[], DenormalizedRecord> outputTopic = outputTopics.get(root.getDenormalizedName());
                 scrubParentIndices(root, root, dePrimaryKey);
                 DenormalizedRecord newDeRecord = createDenormalizedRecord(root, root, dePrimaryKey, dePrimaryKey);
-                if(logger.isDebugEnabled()) {
+                if (logger.isDebugEnabled()) {
                     try {
-                        logger.debug(
-                                String.format(
-                                        "Root Entity: %s / Primary Key: %s",
-                                        root.getEntity(), dePrimaryKey.toString()
-                                )
-                        );
+                        logger.debug(String.format(
+                                "Root Entity: %s / Primary Key: %s", root.getEntity(), dePrimaryKey));
                         logger.debug(mapper.writeValueAsString(newDeRecord));
                     } catch (Exception ex) {
                         // noop
                     }
                 }
 
-                outputTopic.write(
-                        dePrimaryKey.getBytes(),
-                        newDeRecord
-                );
+                outputTopic.write(dePrimaryKey.getBytes(), newDeRecord);
+                metrics.denormalizedRecordsCreated.mark(1);
+                metrics.denormalizedRecordsCreatedByTopic.get(root.getDenormalizedName()).mark(1);
+                createdDePKs.add(dePrimaryKey);
             }
-            metrics.denormalizedRecordsCreated.mark(1);
-            metrics.denormalizedRecordsCreatedByTopic.get(root.getDenormalizedName()).mark(1);
-            metrics.denormalizedRecordsToCreate.update(metrics.denormalizedRecordsToCreate.getValue() - 1);
-            metrics.denormalizedRecordsToCreateByTopic.get(root.getDenormalizedName())
-                    .update(metrics.denormalizedRecordsToCreateByTopic.get(root.getDenormalizedName()).getValue() - 1);
+            if(config.createRecordsTimeS > 0 && timer.getTime() > config.createRecordsTimeS * 1000L) {
+                break;
+            }
+        }
+        if(createdDePKs.size() == rootRecordPKs.size()) {
+            rootRecordPKs.clear();
+        } else {
+            rootRecordPKs.removeAll(createdDePKs);
         }
     }
 
@@ -612,8 +534,8 @@ public class Southpaw {
     protected BaseTopic<byte[], DenormalizedRecord> createOutputTopic(String shortName)
             throws ClassNotFoundException, IllegalAccessException, InstantiationException, NoSuchMethodException, InvocationTargetException {
         Map<String, Object> topicConfig = createTopicConfig(shortName);
-        Class keySerdeClass = Class.forName(Preconditions.checkNotNull(topicConfig.get(BaseTopic.KEY_SERDE_CLASS_CONFIG).toString()));
-        Class valueSerdeClass = Class.forName(Preconditions.checkNotNull(topicConfig.get(BaseTopic.VALUE_SERDE_CLASS_CONFIG).toString()));
+        Class<?> keySerdeClass = Class.forName(Preconditions.checkNotNull(topicConfig.get(BaseTopic.KEY_SERDE_CLASS_CONFIG).toString()));
+        Class<?> valueSerdeClass = Class.forName(Preconditions.checkNotNull(topicConfig.get(BaseTopic.VALUE_SERDE_CLASS_CONFIG).toString()));
         Serde<byte[]> keySerde = (Serde<byte[]>) keySerdeClass.getDeclaredConstructor().newInstance();
         Serde<DenormalizedRecord> valueSerde = (Serde<DenormalizedRecord>) valueSerdeClass.getDeclaredConstructor().newInstance();
         return createTopic(
@@ -640,7 +562,7 @@ public class Southpaw {
     /**
      * Creates a new topic with the given short name. Pulls the key and value serde classes from the configuration,
      * which should be subclasses of BaseSerde.
-     * @param shortName - The short name of the topic, used to construct it's configuration by combining the specific
+     * @param shortName - The short name of the topic, used to construct its configuration by combining the specific
      *                  configuration based on this short name and the default configuration.
      * @return A shiny, new topic
      */
@@ -648,9 +570,9 @@ public class Southpaw {
     protected <K extends BaseRecord, V extends BaseRecord> BaseTopic<K, V> createTopic(String shortName)
             throws ClassNotFoundException, IllegalAccessException, InstantiationException, NoSuchMethodException, InvocationTargetException {
         Map<String, Object> topicConfig = createTopicConfig(shortName);
-        Class keySerdeClass = Class.forName(Preconditions.checkNotNull(topicConfig.get(BaseTopic.KEY_SERDE_CLASS_CONFIG).toString()));
-        Class valueSerdeClass = Class.forName(Preconditions.checkNotNull(topicConfig.get(BaseTopic.VALUE_SERDE_CLASS_CONFIG).toString()));
-        Class filterClass = Class.forName(topicConfig.getOrDefault(BaseTopic.FILTER_CLASS_CONFIG, BaseTopic.FILTER_CLASS_DEFAULT).toString());
+        Class<?> keySerdeClass = Class.forName(Preconditions.checkNotNull(topicConfig.get(BaseTopic.KEY_SERDE_CLASS_CONFIG).toString()));
+        Class<?> valueSerdeClass = Class.forName(Preconditions.checkNotNull(topicConfig.get(BaseTopic.VALUE_SERDE_CLASS_CONFIG).toString()));
+        Class<?> filterClass = Class.forName(topicConfig.getOrDefault(BaseTopic.FILTER_CLASS_CONFIG, BaseTopic.FILTER_CLASS_DEFAULT).toString());
         BaseSerde<K> keySerde = (BaseSerde<K>) keySerdeClass.getDeclaredConstructor().newInstance();
         BaseSerde<V> valueSerde = (BaseSerde<V>) valueSerdeClass.getDeclaredConstructor().newInstance();
         BaseFilter filter = (BaseFilter) filterClass.getDeclaredConstructor().newInstance();
@@ -665,7 +587,7 @@ public class Southpaw {
     }
 
     /**
-     * Creates a new topic with the given parameters. Also useful for overriding for testing purposes.
+     * Creates a new topic with the given parameters. Also, useful for overriding for testing purposes.
      * @param shortName - The short name of the topic
      * @param southpawConfig - The topic configuration
      * @param keySerde - The serde used to (de)serialize the key bytes
@@ -683,7 +605,7 @@ public class Southpaw {
             Serde<V> valueSerde,
             BaseFilter filter,
             Metrics metrics) throws ClassNotFoundException, IllegalAccessException, InstantiationException, NoSuchMethodException, InvocationTargetException {
-        Class topicClass = Class.forName(Preconditions.checkNotNull(southpawConfig.get(BaseTopic.TOPIC_CLASS_CONFIG).toString()));
+        Class<?> topicClass = Class.forName(Preconditions.checkNotNull(southpawConfig.get(BaseTopic.TOPIC_CLASS_CONFIG).toString()));
         BaseTopic<K, V> topic = (BaseTopic<K, V>) topicClass.getDeclaredConstructor().newInstance();
         keySerde.configure(southpawConfig, true);
         valueSerde.configure(southpawConfig, false);
@@ -697,7 +619,7 @@ public class Southpaw {
             .setValueSerde(valueSerde)
             .setFilter(filter)
             .setMetrics(metrics));
-        
+
         return topic;
     }
 
@@ -761,6 +683,31 @@ public class Southpaw {
     }
 
     /**
+     * Handles the various timers for backups, commits, etc.
+     */
+    protected void handleTimers() {
+        metrics.timeSinceLastBackup.update(backupWatch.getTime());
+
+        if(config.backupTimeS > 0 && backupWatch.getTime() > config.backupTimeS * 1000L) {
+            try(Timer.Context ignored = metrics.backupsCreated.time()) {
+                logger.info("Performing a backup after a full commit");
+                commit();
+                state.backup();
+                backupWatch.reset();
+                backupWatch.start();
+            }
+        }
+        if(config.commitTimeS > 0 && commitWatch.getTime() > config.commitTimeS * 1000L) {
+            commit();
+        }
+        if(config.metricsReportTimeS > 0 && metricsWatch.getTime() > config.metricsReportTimeS * 1000L) {
+            reportMetrics();
+            metricsWatch.reset();
+            metricsWatch.start();
+        }
+    }
+
+    /**
      * Loads all top level relations from the given URIs. Needs to fit the relations JSON schema.
      * @param uris - The URIs to load
      * @return Top level relations from the given URIs
@@ -772,10 +719,10 @@ public class Southpaw {
         for(URI uri: uris) {
             retVal.addAll(Arrays.asList(mapper.readValue(FileHelper.loadFileAsString(uri), Relation[].class)));
         }
-        return retVal.toArray(new Relation[retVal.size()]);
+        return retVal.toArray(new Relation[0]);
     }
 
-    public static void main(String args[]) throws Exception {
+    public static void main(String[] args) throws Exception {
         String BUILD = "build";
         String CONFIG = "config";
         String DELETE_BACKUP = "delete-backup";
@@ -833,7 +780,7 @@ public class Southpaw {
         if(options.has(BUILD)) {
             Southpaw southpaw = new Southpaw(config, relURIs);
             try{
-                southpaw.run(0);
+                southpaw.run(0L);
             } finally {
                 southpaw.close();
             }
@@ -841,26 +788,93 @@ public class Southpaw {
     }
 
     /**
-     * Reports the number of denormalized records that are queued to be created
+     * Processes a new input record by looking up all PKs of the denormalized records that need to be (re)created
+     * based on the root relation and the entity name. Additionally, it updates the join index.
+     * @param root - The root relation
+     * @param entity - The entity that belongs to the input record
+     * @param inputRecord - The input record to process
+     * @return A set of PKs of the denormalized records that need to be (re)created
      */
-    protected void reportRecordsToCreate() {
-        long totalRecords = 0;
-        for(Map.Entry<String, StaticGauge<Long>> entry: metrics.denormalizedRecordsToCreateByTopic.entrySet()) {
-            long records = entry.getValue().getValue();
-            totalRecords += records;
-            metrics.denormalizedRecordsToCreateByTopic.get(entry.getKey()).update(records);
+    protected Set<ByteArray> processInputRecord(
+            Relation root,
+            String entity,
+            ConsumerRecord<BaseRecord, BaseRecord> inputRecord) {
+        ByteArray newRecordPK = inputRecord.key().toByteArray();
+        Set<ByteArray> newDePKs = new ByteArraySet();
+        if (root.getEntity().equals(entity)) {
+            // The top level relation is the relation of the input record
+            newDePKs.add(newRecordPK);
+        } else {
+            // Check the child relations instead
+            AbstractMap.SimpleEntry<Relation, Relation> child = getRelation(root, entity);
+            if (child != null && child.getValue() != null) {
+                // Get join keys
+                BaseIndex<BaseRecord, BaseRecord, Set<ByteArray>> joinIndex =
+                        fkIndices.get(createJoinIndexName(child.getValue()));
+                Set<ByteArray> joinKeys = ((Reversible) joinIndex).getForeignKeys(newRecordPK);
+                if(joinKeys == null) joinKeys = new ByteArraySet();
+                if (inputRecord.value() != null) {
+                    joinKeys.add(ByteArray.toByteArray(inputRecord.value().get(child.getValue().getJoinKey())));
+                }
+                // Get the PKs for the denormalized records to create
+                BaseIndex<BaseRecord, BaseRecord, Set<ByteArray>> parentIndex =
+                        fkIndices.get(createParentIndexName(root, child.getKey(), child.getValue()));
+                for (ByteArray joinKey : joinKeys) {
+                    Set<ByteArray> primaryKeys = parentIndex.getIndexEntry(joinKey);
+                    if (primaryKeys != null) {
+                        newDePKs.addAll(primaryKeys);
+                    }
+                }
+                // Update the join index
+                updateJoinIndex(child.getValue(), inputRecord);
+            }
         }
-        metrics.denormalizedRecordsToCreate.update(totalRecords);
+        return newDePKs;
     }
 
     /**
-     * Sums up and reports the total lag for all input topics
+     * Processes previously queued denormalized PKs.
      */
-    protected void reportTotalLag() {
-        long topicLag;
+    protected void processDenormalizedPKs() {
+        for(Map.Entry<Relation, ByteArraySet> entry: dePKsByType.entrySet()) {
+            do {
+                createDenormalizedRecords(entry.getKey(), entry.getValue());
+                handleTimers();
+            } while (entry.getValue().size() > 0);
+        }
+    }
+
+    /**
+     * Queues new denormalized PKs, and if too many have been queued, creates denormalized records until the queue
+     * size is below the configured amount.
+     * @param root - The root relation of these PKs
+     * @param newDePKs - The PKs of the denormalized records to create
+     */
+    protected void queueDenormalizedPKs(Relation root, Set<ByteArray> newDePKs) {
+        Set<ByteArray> dePKsToCreate = dePKsByType.get(root);
+        dePKsToCreate.addAll(newDePKs);
+        while(dePKsToCreate.size() > config.createRecordsTrigger) {
+            createDenormalizedRecords(root, dePKsToCreate);
+            handleTimers();
+        }
+    }
+
+    /**
+     * Calculates and reports metrics
+     */
+    protected void reportMetrics() {
+        // Denormalized records to create
+        long totalRecords = 0;
+        for(Map.Entry<Relation, ByteArraySet> entry: dePKsByType.entrySet()) {
+            long records = entry.getValue().size();
+            totalRecords += records;
+            metrics.denormalizedRecordsToCreateByTopic.get(entry.getKey().getDenormalizedName()).update(records);
+        }
+        metrics.denormalizedRecordsToCreate.update(totalRecords);
+        // Topic lag
         long totalLag = 0;
-        for(Map.Entry<String, StaticGauge<Long>> entry: metrics.topicLagByTopic.entrySet()) {
-            topicLag = entry.getValue().getValue();
+        for(Map.Entry<String, BaseTopic<BaseRecord, BaseRecord>> entry: inputTopics.entrySet()) {
+            long topicLag = entry.getValue().getLag();
             totalLag += topicLag;
             metrics.topicLagByTopic.get(entry.getKey()).update(topicLag);
         }
@@ -878,12 +892,12 @@ public class Southpaw {
     /**
      * Main method to call for reading input records and building denormalized records. Appropriately
      * switches between buildChildIndices and build to most efficiently build the records.
-     * @param runTimeS - Sets an amount of time in seconds for this method to run. The method will not run this amount
-     *                of time exactly, but will stop after processing the latest batch of records. If set to 0,
-     *                it will run until interrupted. Probably most useful for testing.
+     * @param runTimeMS - Sets an amount of time in milliseconds for this method to run. The method will not run this
+     *                amount of time exactly, but will stop after processing the latest batch of records. If set to 0,
+     *                it will run until interrupted. Useful for testing.
      */
-    public void run(int runTimeS) {
-        build(runTimeS);
+    public void run(long runTimeMS) {
+        build(runTimeMS);
     }
 
     /**
@@ -916,19 +930,18 @@ public class Southpaw {
     /**
      * Updates the join index for the given child relation using the new record and the old PK index entry.
      * @param relation - The child relation of the join index
-     * @param primaryKey - The primary key of the child record.
      * @param newRecord - The new version of the child record. May technically not be the latest version of a
      *                  record, but that is ok, since the index will eventually be updated with the latest
      *                  record.
      */
     protected void updateJoinIndex(
             Relation relation,
-            ByteArray primaryKey,
             ConsumerRecord<BaseRecord, BaseRecord> newRecord) {
         Preconditions.checkNotNull(relation.getJoinKey());
         Preconditions.checkNotNull(newRecord);
+        ByteArray newRecordPK = newRecord.key().toByteArray();
         BaseIndex<BaseRecord, BaseRecord, Set<ByteArray>> joinIndex = fkIndices.get(createJoinIndexName(relation));
-        Set<ByteArray> oldJoinKeys = ((Reversible) joinIndex).getForeignKeys(primaryKey);
+        Set<ByteArray> oldJoinKeys = ((Reversible) joinIndex).getForeignKeys(newRecordPK);
         ByteArray newJoinKey = null;
         if(newRecord.value() != null) {
             newJoinKey = ByteArray.toByteArray(newRecord.value().get(relation.getJoinKey()));
@@ -936,12 +949,12 @@ public class Southpaw {
         if (oldJoinKeys != null && oldJoinKeys.size() > 0) {
             for(ByteArray oldJoinKey: oldJoinKeys) {
                 if(!oldJoinKey.equals(newJoinKey)) {
-                    joinIndex.remove(oldJoinKey, primaryKey);
+                    joinIndex.remove(oldJoinKey, newRecordPK);
                 }
             }
         }
         if (newJoinKey != null) {
-            joinIndex.add(newJoinKey, primaryKey);
+            joinIndex.add(newJoinKey, newRecordPK);
         }
     }
 
@@ -1022,19 +1035,19 @@ public class Southpaw {
     protected void verifyState() {
         for(Map.Entry<String, BaseIndex<BaseRecord, BaseRecord, Set<ByteArray>>> index: fkIndices.entrySet()) {
             logger.info("Verifying index state integrity: " + index.getValue().getIndexedTopic().getShortName());
-            Set<String> missingIndexKeys = ((MultiIndex)index.getValue()).verifyIndexState();
+            Set<String> missingIndexKeys = ((MultiIndex<?, ?>)index.getValue()).verifyIndexState();
             if(missingIndexKeys.isEmpty()){
                 logger.info("Index " + index.getValue().getIndexedTopic().getShortName() +  " integrity check complete");
             } else {
-                logger.error("Index " + index.getValue().getIndexedTopic().getShortName() + " check failed for the following " + missingIndexKeys.size() + " keys: " + missingIndexKeys.toString());
+                logger.error("Index " + index.getValue().getIndexedTopic().getShortName() + " check failed for the following " + missingIndexKeys.size() + " keys: " + missingIndexKeys);
             }
 
             logger.info("Verifying reverse index state integrity: " + index.getValue().getIndexedTopic().getShortName());
-            Set<String> missingReverseIndexKeys = ((MultiIndex)index.getValue()).verifyReverseIndexState();
+            Set<String> missingReverseIndexKeys = ((MultiIndex<?, ?>)index.getValue()).verifyReverseIndexState();
             if(missingReverseIndexKeys.isEmpty()){
                 logger.info("Reverse index " + index.getValue().getIndexedTopic().getShortName() +  " integrity check complete");
             } else {
-                logger.error("Reverse index " + index.getValue().getIndexedTopic().getShortName() + " check failed for the following " + missingReverseIndexKeys.size() + " keys: " + missingReverseIndexKeys.toString());
+                logger.error("Reverse index " + index.getValue().getIndexedTopic().getShortName() + " check failed for the following " + missingReverseIndexKeys.size() + " keys: " + missingReverseIndexKeys);
             }
         }
     }

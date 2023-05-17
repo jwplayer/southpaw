@@ -70,8 +70,8 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
          * 
          *  (1) When NULL this indicates we don't have a staged record available, 
          *     there might be another record available in the Kafka topic.
-         *  (2) When not NULL, we have a staged record that has passed filtering already
-         *      nextRecord is the what should be returned from next()
+         *  (2) When not NULL, we have a staged record that has passed filtering already.
+         *      nextRecord is what should be returned from next()
         */
         private ConsumerRecord<byte[], byte[]> nextRecord;
         private FilterMode nextRecordFilterMode;
@@ -135,11 +135,10 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
                     filterMode = FilterMode.UPDATE;
                 }
 
-                // If the record is classified as to be skipped
-                // increment the appropriate metrics to indicate we have finished consuming
-                // an input topic record.
-                // In the case that the record is not flagged as skip, we'll rely on the caller
-                // to increment appropriate metrics when it has finished consuming the record.
+                /*
+                If the record is classified as to be skipped increment the appropriate metrics to indicate we have
+                finished consuming an input topic record.
+                 */
                 if (filterMode == FilterMode.SKIP && this.topic.getMetrics() != null) {
                     this.topic.getMetrics().recordsConsumed.mark(1);
                     this.topic.getMetrics().recordsConsumedByTopic.get(this.topic.getShortName()).mark(1);
@@ -207,18 +206,22 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
 
             // mark the record as consumed from the staging area and return
             this.resetStagedRecord();
+            if (this.topic.getMetrics() != null) {
+                this.topic.getMetrics().recordsConsumed.mark(1);
+                this.topic.getMetrics().recordsConsumedByTopic.get(this.topic.getShortName()).mark(1);
+            }
             return new ConsumerRecord<>(
                 record.topic(),
                 record.partition(),
                 record.offset(),
                 record.timestamp(),
                 record.timestampType(),
-                0L,
                 record.serializedKeySize(),
                 record.serializedValueSize(),
                 key,
                 value,
-                record.headers()
+                record.headers(),
+                null
             );
         }
     }
@@ -262,7 +265,7 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
     /**
      * A count of all currently in flight async writes to Kafka
      */
-    private AtomicLong inflightRecords = new AtomicLong();
+    private final AtomicLong inflightRecords = new AtomicLong();
     /**
      * Number of partitions in the topic
      */

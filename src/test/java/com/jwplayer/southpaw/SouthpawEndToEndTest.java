@@ -114,7 +114,7 @@ public class SouthpawEndToEndTest {
                     );
                 }
             }
-            southpaw.run(1);
+            southpaw.run(1L);
             for(Map.Entry<String, BaseTopic<byte[], DenormalizedRecord>> entry: southpaw.outputTopics.entrySet()) {
                 if(!denormalizedRecords.containsKey(entry.getKey())) {
                     denormalizedRecords.put(entry.getKey(), new HashMap<>());
