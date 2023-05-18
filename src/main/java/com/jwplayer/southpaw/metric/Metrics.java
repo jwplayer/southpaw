@@ -17,6 +17,7 @@ package com.jwplayer.southpaw.metric;
 
 import com.codahale.metrics.*;
 import com.codahale.metrics.jmx.JmxReporter;
+import com.jwplayer.southpaw.strategy.QueueingStrategy;
 
 import java.util.*;
 
@@ -29,6 +30,7 @@ public class Metrics {
     public static final String BACKUPS_DELETED = "backups.deleted";
     public static final String BACKUPS_RESTORED = "backups.restored";
     public static final String DENORMALIZED_RECORDS_CREATED = "denormalized.records.created";
+    public static final String DENORMALIZED_RECORDS_DROPPED = "denormalized.records.dropped";
     public static final String DENORMALIZED_RECORDS_TO_CREATE = "denormalized.records.to.create";
     public static final String INDEX_ENTRIES_SIZE = "index.entries.size";
     public static final String INDEX_REVERSE_ENTRIES_SIZE = "index.reverse.entries.size";
@@ -67,6 +69,18 @@ public class Metrics {
      */
     public final Map<String, Meter> denormalizedRecordsCreatedByTopic = new HashMap<>();
     /**
+     * The number of denormalized records created by topic and priority
+     */
+    public final Map<String, Map<QueueingStrategy.Priority, Meter>> denormalizedRecordsCreatedByTopicAndPriority = new HashMap<>();
+    /**
+     * The number of denormalized records dropped due to having a priority of "none" for all topics
+     */
+    public final Meter denormalizedRecordsDropped = registry.meter(DENORMALIZED_RECORDS_DROPPED);
+    /**
+     * The number of denormalized records dropped due to having a priority of "none" by topic
+     */
+    public final Map<String, Meter> denormalizedRecordsDroppedByTopic = new HashMap<>();
+    /**
      * The number of denormalized records queued to create for all topics
      */
     public StaticGauge<Long> denormalizedRecordsToCreate =  new StaticGauge<>();
@@ -74,6 +88,10 @@ public class Metrics {
      * The number of denormalized records to create by topic
      */
     public final Map<String, StaticGauge<Long>> denormalizedRecordsToCreateByTopic = new HashMap<>();
+    /**
+     * The number of denormalized records to create by topic and priority queue
+     */
+    public final Map<String, Map<QueueingStrategy.Priority, StaticGauge<Long>>> denormalizedRecordsToCreateByTopicAndPriority = new HashMap<>();
     /**
      * Histogram of the size of entries for each index
      */
@@ -176,11 +194,37 @@ public class Metrics {
         } else {
             denormalizedRecordsCreatedByTopic.put(shortName, (Meter) registry.getMetrics().get(meterName));
         }
+        meterName = String.join(".", DENORMALIZED_RECORDS_DROPPED, shortName);
+        if(!registry.getMetrics().containsKey(meterName)) {
+            denormalizedRecordsDroppedByTopic.put(shortName, registry.meter(meterName));
+        } else {
+            denormalizedRecordsDroppedByTopic.put(shortName, (Meter) registry.getMetrics().get(meterName));
+        }
+        denormalizedRecordsCreatedByTopicAndPriority.put(shortName, new HashMap<>());
+        for(QueueingStrategy.Priority priority: QueueingStrategy.Priority.values()) {
+            if(priority == QueueingStrategy.Priority.NONE) continue;
+            meterName = String.join(".", DENORMALIZED_RECORDS_CREATED, priority.name().toLowerCase(), shortName);
+            if(!registry.getMetrics().containsKey(meterName)) {
+                denormalizedRecordsCreatedByTopicAndPriority.get(shortName).put(priority, registry.meter(meterName));
+            } else {
+                denormalizedRecordsCreatedByTopicAndPriority.get(shortName).put(priority, (Meter) registry.getMetrics().get(meterName));
+            }
+        }
         meterName = String.join(".", DENORMALIZED_RECORDS_TO_CREATE, shortName);
         if(!registry.getMetrics().containsKey(meterName)) {
             denormalizedRecordsToCreateByTopic.put(shortName, registry.register(meterName, new StaticGauge<>()));
         } else {
             denormalizedRecordsToCreateByTopic.put(shortName, (StaticGauge<Long>) registry.getMetrics().get(meterName));
+        }
+        denormalizedRecordsToCreateByTopicAndPriority.put(shortName, new HashMap<>());
+        for(QueueingStrategy.Priority priority: QueueingStrategy.Priority.values()) {
+            if(priority == QueueingStrategy.Priority.NONE) continue;
+            meterName = String.join(".", DENORMALIZED_RECORDS_TO_CREATE, priority.name().toLowerCase(), shortName);
+            if(!registry.getMetrics().containsKey(meterName)) {
+                denormalizedRecordsToCreateByTopicAndPriority.get(shortName).put(priority, new StaticGauge<>());
+            } else {
+                denormalizedRecordsToCreateByTopicAndPriority.get(shortName).put(priority, (StaticGauge<Long>) registry.getMetrics().get(meterName));
+            }
         }
     }
 

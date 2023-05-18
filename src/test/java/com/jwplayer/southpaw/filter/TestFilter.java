@@ -16,8 +16,12 @@
 package com.jwplayer.southpaw.filter;
 
 import com.jwplayer.southpaw.record.BaseRecord;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class TestFilter extends BaseFilter {
+    private static final Logger logger =  LoggerFactory.getLogger(TestFilter.class);
+
     String DELETED = "deleted";
     String SKIP = "skip";
     String INVALID = "INVALID";
@@ -46,6 +50,7 @@ public class TestFilter extends BaseFilter {
             default:
                 mode = FilterMode.UPDATE;
         }
+        logger.info(String.format("Filter mode %s for: %s / %s", mode, entity, record));
         return mode;
     }
 }

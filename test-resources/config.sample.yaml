@@ -4,6 +4,7 @@ commit.time.s: 60
 create.records.trigger: 1
 index.lru.cache.size: 1
 index.write.batch.size: 3
+queueing.strategy.class: "com.jwplayer.southpaw.strategy.TestQueueingStrategy"
 topic.lag.trigger: 1000000
 
 rocks.db.backup.uri: "file:///tmp/RocksDB/testBackup"

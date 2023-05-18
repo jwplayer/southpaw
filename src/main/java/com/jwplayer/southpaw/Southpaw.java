@@ -23,6 +23,7 @@ import com.jwplayer.southpaw.json.*;
 import com.jwplayer.southpaw.record.BaseRecord;
 import com.jwplayer.southpaw.state.BaseState;
 import com.jwplayer.southpaw.state.RocksDBState;
+import com.jwplayer.southpaw.strategy.QueueingStrategy;
 import com.jwplayer.southpaw.topic.BaseTopic;
 import com.jwplayer.southpaw.topic.Topics;
 import com.jwplayer.southpaw.util.ByteArray;
@@ -90,10 +91,6 @@ public class Southpaw {
      */
     protected final Config config;
     /**
-     * The PKs of the denormalized records yet to be created
-     */
-    protected Map<Relation, ByteArraySet> dePKsByType = new HashMap<>();
-    /**
      * The indices used by Southpaw
      */
     protected Indices indices;
@@ -110,10 +107,18 @@ public class Southpaw {
      */
     protected boolean processRecords = true;
     /**
+     * The queueing strategy for records to be created
+     */
+    protected QueueingStrategy queueingStrategy;
+    /**
      * The configuration for Southpaw. Mostly Kafka and topic configuration. See
      * test/test-resources/config.sample.yaml for an example.
      */
     protected final Map<String, Object> rawConfig;
+    /**
+     * The PKs of the denormalized records yet to be created
+     */
+    protected Map<Relation, Map<QueueingStrategy.Priority, ByteArraySet>> recordsToBeCreated = new HashMap<>();
     /**
      * The top level relations that instruct Southpaw how to construct denormalized records. See
      * test-resources/relations.sample.json for an example.
@@ -142,6 +147,8 @@ public class Southpaw {
         public static final int CREATE_RECORDS_TRIGGER_DEFAULT = 250000;
         public static final String METRICS_REPORT_TIME_S_CONFIG = "metrics.report.time.s";
         public static final int METRICS_REPORT_TIME_S_DEFAULT = 30;
+        public static final String QUEUEING_STRATEGY_CLASS_CONFIG = "queueing.strategy.class";
+        public static final String QUEUEING_STRATEGY_CLASS_DEFAULT = "com.jwplayer.southpaw.strategy.QueueingStrategy";
         public static final String TOPIC_LAG_TRIGGER_CONFIG = "topic.lag.trigger";
         public static final String TOPIC_LAG_TRIGGER_DEFAULT = "1000";
 
@@ -168,6 +175,10 @@ public class Southpaw {
          */
         public int metricsReportTimeS;
         /**
+         * The class name for the queueing strategy
+         */
+        public String queueingStrategyClass;
+        /**
          * Config for when to switch from one topic to the next (or to stop processing a topic entirely), when lag drops below this value
          */
         public int topicLagTrigger;
@@ -178,6 +189,7 @@ public class Southpaw {
             this.createRecordsTimeS = (int) rawConfig.getOrDefault(CREATE_RECORDS_TIME_S_CONFIG, CREATE_RECORDS_TIME_S_DEFAULT);
             this.createRecordsTrigger = (int) rawConfig.getOrDefault(CREATE_RECORDS_TRIGGER_CONFIG, CREATE_RECORDS_TRIGGER_DEFAULT);
             this.metricsReportTimeS = (int) rawConfig.getOrDefault(METRICS_REPORT_TIME_S_CONFIG, METRICS_REPORT_TIME_S_DEFAULT);
+            this.queueingStrategyClass = (String) rawConfig.getOrDefault(QUEUEING_STRATEGY_CLASS_CONFIG, QUEUEING_STRATEGY_CLASS_DEFAULT);
             this.topicLagTrigger = (int) rawConfig.getOrDefault(TOPIC_LAG_TRIGGER_CONFIG, TOPIC_LAG_TRIGGER_DEFAULT);
         }
     }
@@ -209,12 +221,21 @@ public class Southpaw {
         this.state.open();
         this.state.createKeySpace(METADATA_KEYSPACE);
         this.indices = new Indices(this.rawConfig, this.metrics, this.state, this.relations);
+        Class<?> queueingStrategyClass = Class.forName(config.queueingStrategyClass);
+        this.queueingStrategy = (QueueingStrategy) queueingStrategyClass.getDeclaredConstructor().newInstance();
         this.topics = new Topics(this.rawConfig, this.metrics, this.state, this.relations);
 
         // Load any previous denormalized record PKs that have yet to be created
         for (Relation root : relations) {
-            byte[] bytes = this.state.get(METADATA_KEYSPACE, createDePKEntryName(root).getBytes());
-            this.dePKsByType.put(root, ByteArraySet.deserialize(bytes));
+            this.recordsToBeCreated.put(root, new HashMap<>());
+            for (QueueingStrategy.Priority priority: QueueingStrategy.Priority.values()) {
+                if (priority != QueueingStrategy.Priority.NONE) {
+                    byte[] bytes = this.state.get(
+                            METADATA_KEYSPACE,
+                            createRecordsToBeCreatedKeyspace(root, priority).getBytes());
+                    this.recordsToBeCreated.get(root).put(priority, ByteArraySet.deserialize(bytes));
+                }
+            }
         }
 
         // Start the global timers
@@ -246,7 +267,7 @@ public class Southpaw {
                         ConsumerRecord<BaseRecord, BaseRecord> inputRecord = records.next();
                         for (Relation root : relations) {
                             Set<ByteArray> newDePKs = processInputRecord(root, entity, inputRecord);
-                            queueDenormalizedPKs(root, newDePKs);
+                            queueDenormalizedPKs(root, entity, newDePKs);
                             handleTimers();
                         }
                     }
@@ -279,10 +300,14 @@ public class Southpaw {
             logger.info("Performing a full commit");
             topics.flushOutputTopics();
             indices.flush();
-            for(Map.Entry<Relation, ByteArraySet> entry: dePKsByType.entrySet()) {
-                state.put(METADATA_KEYSPACE, createDePKEntryName(entry.getKey()).getBytes(), entry.getValue().serialize());
-                state.flush(METADATA_KEYSPACE);
+            for(Map.Entry<Relation, Map<QueueingStrategy.Priority, ByteArraySet>> relationQueues: recordsToBeCreated.entrySet()) {
+                for(Map.Entry<QueueingStrategy.Priority, ByteArraySet> priorityQueue: relationQueues.getValue().entrySet()){
+                    state.put(METADATA_KEYSPACE,
+                            createRecordsToBeCreatedKeyspace(relationQueues.getKey(), priorityQueue.getKey()).getBytes(),
+                            priorityQueue.getValue().serialize());
+                }
             }
+            state.flush(METADATA_KEYSPACE);
             topics.commitInputTopics();
             state.flush();
             commitWatch.reset();
@@ -338,10 +363,12 @@ public class Southpaw {
      * guaranteed to be created because this method will only run for config.createRecordsTimeS seconds. Any records
      * that were created will be removed from the input set of PKs.
      * @param root - The top level relation defining the structure and relations of the denormalized records to create
+     * @param priority - The priority of the queue the primary keys belong to
      * @param rootRecordPKs - The primary keys of the root input records to create denormalized records for
      */
     protected void createDenormalizedRecords(
             Relation root,
+            QueueingStrategy.Priority priority,
             Set<ByteArray> rootRecordPKs) {
         Set<ByteArray> createdDePKs = new ByteArraySet();
         StopWatch timer = new StopWatch();
@@ -364,6 +391,7 @@ public class Southpaw {
                 outputTopic.write(dePrimaryKey.getBytes(), newDeRecord);
                 metrics.denormalizedRecordsCreated.mark(1);
                 metrics.denormalizedRecordsCreatedByTopic.get(root.getDenormalizedName()).mark(1);
+                metrics.denormalizedRecordsCreatedByTopicAndPriority.get(root.getDenormalizedName()).get(priority).mark(1);
                 createdDePKs.add(dePrimaryKey);
             }
             if(config.createRecordsTimeS > 0 && timer.getTime() > config.createRecordsTimeS * 1000L) {
@@ -375,14 +403,22 @@ public class Southpaw {
         } else {
             rootRecordPKs.removeAll(createdDePKs);
         }
+        handleTimers();
     }
 
     /**
-     * Create the entry name for the denormalized PKs yet to be created
-     * @return - The entry name
+     * Create the keyspace for the primary keys of the denormalized records yet to be created. Only low and high
+     * priorities have the priority in the keyspace for backwards compatibility.
+     * @param root - The root relation
+     * @param priority - The priority of the records to be created
+     * @return - The name of the keyspace
      */
-    protected static String createDePKEntryName(Relation root) {
-        return String.join(SEP, PK, root.getDenormalizedName());
+    protected static String createRecordsToBeCreatedKeyspace(Relation root, QueueingStrategy.Priority priority) {
+        if(priority == QueueingStrategy.Priority.MEDIUM) {
+            return String.join(SEP, PK, root.getDenormalizedName());
+        } else {
+            return String.join(SEP, PK, priority.name().toLowerCase(), root.getDenormalizedName());
+        }
     }
 
     /**
@@ -569,29 +605,45 @@ public class Southpaw {
     }
 
     /**
-     * Processes previously queued denormalized PKs.
+     * Processes previously queued denormalized PKs. High and medium queues are completely processed, while low
+     * priority queues only get a single pass.
      */
     protected void processDenormalizedPKs() {
-        for(Map.Entry<Relation, ByteArraySet> entry: dePKsByType.entrySet()) {
-            do {
-                createDenormalizedRecords(entry.getKey(), entry.getValue());
-                handleTimers();
-            } while (entry.getValue().size() > 0);
+        for(Map.Entry<Relation, Map<QueueingStrategy.Priority, ByteArraySet>> relationQueues: recordsToBeCreated.entrySet()) {
+            for(Map.Entry<QueueingStrategy.Priority, ByteArraySet> priorityQueue: relationQueues.getValue().entrySet()) {
+                do {
+                    createDenormalizedRecords(relationQueues.getKey(), priorityQueue.getKey(), priorityQueue.getValue());
+                } while (priorityQueue.getValue().size() > 0 && priorityQueue.getKey() != QueueingStrategy.Priority.LOW);
+            }
         }
     }
 
     /**
      * Queues new denormalized PKs, and if too many have been queued, creates denormalized records until the queue
-     * size is below the configured amount.
+     * sizes are below the configured amount. Additionally, all records for the high priority queue are created,
+     * even if the queue is below the configured amount.
      * @param root - The root relation of these PKs
+     * @param entity - The entity that triggered these records to be created
      * @param newDePKs - The PKs of the denormalized records to create
      */
-    protected void queueDenormalizedPKs(Relation root, Set<ByteArray> newDePKs) {
-        Set<ByteArray> dePKsToCreate = dePKsByType.get(root);
-        dePKsToCreate.addAll(newDePKs);
-        while(dePKsToCreate.size() > config.createRecordsTrigger) {
-            createDenormalizedRecords(root, dePKsToCreate);
-            handleTimers();
+    protected void queueDenormalizedPKs(Relation root, String entity, Set<ByteArray> newDePKs) {
+        if(newDePKs.size() == 0) return;
+        QueueingStrategy.Priority priority = queueingStrategy.getPriority(root.getDenormalizedName(), entity, newDePKs);
+        if(priority == QueueingStrategy.Priority.NONE) {
+            metrics.denormalizedRecordsDropped.mark(newDePKs.size());
+            metrics.denormalizedRecordsDroppedByTopic.get(root.getDenormalizedName()).mark(newDePKs.size());
+            return;
+        }
+        ByteArraySet queue = recordsToBeCreated.get(root).get(priority);
+        queue.addAll(newDePKs);
+        if(priority == QueueingStrategy.Priority.HIGH) {
+            do {
+                createDenormalizedRecords(root, priority, queue);
+            } while (queue.size() > 0);
+        } else {
+            while(queue.size() > config.createRecordsTrigger) {
+                createDenormalizedRecords(root, priority, queue);
+            }
         }
     }
 
@@ -601,10 +653,20 @@ public class Southpaw {
     protected void reportMetrics() {
         // Denormalized records to create
         long totalRecords = 0;
-        for(Map.Entry<Relation, ByteArraySet> entry: dePKsByType.entrySet()) {
-            long records = entry.getValue().size();
-            totalRecords += records;
-            metrics.denormalizedRecordsToCreateByTopic.get(entry.getKey().getDenormalizedName()).update(records);
+        for(Map.Entry<Relation, Map<QueueingStrategy.Priority, ByteArraySet>> relationQueues: recordsToBeCreated.entrySet()) {
+            long topicRecords = 0;
+            for(Map.Entry<QueueingStrategy.Priority, ByteArraySet> priorityQueue: relationQueues.getValue().entrySet()) {
+                long records = priorityQueue.getValue().size();
+                topicRecords += records;
+                totalRecords += records;
+                metrics.denormalizedRecordsToCreateByTopicAndPriority
+                        .get(relationQueues.getKey().getDenormalizedName())
+                        .get(priorityQueue.getKey())
+                        .update(records);
+            }
+            metrics.denormalizedRecordsToCreateByTopic
+                    .get(relationQueues.getKey().getDenormalizedName())
+                    .update(topicRecords);
         }
         metrics.denormalizedRecordsToCreate.update(totalRecords);
         topics.reportMetrics();
