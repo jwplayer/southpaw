@@ -7,10 +7,7 @@ import com.jwplayer.southpaw.json.Relation;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.AbstractMap;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import java.util.*;
 
 public class RelationHelper {
     /**
@@ -35,6 +32,39 @@ public class RelationHelper {
             if(retVal != null) return retVal;
         }
         return null;
+    }
+
+    /**
+     * Gets all entities from the given relation
+     * @param relation - The relation to extract the entities from
+     * @return A list of all entities contained in the given relation
+     */
+    public static Set<String> getEntities(Relation relation) {
+        Set<String> entities = new TreeSet<>();
+        entities.add(relation.getEntity());
+
+        if(relation.getChildren() != null) {
+            for(Relation child: relation.getChildren()) {
+                entities.addAll(getEntities(child));
+            }
+        }
+
+        return entities;
+    }
+
+    /**
+     * Gets all entities from the given relations
+     * @param relations - The relations to extract the entities from
+     * @return A list of all entities contained in the given relations
+     */
+    public static Set<String> getEntities(Relation[] relations) {
+        Set<String> entities = new TreeSet<>();
+
+        for(Relation relation: relations) {
+            entities.addAll(getEntities(relation));
+        }
+
+        return entities;
     }
 
     /**

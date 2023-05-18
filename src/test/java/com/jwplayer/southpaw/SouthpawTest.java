@@ -19,7 +19,6 @@ import com.jwplayer.southpaw.json.Record;
 import com.jwplayer.southpaw.record.BaseRecord;
 import com.jwplayer.southpaw.record.MapRecord;
 import com.jwplayer.southpaw.state.RocksDBState;
-import com.jwplayer.southpaw.topic.BaseTopic;
 import com.jwplayer.southpaw.util.FileHelper;
 import org.junit.*;
 import org.junit.rules.TemporaryFolder;
@@ -75,32 +74,5 @@ public class SouthpawTest {
             assertTrue(internalMap.containsKey(entry.getKey()));
             assertEquals(entry.getValue(), internalMap.get(entry.getKey()));
         }
-    }
-
-    @Test
-    public void testCreateKafkaConfig() {
-        Map<String, Object> kafkaConfig = southpaw.createTopicConfig("Overrides");
-
-        assertEquals(kafkaConfig.get("bootstrap.servers"), "kafka:29092");
-        assertEquals(kafkaConfig.get("client.id"), "overrides");
-        assertEquals(kafkaConfig.get("group.id"), "southpaw");
-        assertEquals(kafkaConfig.get("key.serde.class"), "com.jwplayer.southpaw.serde.AvroSerde");
-        assertEquals(kafkaConfig.get("schema.registry.url"), "http://schema-registry:8081");
-        assertEquals(kafkaConfig.get("value.serde.class"), "com.jwplayer.southpaw.serde.AvroSerde");
-        assertEquals(kafkaConfig.get("topic.name"), "overrides");
-    }
-
-    @Test
-    public void testNormalizedTopics() {
-        Map<String, BaseTopic<BaseRecord, BaseRecord>> topics = southpaw.inputTopics;
-
-        assertEquals(7, topics.size());
-        assertTrue(topics.containsKey("media"));
-        assertTrue(topics.containsKey("playlist"));
-        assertTrue(topics.containsKey("playlist_custom_params"));
-        assertTrue(topics.containsKey("playlist_media"));
-        assertTrue(topics.containsKey("playlist_tag"));
-        assertTrue(topics.containsKey("user"));
-        assertTrue(topics.containsKey("user_tag"));
     }
 }

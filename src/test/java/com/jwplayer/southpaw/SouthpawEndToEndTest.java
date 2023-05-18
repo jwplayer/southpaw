@@ -17,11 +17,13 @@ package com.jwplayer.southpaw;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jwplayer.southpaw.json.DenormalizedRecord;
+import com.jwplayer.southpaw.json.Relation;
 import com.jwplayer.southpaw.record.BaseRecord;
 import com.jwplayer.southpaw.state.RocksDBState;
 import com.jwplayer.southpaw.topic.BaseTopic;
 import com.jwplayer.southpaw.util.ByteArray;
 import com.jwplayer.southpaw.util.FileHelper;
+import com.jwplayer.southpaw.util.RelationHelper;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.junit.After;
 import org.junit.Before;
@@ -32,6 +34,7 @@ import org.yaml.snakeyaml.Yaml;
 
 import java.net.URI;
 import java.util.*;
+import java.util.stream.Collectors;
 
 import static org.junit.Assert.*;
 
@@ -96,34 +99,38 @@ public class SouthpawEndToEndTest {
         // Generate the actual results
         int maxRecords = 0;
 
-        Map<String, BaseTopic<BaseRecord, BaseRecord>> normalizedTopics = southpaw.inputTopics;
+        Set<String> denormalizedNames = Arrays.stream(southpaw.relations)
+                .map(Relation::getDenormalizedName).collect(Collectors.toSet());
+        Set<String> entities = RelationHelper.getEntities(southpaw.relations);
         Map<String, String[]> records = new HashMap<>();
-        for(Map.Entry<String, BaseTopic<BaseRecord, BaseRecord>> entry: normalizedTopics.entrySet()) {
-            records.put(entry.getKey(), FileHelper.loadFileAsString(new URI(TOPIC_DATA_PATH + entry.getKey() + ".json")).split("\n"));
-            maxRecords = Math.max(records.get(entry.getKey()).length, maxRecords);
+        for(String entity: entities) {
+            records.put(entity, FileHelper.loadFileAsString(new URI(TOPIC_DATA_PATH + entity + ".json")).split("\n"));
+            maxRecords = Math.max(records.get(entity).length, maxRecords);
         }
         Map<String, Map<ByteArray, DenormalizedRecord>> denormalizedRecords = new HashMap<>();
 
         for(int i = 0; i < maxRecords / 2; i++) {
-            for(Map.Entry<String, BaseTopic<BaseRecord, BaseRecord>> entry: normalizedTopics.entrySet()) {
-                String[] json = records.get(entry.getKey());
+            for(String entity: entities) {
+                BaseTopic<BaseRecord, BaseRecord> topic = southpaw.topics.getInputTopic(entity);
+                String[] json = records.get(entity);
                 if(json.length >= i * 2 + 2) {
-                    entry.getValue().write(
-                            entry.getValue().getKeySerde().deserializer().deserialize(null, json[2 * i].getBytes()),
-                            entry.getValue().getValueSerde().deserializer().deserialize(null, json[2 * i + 1].getBytes())
+                    topic.write(
+                            topic.getKeySerde().deserializer().deserialize(null, json[2 * i].getBytes()),
+                            topic.getValueSerde().deserializer().deserialize(null, json[2 * i + 1].getBytes())
                     );
                 }
             }
             southpaw.run(1L);
-            for(Map.Entry<String, BaseTopic<byte[], DenormalizedRecord>> entry: southpaw.outputTopics.entrySet()) {
-                if(!denormalizedRecords.containsKey(entry.getKey())) {
-                    denormalizedRecords.put(entry.getKey(), new HashMap<>());
+            for(String denormalizedName: denormalizedNames) {
+                BaseTopic<byte[], DenormalizedRecord> topic = southpaw.topics.getOutputTopic(denormalizedName);
+                if(!denormalizedRecords.containsKey(denormalizedName)) {
+                    denormalizedRecords.put(denormalizedName, new HashMap<>());
                 }
-                entry.getValue().resetCurrentOffsets();
-                Iterator<ConsumerRecord<byte[], DenormalizedRecord>> iter = entry.getValue().readNext();
+                topic.resetCurrentOffsets();
+                Iterator<ConsumerRecord<byte[], DenormalizedRecord>> iter = topic.readNext();
                 while(iter.hasNext()) {
                     ConsumerRecord<byte[], DenormalizedRecord> record = iter.next();
-                    denormalizedRecords.get(entry.getKey()).put(new ByteArray(record.key()), record.value());
+                    denormalizedRecords.get(denormalizedName).put(new ByteArray(record.key()), record.value());
                 }
             }
         }

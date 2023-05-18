@@ -36,9 +36,8 @@ public class IndicesTest {
         Yaml yaml = new Yaml();
         Map<String, Object> config = yaml.load(FileHelper.getInputStream(new URI(CONFIG_PATH)));
         state = createState();
-        indices = new Indices(config, state);
         Relation[] relations = RelationHelper.loadRelations(Collections.singletonList(new URI(RELATIONS_PATH)));
-        indices.createIndices(relations);
+        indices = new Indices(config, state, relations);
     }
 
     @After

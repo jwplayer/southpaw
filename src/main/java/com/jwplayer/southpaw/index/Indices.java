@@ -55,9 +55,10 @@ public class Indices {
      * @param config - Config for the indices
      * @param state - State for storing the indices
      */
-    public Indices(Map<String, Object> config, BaseState state) {
+    public Indices(Map<String, Object> config, BaseState state, Relation[] relations) {
         this.config = config;
         this.state = state;
+        createIndices(relations);
     }
 
     /**
@@ -96,7 +97,7 @@ public class Indices {
      * Creates all indices for all relations provided to Southpaw. Note: indices to the input records
      * can be shared between top level relations.
      */
-    public void createIndices(Relation[] relations) {
+    protected void createIndices(Relation[] relations) {
         for(Relation root: relations) {
             for(Relation child: root.getChildren()) {
                 createChildIndices(root, root, child);
@@ -254,7 +255,7 @@ public class Indices {
      * Verifies and logs the given index
      * @param index - The index to verify
      */
-    public void verifyIndex(Index index) {
+    protected void verifyIndex(Index index) {
         Set<String> missingIndexKeys = index.verifyIndexState();
         logger.info("Verifying forward index");
         if(missingIndexKeys.isEmpty()){
