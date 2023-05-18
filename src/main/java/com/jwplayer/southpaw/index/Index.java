@@ -16,6 +16,7 @@
 package com.jwplayer.southpaw.index;
 
 import com.google.common.base.Preconditions;
+import com.jwplayer.southpaw.metric.Metrics;
 import com.jwplayer.southpaw.state.BaseState;
 import com.jwplayer.southpaw.util.ByteArray;
 import com.jwplayer.southpaw.util.ByteArraySet;
@@ -65,6 +66,10 @@ public class Index {
      * are not guaranteed to be immediately gettable without flushing.
      */
     protected int indexWriteBatchSize;
+    /**
+     * Metrics class that contains index related metrics
+     */
+    protected Metrics metrics;
     protected Map<ByteArray, ByteArraySet> pendingRIWrites = new HashMap<>();
     protected Map<ByteArray, ByteArraySet> pendingWrites = new HashMap<>();
     protected String reverseIndexName;
@@ -86,6 +91,7 @@ public class Index {
         }
         addRI(foreignKey, primaryKey);
         if(pks.add(primaryKey)) {
+            metrics.indexEntriesSize.get(indexName).update(pks.size());
             putToState(foreignKey, pks);
         }
     }
@@ -101,6 +107,7 @@ public class Index {
             keys = new ByteArraySet();
         }
         if(keys.add(foreignKey)) {
+            metrics.indexReverseEntriesSize.get(indexName).update(keys.size());
             putRIToState(primaryKey, keys);
         }
     }
@@ -109,14 +116,17 @@ public class Index {
      * Configure the index
      * @param indexName - The name of the index
      * @param config - Configuration object containing index config
+     * @param metrics - Metrics object for reporting index based metrics
      * @param state - State used to store the index
      */
-    public void configure(String indexName, Map<String, Object> config, BaseState state) {
+    public void configure(String indexName, Map<String, Object> config, Metrics metrics, BaseState state) {
         this.indexLRUCacheSize = (int) Preconditions.checkNotNull(config.get(INDEX_LRU_CACHE_SIZE));
         this.entryCache = new LRUMap<>(this.indexLRUCacheSize);
         this.entryRICache = new LRUMap<>(this.indexLRUCacheSize);
         this.indexName = Preconditions.checkNotNull(indexName);
         this.indexWriteBatchSize = (int) Preconditions.checkNotNull(config.get(INDEX_WRITE_BATCH_SIZE));
+        this.metrics = metrics;
+        this.metrics.registerIndex(this.indexName);
         this.reverseIndexName = indexName + "-reverse";
         this.state = state;
         this.state.createKeySpace(this.indexName);
@@ -146,20 +156,27 @@ public class Index {
      * @return The keys for the given primary key or null if no corresponding entry exists
      */
     public ByteArraySet getForeignKeys(ByteArray primaryKey) {
+        ByteArraySet retVal;
         if(entryRICache.containsKey(primaryKey)) {
-            return entryRICache.get(primaryKey);
+            retVal = entryRICache.get(primaryKey);
         } else if(pendingRIWrites.containsKey(primaryKey)) {
-            return pendingRIWrites.get(primaryKey);
+            retVal = pendingRIWrites.get(primaryKey);
         } else {
             byte[] bytes = state.get(reverseIndexName, primaryKey.getBytes());
             if (bytes == null) {
-                return null;
+                retVal = null;
             } else {
                 ByteArraySet set = ByteArraySet.deserialize(bytes);
                 if(set.size() > LRU_CACHE_THRESHOLD) entryRICache.put(primaryKey, set);
-                return set;
+                retVal = set;
             }
         }
+        if(retVal == null) {
+            metrics.indexReverseEntriesSize.get(indexName).update(0);
+        } else {
+            metrics.indexReverseEntriesSize.get(indexName).update(retVal.size());
+        }
+        return retVal;
     }
 
     /**
@@ -169,20 +186,27 @@ public class Index {
      */
     public ByteArraySet getIndexEntry(ByteArray foreignKey) {
         Preconditions.checkNotNull(foreignKey);
+        ByteArraySet retVal;
         if(entryCache.containsKey(foreignKey)) {
-            return entryCache.get(foreignKey);
+            retVal = entryCache.get(foreignKey);
         } else if(pendingWrites.containsKey(foreignKey)) {
-            return pendingWrites.get(foreignKey);
+            retVal = pendingWrites.get(foreignKey);
         } else {
             byte[] bytes = state.get(indexName, foreignKey.getBytes());
             if (bytes == null) {
-                return null;
+                retVal = null;
             } else {
                 ByteArraySet set = ByteArraySet.deserialize(bytes);
                 if(set.size() > LRU_CACHE_THRESHOLD) entryCache.put(foreignKey, set);
-                return set;
+                retVal = set;
             }
         }
+        if(retVal == null) {
+            metrics.indexEntriesSize.get(indexName).update(0);
+        } else {
+            metrics.indexEntriesSize.get(indexName).update(retVal.size());
+        }
+        return retVal;
     }
 
     /**
@@ -222,6 +246,7 @@ public class Index {
         ByteArraySet foreignKeys = getForeignKeys(primaryKey);
         if(foreignKeys != null) {
             foreignKeys.remove(foreignKey);
+            metrics.indexReverseEntriesSize.get(indexName).update(foreignKeys.size());
             if(foreignKeys.size() == 0) {
                 state.delete(reverseIndexName, primaryKey.getBytes());
                 entryRICache.remove(primaryKey);
@@ -229,6 +254,8 @@ public class Index {
             } else {
                 putRIToState(primaryKey, foreignKeys);
             }
+        } else {
+            metrics.indexReverseEntriesSize.get(indexName).update(0);
         }
     }
 
@@ -243,6 +270,7 @@ public class Index {
         ByteArraySet primaryKeys = getIndexEntry(foreignKey);
         if(primaryKeys != null) {
             if(primaryKeys.remove(primaryKey)) {
+                metrics.indexEntriesSize.get(indexName).update(primaryKeys.size());
                 if(primaryKeys.size() == 0) {
                     state.delete(indexName, foreignKey.getBytes());
                     entryCache.remove(foreignKey);
@@ -252,9 +280,11 @@ public class Index {
                 }
                 return true;
             } else {
+                metrics.indexEntriesSize.get(indexName).update(primaryKeys.size());
                 return false;
             }
         } else {
+            metrics.indexEntriesSize.get(indexName).update(0);
             return false;
         }
     }

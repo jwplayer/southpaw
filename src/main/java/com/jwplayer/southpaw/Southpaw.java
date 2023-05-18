@@ -208,7 +208,7 @@ public class Southpaw {
         this.state = new RocksDBState(rawConfig);
         this.state.open();
         this.state.createKeySpace(METADATA_KEYSPACE);
-        this.indices = new Indices(this.rawConfig, this.state, this.relations);
+        this.indices = new Indices(this.rawConfig, this.metrics, this.state, this.relations);
         this.topics = new Topics(this.rawConfig, this.metrics, this.state, this.relations);
 
         // Load any previous denormalized record PKs that have yet to be created

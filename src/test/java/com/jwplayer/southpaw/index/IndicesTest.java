@@ -2,6 +2,7 @@ package com.jwplayer.southpaw.index;
 
 import com.jwplayer.southpaw.MockState;
 import com.jwplayer.southpaw.json.Relation;
+import com.jwplayer.southpaw.metric.Metrics;
 import com.jwplayer.southpaw.state.BaseState;
 import com.jwplayer.southpaw.util.FileHelper;
 import com.jwplayer.southpaw.util.RelationHelper;
@@ -37,7 +38,7 @@ public class IndicesTest {
         Map<String, Object> config = yaml.load(FileHelper.getInputStream(new URI(CONFIG_PATH)));
         state = createState();
         Relation[] relations = RelationHelper.loadRelations(Collections.singletonList(new URI(RELATIONS_PATH)));
-        indices = new Indices(config, state, relations);
+        indices = new Indices(config, new Metrics(), state, relations);
     }
 
     @After

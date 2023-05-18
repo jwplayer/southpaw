@@ -30,6 +30,8 @@ public class Metrics {
     public static final String BACKUPS_RESTORED = "backups.restored";
     public static final String DENORMALIZED_RECORDS_CREATED = "denormalized.records.created";
     public static final String DENORMALIZED_RECORDS_TO_CREATE = "denormalized.records.to.create";
+    public static final String INDEX_ENTRIES_SIZE = "index.entries.size";
+    public static final String INDEX_REVERSE_ENTRIES_SIZE = "index.reverse.entries.size";
     public static final String RECORDS_CONSUMED = "records.consumed";
     public static final String STATE_COMMITTED = "states.committed";
     public static final String STATES_DELETED = "states.deleted";
@@ -72,6 +74,14 @@ public class Metrics {
      * The number of denormalized records to create by topic
      */
     public final Map<String, StaticGauge<Long>> denormalizedRecordsToCreateByTopic = new HashMap<>();
+    /**
+     * Histogram of the size of entries for each index
+     */
+    public final Map<String, Histogram> indexEntriesSize = new HashMap<>();
+    /**
+     * Histogram of the size of entries for each reverse index
+     */
+    public final Map<String, Histogram> indexReverseEntriesSize = new HashMap<>();
     /**
      * Number of records consumed from all topics
      */
@@ -171,6 +181,25 @@ public class Metrics {
             denormalizedRecordsToCreateByTopic.put(shortName, registry.register(meterName, new StaticGauge<>()));
         } else {
             denormalizedRecordsToCreateByTopic.put(shortName, (StaticGauge<Long>) registry.getMetrics().get(meterName));
+        }
+    }
+
+    /**
+     * Register an index's metrics
+     * @param indexName - The name of the index to register
+     */
+    public void registerIndex(String indexName) {
+        String meterName = String.join(".", INDEX_ENTRIES_SIZE, indexName);
+        if(!registry.getMetrics().containsKey(meterName)) {
+            indexEntriesSize.put(indexName, registry.histogram(meterName));
+        } else {
+            indexEntriesSize.put(indexName, (Histogram) registry.getMetrics().get(meterName));
+        }
+        meterName = String.join(".", INDEX_REVERSE_ENTRIES_SIZE, indexName);
+        if(!registry.getMetrics().containsKey(meterName)) {
+            indexReverseEntriesSize.put(indexName, registry.histogram(meterName));
+        } else {
+            indexReverseEntriesSize.put(indexName, (Histogram) registry.getMetrics().get(meterName));
         }
     }
 }

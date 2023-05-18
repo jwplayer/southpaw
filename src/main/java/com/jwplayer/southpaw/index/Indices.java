@@ -3,6 +3,7 @@ package com.jwplayer.southpaw.index;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
 import com.jwplayer.southpaw.json.Relation;
+import com.jwplayer.southpaw.metric.Metrics;
 import com.jwplayer.southpaw.record.BaseRecord;
 import com.jwplayer.southpaw.state.BaseState;
 import com.jwplayer.southpaw.util.ByteArray;
@@ -42,6 +43,10 @@ public class Indices {
      */
     protected final Map<String, Index> joinIndices = new HashMap<>();
     /**
+     * Metrics class that contains index related metrics
+     */
+    protected Metrics metrics;
+    /**
      * All indices representing the relationship between a child entity's join keys and the root entity's primary keys
      */
     protected final Map<String, Index> parentIndices = new HashMap<>();
@@ -55,8 +60,9 @@ public class Indices {
      * @param config - Config for the indices
      * @param state - State for storing the indices
      */
-    public Indices(Map<String, Object> config, BaseState state, Relation[] relations) {
+    public Indices(Map<String, Object> config, Metrics metrics, BaseState state, Relation[] relations) {
         this.config = config;
+        this.metrics = metrics;
         this.state = state;
         createIndices(relations);
     }
@@ -89,7 +95,7 @@ public class Indices {
      */
     protected Index createIndex(String indexName) {
         Index index = new Index();
-        index.configure(indexName, config, state);
+        index.configure(indexName, config, metrics, state);
         return index;
     }
 

@@ -17,6 +17,7 @@ package com.jwplayer.southpaw.index;
 
 import com.jwplayer.southpaw.MockState;
 import com.jwplayer.southpaw.filter.BaseFilter;
+import com.jwplayer.southpaw.metric.Metrics;
 import com.jwplayer.southpaw.record.BaseRecord;
 import com.jwplayer.southpaw.serde.JsonSerde;
 import com.jwplayer.southpaw.state.BaseState;
@@ -65,7 +66,7 @@ public class IndexTest {
 
     private Index createEmptyIndex(Map<String, Object> config, BaseState state) {
         Index index = new Index();
-        index.configure("TestIndex", config, state);
+        index.configure("TestIndex", config, new Metrics(), state);
         return index;
     }
 
