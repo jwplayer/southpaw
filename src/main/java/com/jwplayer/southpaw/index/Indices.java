@@ -116,7 +116,7 @@ public class Indices {
      * @param child - The child relation to create the join index name for
      * @return The join index name
      */
-    protected static String createJoinIndexName(Relation child) {
+    public static String createJoinIndexName(Relation child) {
         return String.join(SEP, JK, child.getEntity(), child.getJoinKey());
     }
 
@@ -127,7 +127,7 @@ public class Indices {
      * @param child - The child relation to create the join index name for
      * @return The join index name
      */
-    protected static String createParentIndexName(Relation root, Relation parent, Relation child) {
+    public static String createParentIndexName(Relation root, Relation parent, Relation child) {
         return String.join(SEP, PaK, root.getEntity(), parent.getEntity(), child.getParentKey());
     }
 
@@ -253,20 +253,25 @@ public class Indices {
         Preconditions.checkNotNull(child);
         Preconditions.checkNotNull(rootPrimaryKey);
 
-        Index parentIndex = parentIndices.get(createParentIndexName(root, parent, child));
-        if (newParentKey != null) parentIndex.add(newParentKey, rootPrimaryKey);
+        if (newParentKey != null) {
+            Index parentIndex = parentIndices.get(createParentIndexName(root, parent, child));
+            parentIndex.add(newParentKey, rootPrimaryKey);
+        }
     }
 
     /**
      * Verifies and logs the given index
      * @param index - The index to verify
+     * @return True if the verification passed, otherwise false
      */
-    protected void verifyIndex(Index index) {
+    protected boolean verifyIndex(Index index) {
+        boolean passed = true;
         Set<String> missingIndexKeys = index.verifyIndexState();
         logger.info("Verifying forward index");
         if(missingIndexKeys.isEmpty()){
             logger.info("Forward index check complete");
         } else {
+            passed = false;
             logger.error("Forward index check failed for the following " + missingIndexKeys.size() + " keys:");
             logger.error(missingIndexKeys.toString());
         }
@@ -276,9 +281,11 @@ public class Indices {
         if(missingReverseIndexKeys.isEmpty()){
             logger.info("Reverse index check complete");
         } else {
+            passed = false;
             logger.error("Reverse index check failed for the following " + missingReverseIndexKeys.size() + " keys:");
             logger.error(missingReverseIndexKeys.toString());
         }
+        return passed;
     }
 
     /**
@@ -286,17 +293,20 @@ public class Indices {
      * are not set properly in the index and reverse index are logged to error.
      * <b>Note: This requires a full scan of each index dataset. This could be an expensive operation on larger
      * datasets.</b>
+     * @return True if the verification passed, otherwise false
      */
-    public void verifyIndices() {
+    public boolean verifyIndices() {
+        boolean passed = true;
         logger.info("Verifying join indices");
         for(Map.Entry<String, Index> index: joinIndices.entrySet()) {
             logger.info("Verifying join index: " + index.getKey());
-            verifyIndex(index.getValue());
+            passed &= verifyIndex(index.getValue());
         }
         logger.info("Verifying parent indices");
         for(Map.Entry<String, Index> index: parentIndices.entrySet()) {
             logger.info("Verifying parent index: " + index.getKey());
-            verifyIndex(index.getValue());
+            passed &= verifyIndex(index.getValue());
         }
+        return passed;
     }
 }

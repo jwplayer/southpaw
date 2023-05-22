@@ -223,6 +223,7 @@ public class Southpaw {
         this.indices = new Indices(this.rawConfig, this.metrics, this.state, this.relations);
         Class<?> queueingStrategyClass = Class.forName(config.queueingStrategyClass);
         this.queueingStrategy = (QueueingStrategy) queueingStrategyClass.getDeclaredConstructor().newInstance();
+        this.queueingStrategy.configure(this.rawConfig);
         this.topics = new Topics(this.rawConfig, this.metrics, this.state, this.relations);
 
         // Load any previous denormalized record PKs that have yet to be created

@@ -17,7 +17,7 @@ package com.jwplayer.southpaw.topic;
 
 import com.google.common.primitives.Ints;
 import com.google.common.primitives.Longs;
-import com.jwplayer.southpaw.MockState;
+import com.jwplayer.southpaw.state.InMemoryState;
 import com.jwplayer.southpaw.filter.BaseFilter;
 import com.jwplayer.southpaw.state.BaseState;
 import com.jwplayer.southpaw.util.ByteArray;
@@ -87,7 +87,7 @@ public class KafkaTopicTest {
 
     @BeforeClass
     public static void setup() {
-        state = new MockState();
+        state = new InMemoryState();
         state.open();
 
         Properties properties = new Properties();

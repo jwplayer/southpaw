@@ -27,7 +27,7 @@ import java.util.*;
  * A set class that optimizes (de)serialization while maintaining good (O(log n)) put/remove/contains performance,
  * especially for large index entries (e.g. user_id -> media_id)
  */
-public class ByteArraySet implements Set<ByteArray> {
+public class ByteArraySet extends AbstractSet<ByteArray> {
     /**
      * Enum for the different byte array formats
      */

@@ -17,7 +17,7 @@ public class BaseFilterTest {
         BaseFilter filter = new BaseFilter();
         BaseRecord record1 = new MapRecord(ImmutableMap.of("A", 1, "B", 2, "C", 3));
         BaseRecord record2 = new MapRecord(ImmutableMap.of("A", 1, "B", 2, "C", 3));
-        Boolean isEqual = filter.isEqual(record1, record2, Collections.emptyList());
+        boolean isEqual = filter.isEqual(record1, record2, Collections.emptyList());
 
         assertTrue(isEqual);
     }
@@ -27,7 +27,7 @@ public class BaseFilterTest {
         BaseFilter filter = new BaseFilter();
         BaseRecord record1 = new MapRecord(ImmutableMap.of("A", 1, "B", 2, "C", 3));
         BaseRecord record2 = new MapRecord(ImmutableMap.of("A", 1, "B", 5, "C", 3));
-        Boolean isEqual = filter.isEqual(record1, record2, ImmutableList.of("B"));
+        boolean isEqual = filter.isEqual(record1, record2, ImmutableList.of("B"));
 
         assertTrue(isEqual);
     }
@@ -64,7 +64,7 @@ public class BaseFilterTest {
         BaseFilter filter = new BaseFilter();
         BaseRecord record1 = new MapRecord(ImmutableMap.of("A", 1, "B", 2, "C", 3));
         BaseRecord record2 = new MapRecord(ImmutableMap.of("A", 1, "B", 5, "C", 3));
-        Boolean isEqual = filter.isEqual(record1, record2, Collections.emptyList());
+        boolean isEqual = filter.isEqual(record1, record2, Collections.emptyList());
 
         assertFalse(isEqual);
     }

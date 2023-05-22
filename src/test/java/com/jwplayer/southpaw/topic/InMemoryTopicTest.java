@@ -16,7 +16,7 @@
 package com.jwplayer.southpaw.topic;
 
 import com.google.common.collect.Lists;
-import com.jwplayer.southpaw.MockState;
+import com.jwplayer.southpaw.state.InMemoryState;
 import com.jwplayer.southpaw.filter.BaseFilter;
 import com.jwplayer.southpaw.state.BaseState;
 import com.jwplayer.southpaw.util.ByteArray;
@@ -39,7 +39,7 @@ public class InMemoryTopicTest {
 
     @Before
     public void setup() {
-        state = new MockState();
+        state = new InMemoryState();
         state.open();
     }
 
@@ -71,12 +71,9 @@ public class InMemoryTopicTest {
         Iterator<ConsumerRecord<String, String>> records = topic.readNext();
         int i = 0;
         while(records.hasNext()) {
-            assertEquals(keys.size() - i, topic.getLag());
             ConsumerRecord<String, String> record = records.next();
-            assertTrue(values.contains(record.value()));
-            int index = values.indexOf(record.value());
-            assertEquals(keys.get(index), record.key());
-            assertEquals(values.get(index), record.value());
+            assertEquals(keys.get(i), record.key());
+            assertEquals(values.get(i), record.value());
             i++;
         }
         assertEquals(0, topic.getLag());

@@ -15,6 +15,7 @@
  */
 package com.jwplayer.southpaw.index;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Preconditions;
 import com.jwplayer.southpaw.metric.Metrics;
 import com.jwplayer.southpaw.state.BaseState;
@@ -210,6 +211,14 @@ public class Index {
     }
 
     /**
+     * Returns the name of this index
+     * @return The index name
+     */
+    public String getIndexName() {
+        return indexName;
+    }
+
+    /**
      * Method for keeping pending writes manageable by auto-flushing once it reaches a certain size.
      */
     protected void putToState(ByteArray key, ByteArraySet value) {
@@ -290,11 +299,35 @@ public class Index {
     }
 
     /**
-     * Gives a nicely formatted string representation of this object. Useful for the Intellij debugger.
+     * Gives a nicely formatted string representation of this object. Useful for debugging.
      * @return Formatted string representation of this object
      */
+    @Override
     public String toString() {
-        return String.format("{indexName=%s}", indexName);
+        ObjectMapper mapper = new ObjectMapper();
+        Map<String, Object> index = new HashMap<>();
+        index.put("indexName", indexName);
+        Map<ByteArray, ByteArraySet> indexEntries = new HashMap<>();
+        BaseState.Iterator iterator = state.iterate(indexName);
+        while(iterator.hasNext()) {
+            AbstractMap.SimpleEntry<byte[], byte[]> entry = iterator.next();
+            indexEntries.put(ByteArray.toByteArray(entry.getKey()), ByteArraySet.deserialize(entry.getValue()));
+        }
+        indexEntries.putAll(pendingWrites);
+        index.put("index", indexEntries);
+        Map<ByteArray, ByteArraySet> reverseEntries = new HashMap<>();
+        iterator = state.iterate(reverseIndexName);
+        while(iterator.hasNext()) {
+            AbstractMap.SimpleEntry<byte[], byte[]> entry = iterator.next();
+            reverseEntries.put(ByteArray.toByteArray(entry.getKey()), ByteArraySet.deserialize(entry.getValue()));
+        }
+        reverseEntries.putAll(pendingRIWrites);
+        index.put("reverseIndex", reverseEntries);
+        try {
+            return mapper.writeValueAsString(index);
+        } catch(Exception ex) {
+            return "Could not convert to a string";
+        }
     }
 
     /**
@@ -332,6 +365,7 @@ public class Index {
      */
     public Set<String> verifyIndexState() {
         LOGGER.info("Verifying reverse index: " + reverseIndexName + " against index: " + indexName);
+        flush();
         Set<String> missingKeys = new HashSet<>();
         BaseState.Iterator iter = state.iterate(reverseIndexName);
         while (iter.hasNext()) {
@@ -359,6 +393,7 @@ public class Index {
      */
     public Set<String> verifyReverseIndexState() {
         LOGGER.info("Verifying index: " + indexName + " against reverse index: " + reverseIndexName);
+        flush();
         Set<String> missingKeys = new HashSet<>();
         BaseState.Iterator iter = state.iterate(indexName);
         while (iter.hasNext()) {

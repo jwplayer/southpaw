@@ -50,7 +50,13 @@ public class TestFilter extends BaseFilter {
             default:
                 mode = FilterMode.UPDATE;
         }
-        logger.info(String.format("Filter mode %s for: %s / %s", mode, entity, record));
+        return mode;
+    }
+
+    @Override
+    public FilterMode filter(String entity, BaseRecord record, BaseRecord oldRecord) {
+        FilterMode mode = super.filter(entity, record, oldRecord);
+        logger.info(String.format("Filter mode %s for: %s / %s / %s", mode, entity, record, oldRecord));
         return mode;
     }
 }

@@ -15,7 +15,7 @@
  */
 package com.jwplayer.southpaw.topic;
 
-import com.jwplayer.southpaw.MockState;
+import com.jwplayer.southpaw.state.InMemoryState;
 import com.jwplayer.southpaw.filter.BaseFilter;
 import com.jwplayer.southpaw.util.ByteArray;
 import org.apache.commons.lang.NotImplementedException;
@@ -27,7 +27,7 @@ import java.util.Map;
 
 
 public class ConsoleTopicTest {
-    private MockState state;
+    private InMemoryState state;
     private ConsoleTopic<String, String> topic;
 
 
@@ -35,7 +35,7 @@ public class ConsoleTopicTest {
     public void setUp() {
         topic = new ConsoleTopic<>();
         Map<String, Object> config = new HashMap<>();
-        state = new MockState();
+        state = new InMemoryState();
         state.open();
         topic.configure(new TopicConfig<String, String>()
             .setShortName("TestTopic")

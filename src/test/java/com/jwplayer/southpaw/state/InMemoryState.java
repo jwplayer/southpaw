@@ -13,9 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.jwplayer.southpaw;
+package com.jwplayer.southpaw.state;
 
-import com.jwplayer.southpaw.state.BaseState;
 import com.jwplayer.southpaw.util.ByteArray;
 import org.apache.commons.lang.NotImplementedException;
 
@@ -23,12 +22,12 @@ import java.util.AbstractMap;
 import java.util.HashMap;
 import java.util.Map;
 
-public class MockState extends BaseState {
+public class InMemoryState extends BaseState {
     public static class Iterator extends BaseState.Iterator {
-        java.util.Iterator<Map.Entry<com.jwplayer.southpaw.util.ByteArray,byte[]>> innerIter;
+        java.util.Iterator<Map.Entry<ByteArray,byte[]>> innerIter;
 
-        public Iterator(java.util.Iterator<Map.Entry<com.jwplayer.southpaw.util.ByteArray,byte[]>> innerIter) {
-            this.innerIter = innerIter;
+        public Iterator(Map<ByteArray, byte[]> keySpaceData) {
+            this.innerIter = keySpaceData.entrySet().iterator();
         }
 
         @Override
@@ -47,7 +46,7 @@ public class MockState extends BaseState {
         }
     }
 
-    private final Map<ByteArray, Map<ByteArray, byte[]>> dataBatches = new HashMap<>();
+    private final Map<String, Map<ByteArray, byte[]>> dataBatches = new HashMap<>();
 
     @Override
     public void backup() {
@@ -66,7 +65,7 @@ public class MockState extends BaseState {
 
     @Override
     public void createKeySpace(String keySpace) {
-        dataBatches.putIfAbsent(new ByteArray(keySpace), new HashMap<>());
+        dataBatches.putIfAbsent(keySpace, new HashMap<>());
     }
 
     @Override
@@ -76,7 +75,7 @@ public class MockState extends BaseState {
 
     @Override
     public void delete(String keySpace, byte[] key) {
-        dataBatches.get(new ByteArray(keySpace)).remove(new ByteArray(key));
+        dataBatches.get(keySpace).remove(new ByteArray(key));
     }
 
     @Override
@@ -94,17 +93,17 @@ public class MockState extends BaseState {
 
     @Override
     public byte[] get(String keySpace, byte[] key) {
-       return dataBatches.get(new ByteArray(keySpace)).get(new ByteArray(key));
+       return dataBatches.get(keySpace).get(new ByteArray(key));
     }
 
     @Override
     public Iterator iterate(String keySpace) {
-        return new Iterator(dataBatches.get(new ByteArray(keySpace)).entrySet().iterator());
+        return new Iterator(dataBatches.get(keySpace));
     }
 
     @Override
     public void put(String keySpace, byte[] key, byte[] value) {
-        Map<ByteArray, byte[]> dataBatch = dataBatches.get(new ByteArray(keySpace));
+        Map<ByteArray, byte[]> dataBatch = dataBatches.get(keySpace);
         dataBatch.put(new ByteArray(key), value);
     }
 

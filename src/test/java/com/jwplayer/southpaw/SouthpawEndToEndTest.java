@@ -15,7 +15,6 @@
  */
 package com.jwplayer.southpaw;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jwplayer.southpaw.json.DenormalizedRecord;
 import com.jwplayer.southpaw.json.Relation;
 import com.jwplayer.southpaw.record.BaseRecord;
@@ -23,6 +22,7 @@ import com.jwplayer.southpaw.state.RocksDBState;
 import com.jwplayer.southpaw.topic.BaseTopic;
 import com.jwplayer.southpaw.util.ByteArray;
 import com.jwplayer.southpaw.util.FileHelper;
+import com.jwplayer.southpaw.util.Pair;
 import com.jwplayer.southpaw.util.RelationHelper;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.junit.After;
@@ -40,14 +40,9 @@ import static org.junit.Assert.*;
 
 
 public class SouthpawEndToEndTest {
-    private static final String CONFIG_PATH = "test-resources/config.sample.yaml";
-    private static final String RELATIONS_PATH = "test-resources/relations.sample.json";
-    private static final String RELATIONS_PATH2 = "test-resources/relations2.sample.json";
-    private static final String RELATIONS_PATH3 = "test-resources/relations3.sample.json";
-    private static final String TOPIC_DATA_PATH = "test-resources/topic/";
-
-    private Southpaw southpaw;
     private Map<String, Object> config;
+    Set<String> denormalizedNames;
+    private Southpaw southpaw;
 
     @Rule
     public final TemporaryFolder dbFolder = new TemporaryFolder();
@@ -58,14 +53,18 @@ public class SouthpawEndToEndTest {
     @Before
     public void setup() throws Exception {
         Yaml yaml = new Yaml();
-        config = yaml.load(FileHelper.getInputStream(new URI(CONFIG_PATH)));
+        config = yaml.load(FileHelper.getInputStream(new URI(TestHelper.CONFIG_PATH)));
         config.put(RocksDBState.URI_CONFIG, dbFolder.getRoot().toURI().toString());
         config.put(RocksDBState.BACKUP_URI_CONFIG, backupFolder.getRoot().toURI().toString());
         southpaw = new Southpaw(
                 config,
-                Arrays.asList(new URI(RELATIONS_PATH), new URI(RELATIONS_PATH2), new URI(RELATIONS_PATH3))
-        );
+                Arrays.asList(
+                        new URI(TestHelper.RELATION_PATHS.PLAYLIST),
+                        new URI(TestHelper.RELATION_PATHS.PLAYER),
+                        new URI(TestHelper.RELATION_PATHS.MEDIA)));
         Southpaw.deleteBackups(config);
+        denormalizedNames = Arrays.stream(southpaw.relations)
+                .map(Relation::getDenormalizedName).collect(Collectors.toSet());
     }
 
     @After
@@ -75,72 +74,90 @@ public class SouthpawEndToEndTest {
         Southpaw.deleteState(config);
     }
 
-    @Test
-    public void testRecord() throws Exception {
-        // Build the expected results
-        ObjectMapper mapper = new ObjectMapper();
-        Map<ByteArray, DenormalizedRecord> expectedResults = new HashMap<>(12);
-        // Expected Feed monthly
-        expectedResults.put(ByteArray.toByteArray(4235), mapper.readValue("{\"Record\":{\"user_id\":1234,\"active\":1,\"id\":4235,\"type\":\"feed\",\"title\":\"Titled Similar Playlist\"},\"Children\":{\"user\":[{\"Record\":{\"user_id\":1234,\"usage_type\":\"monthly\",\"user_name\":\"Suzy\",\"email\":\"Suzy+something@jwplayer.com\"},\"Children\":{}}],\"playlist_custom_params\":[{\"Record\":{\"playlist_id\":4235,\"name\":\"param1\",\"id\":5234,\"value\":\"val1\"},\"Children\":{}}],\"playlist_tag\":[{\"Record\":{\"playlist_id\":4235,\"user_tag_id\":7234,\"tag_type\":\"nada\"},\"Children\":{\"user_tag\":[{\"Record\":{\"user_id\":1234,\"tag_name\":\"a\",\"id\":7234},\"Children\":{}}]}},{\"Record\":{\"playlist_id\":4235,\"user_tag_id\":7235,\"tag_type\":\"inc\"},\"Children\":{\"user_tag\":[{\"Record\":{\"user_id\":1234,\"tag_name\":\"a\",\"id\":7235},\"Children\":{}}]}},{\"Record\":{\"playlist_id\":4235,\"user_tag_id\":7236,\"tag_type\":\"inc\"},\"Children\":{\"user_tag\":[{\"Record\":{\"user_id\":1234,\"tag_name\":\"a\",\"id\":7236},\"Children\":{}}]}}],\"playlist_media\":[{\"Record\":{\"pos\":0,\"playlist_id\":4235,\"media_id\":2234,\"id\":6234},\"Children\":{\"media\":[{\"Record\":{\"user_id\":1234,\"id\":2234,\"title\":\"big buck bunny\",\"status\":\"ready\"},\"Children\":{}}]}},{\"Record\":{\"pos\":1,\"playlist_id\":4235,\"media_id\":2235,\"id\":6235},\"Children\":{\"media\":[{\"Record\":{\"user_id\":1234,\"id\":2235,\"title\":\"something.mov\",\"status\":\"ready\"},\"Children\":{}}]}},{\"Record\":{\"pos\":2,\"playlist_id\":4235,\"media_id\":2236,\"id\":6236},\"Children\":{\"media\":[{\"Record\":{\"user_id\":1234,\"id\":2236,\"title\":\"something_else.mp4\",\"status\":\"ready\"},\"Children\":{}}]}}]}}", DenormalizedRecord.class));
-        expectedResults.put(ByteArray.toByteArray(4236), mapper.readValue("{\"Record\":{\"user_id\":1235,\"active\":1,\"id\":4236,\"type\":\"trending\",\"title\":\"Test Trending Playlist\"},\"Children\":{\"user\":[{\"Record\":{\"user_id\":1235,\"usage_type\":\"unlimited\",\"user_name\":\"TROGDOR\",\"email\":\"TROGDOR@jwplayer.com\"},\"Children\":{}}],\"playlist_custom_params\":[],\"playlist_tag\":[{\"Record\":{\"playlist_id\":4236,\"user_tag_id\":7236,\"tag_type\":\"inc\"},\"Children\":{\"user_tag\":[{\"Record\":{\"user_id\":1234,\"tag_name\":\"a\",\"id\":7236},\"Children\":{}}]}},{\"Record\":{\"playlist_id\":4236,\"user_tag_id\":7237,\"tag_type\":\"nada\"},\"Children\":{\"user_tag\":[{\"Record\":{\"user_id\":1235,\"tag_name\":\"a\",\"id\":7237},\"Children\":{}}]}}],\"playlist_media\":[{\"Record\":{\"pos\":0,\"playlist_id\":4236,\"media_id\":2237,\"id\":6237},\"Children\":{\"media\":[{\"Record\":{\"user_id\":1235,\"id\":2237,\"title\":\"Title Change\",\"status\":\"ready\"},\"Children\":{}}]}},{\"Record\":{\"pos\":1,\"playlist_id\":4236,\"media_id\":2238,\"id\":6238},\"Children\":{\"media\":[]}},{\"Record\":{\"pos\":2,\"playlist_id\":4236,\"media_id\":2237,\"id\":6239},\"Children\":{\"media\":[{\"Record\":{\"user_id\":1235,\"id\":2237,\"title\":\"Title Change\",\"status\":\"ready\"},\"Children\":{}}]}}]}}", DenormalizedRecord.class));
-        expectedResults.put(ByteArray.toByteArray(4237), mapper.readValue("{\"Record\":{\"user_id\":1235,\"active\":1,\"id\":4237,\"type\":\"dynamic\",\"title\":\"Pinned Dynamic\"},\"Children\":{\"user\":[{\"Record\":{\"user_id\":1235,\"usage_type\":\"unlimited\",\"user_name\":\"TROGDOR\",\"email\":\"TROGDOR@jwplayer.com\"},\"Children\":{}}],\"playlist_custom_params\":[],\"playlist_tag\":[{\"Record\":{\"playlist_id\":4237,\"user_tag_id\":7235,\"tag_type\":\"nada\"},\"Children\":{\"user_tag\":[{\"Record\":{\"user_id\":1234,\"tag_name\":\"a\",\"id\":7235},\"Children\":{}}]}}],\"playlist_media\":[]}}", DenormalizedRecord.class));
-        expectedResults.put(ByteArray.toByteArray(4234), null);
-        expectedResults.put(ByteArray.toByteArray(4238), mapper.readValue("{\"Record\":{\"user_id\":1234,\"active\":1,\"id\":4238,\"type\":\"feed\",\"title\":\"look mom, I'm a title\"},\"Children\":{\"user\":[{\"Record\":{\"user_id\":1234,\"usage_type\":\"monthly\",\"user_name\":\"Suzy\",\"email\":\"Suzy+something@jwplayer.com\"},\"Children\":{}}],\"playlist_custom_params\":[],\"playlist_tag\":[{\"Record\":{\"playlist_id\":4238,\"user_tag_id\":7238,\"tag_type\":\"nada\"},\"Children\":{\"user_tag\":[{\"Record\":{\"user_id\":1235,\"tag_name\":\"a\",\"id\":7238},\"Children\":{}}]}}],\"playlist_media\":[]}}", DenormalizedRecord.class));
-        // Expected Media results
-        expectedResults.put(ByteArray.toByteArray(2234), mapper.readValue("{\"Record\":{\"user_id\":1234,\"id\":2234,\"title\":\"big buck bunny\",\"status\":\"ready\"},\"Children\":{\"user\":[{\"Record\":{\"user_id\":1234,\"usage_type\":\"monthly\",\"user_name\":\"Suzy\",\"email\":\"Suzy+something@jwplayer.com\"},\"Children\":{}}],\"playlist_media\":[{\"Record\":{\"pos\":0,\"playlist_id\":4235,\"media_id\":2234,\"id\":6234},\"Children\":{\"playlist\":[{\"Record\":{\"user_id\":1234,\"active\":1,\"id\":4235,\"type\":\"feed\",\"title\":\"Titled Similar Playlist\"},\"Children\":{}}]}}]}}", DenormalizedRecord.class));
-        expectedResults.put(ByteArray.toByteArray(2235), mapper.readValue("{\"Record\":{\"user_id\":1234,\"id\":2235,\"title\":\"something.mov\",\"status\":\"ready\"},\"Children\":{\"user\":[{\"Record\":{\"user_id\":1234,\"usage_type\":\"monthly\",\"user_name\":\"Suzy\",\"email\":\"Suzy+something@jwplayer.com\"},\"Children\":{}}],\"playlist_media\":[{\"Record\":{\"pos\":1,\"playlist_id\":4235,\"media_id\":2235,\"id\":6235},\"Children\":{\"playlist\":[{\"Record\":{\"user_id\":1234,\"active\":1,\"id\":4235,\"type\":\"feed\",\"title\":\"Titled Similar Playlist\"},\"Children\":{}}]}}]}}", DenormalizedRecord.class));
-        expectedResults.put(ByteArray.toByteArray(2236), mapper.readValue("{\"Record\":{\"user_id\":1234,\"id\":2236,\"title\":\"something_else.mp4\",\"status\":\"ready\"},\"Children\":{\"user\":[{\"Record\":{\"user_id\":1234,\"usage_type\":\"monthly\",\"user_name\":\"Suzy\",\"email\":\"Suzy+something@jwplayer.com\"},\"Children\":{}}],\"playlist_media\":[{\"Record\":{\"pos\":2,\"playlist_id\":4235,\"media_id\":2236,\"id\":6236},\"Children\":{\"playlist\":[{\"Record\":{\"user_id\":1234,\"active\":1,\"id\":4235,\"type\":\"feed\",\"title\":\"Titled Similar Playlist\"},\"Children\":{}}]}}]}}", DenormalizedRecord.class));
-        expectedResults.put(ByteArray.toByteArray(2237), mapper.readValue("{\"Record\":{\"user_id\":1235,\"id\":2237,\"title\":\"Title Change\",\"status\":\"ready\"},\"Children\":{\"user\":[{\"Record\":{\"user_id\":1235,\"usage_type\":\"unlimited\",\"user_name\":\"TROGDOR\",\"email\":\"TROGDOR@jwplayer.com\"},\"Children\":{}}],\"playlist_media\":[{\"Record\":{\"pos\":0,\"playlist_id\":4236,\"media_id\":2237,\"id\":6237},\"Children\":{\"playlist\":[{\"Record\":{\"user_id\":1235,\"active\":1,\"id\":4236,\"type\":\"trending\",\"title\":\"Test Trending Playlist\"},\"Children\":{}}]}},{\"Record\":{\"pos\":2,\"playlist_id\":4236,\"media_id\":2237,\"id\":6239},\"Children\":{\"playlist\":[{\"Record\":{\"user_id\":1235,\"active\":1,\"id\":4236,\"type\":\"trending\",\"title\":\"Test Trending Playlist\"},\"Children\":{}}]}}]}}", DenormalizedRecord.class));
-        expectedResults.put(ByteArray.toByteArray(2238), null);
-        // Expected Player results
-        expectedResults.put(ByteArray.toByteArray(3234), mapper.readValue("{\"Record\":{\"user_id\":1235,\"name\":\"16:9 example player\",\"id\":3234},\"Children\":{\"user\":[{\"Record\":{\"user_id\":1235,\"usage_type\":\"unlimited\",\"user_name\":\"TROGDOR\",\"email\":\"TROGDOR@jwplayer.com\"},\"Children\":{}}]}}", DenormalizedRecord.class));
-        expectedResults.put(ByteArray.toByteArray(3235), mapper.readValue("{\"Record\":{\"user_id\":1234,\"name\":\"THIS IS A PLAYER\",\"id\":3235},\"Children\":{\"user\":[{\"Record\":{\"user_id\":1234,\"usage_type\":\"monthly\",\"user_name\":\"Suzy\",\"email\":\"Suzy+something@jwplayer.com\"},\"Children\":{}}]}}", DenormalizedRecord.class));
+    public Map<String, Map<ByteArray, DenormalizedRecord>> getExpectedResults() throws Exception {
+        Map<String, Map<ByteArray, DenormalizedRecord>> expectedResults = new HashMap<>();
+        List<Pair<ByteArray, DenormalizedRecord>> playlistResults
+                = TestHelper.readDenormalizedData(TestHelper.TOPIC_DATA_PATHS.DENORMALIZED_PLAYLIST);
+        expectedResults.put("DenormalizedPlaylist",
+                playlistResults.stream().collect(HashMap::new, (m, p) -> m.put(p.getA(), p.getB()), HashMap::putAll));
+        List<Pair<ByteArray, DenormalizedRecord>> mediaResults
+                = TestHelper.readDenormalizedData(TestHelper.TOPIC_DATA_PATHS.DENORMALIZED_MEDIA);
+        expectedResults.put("DenormalizedMedia",
+                mediaResults.stream().collect(HashMap::new, (m, p) -> m.put(p.getA(), p.getB()), HashMap::putAll));
+        List<Pair<ByteArray, DenormalizedRecord>> playerResults
+                = TestHelper.readDenormalizedData(TestHelper.TOPIC_DATA_PATHS.DENORMALIZED_PLAYER);
+        expectedResults.put("DenormalizedPlayer",
+                playerResults.stream().collect(HashMap::new, (m, p) -> m.put(p.getA(), p.getB()), HashMap::putAll));
+        return expectedResults;
+    }
 
-        // Generate the actual results
-        int maxRecords = 0;
-
-        Set<String> denormalizedNames = Arrays.stream(southpaw.relations)
-                .map(Relation::getDenormalizedName).collect(Collectors.toSet());
-        Set<String> entities = RelationHelper.getEntities(southpaw.relations);
-        Map<String, String[]> records = new HashMap<>();
-        for(String entity: entities) {
-            records.put(entity, FileHelper.loadFileAsString(new URI(TOPIC_DATA_PATH + entity + ".json")).split("\n"));
-            maxRecords = Math.max(records.get(entity).length, maxRecords);
+    public Map<String, Iterator<Pair<BaseRecord, BaseRecord>>> getTopicsData() throws Exception {
+        Map<String, String> topicDataPaths = new HashMap<>();
+        topicDataPaths.put("media", TestHelper.TOPIC_DATA_PATHS.MEDIA);
+        topicDataPaths.put("player", TestHelper.TOPIC_DATA_PATHS.PLAYER);
+        topicDataPaths.put("playlist", TestHelper.TOPIC_DATA_PATHS.PLAYLIST);
+        topicDataPaths.put("playlist_custom_params", TestHelper.TOPIC_DATA_PATHS.PLAYLIST_CUSTOM_PARAMS);
+        topicDataPaths.put("playlist_media", TestHelper.TOPIC_DATA_PATHS.PLAYLIST_MEDIA);
+        topicDataPaths.put("playlist_tag", TestHelper.TOPIC_DATA_PATHS.PLAYLIST_TAG);
+        topicDataPaths.put("user", TestHelper.TOPIC_DATA_PATHS.USER);
+        topicDataPaths.put("user_tag", TestHelper.TOPIC_DATA_PATHS.USER_TAG);
+        Map<String, Iterator<Pair<BaseRecord, BaseRecord>>> topicsData = new HashMap<>();
+        for(Map.Entry<String, String> entry: topicDataPaths.entrySet()) {
+            List<Pair<BaseRecord, BaseRecord>> topicData = TestHelper.readRecordData(entry.getValue());
+            topicsData.put(entry.getKey(), topicData.iterator());
         }
-        Map<String, Map<ByteArray, DenormalizedRecord>> denormalizedRecords = new HashMap<>();
+        return topicsData;
+    }
 
-        for(int i = 0; i < maxRecords / 2; i++) {
+    public Map<String, Map<ByteArray, DenormalizedRecord>> readDenormalizedRecords() {
+        Map<String, Map<ByteArray, DenormalizedRecord>> denormalizedRecords = new HashMap<>();
+        for(String denormalizedName: denormalizedNames) {
+            BaseTopic<byte[], DenormalizedRecord> topic = southpaw.topics.getOutputTopic(denormalizedName);
+            denormalizedRecords.put(denormalizedName, new HashMap<>());
+            topic.resetCurrentOffsets();
+            Iterator<ConsumerRecord<byte[], DenormalizedRecord>> iter = topic.readNext();
+            while(iter.hasNext()) {
+                ConsumerRecord<byte[], DenormalizedRecord> record = iter.next();
+                denormalizedRecords.get(denormalizedName).put(new ByteArray(record.key()), record.value());
+            }
+        }
+        return denormalizedRecords;
+    }
+
+    public void runSouthpaw(Map<String, Iterator<Pair<BaseRecord, BaseRecord>>> topicsData) {
+        Set<String> entities = RelationHelper.getEntities(southpaw.relations);
+        while(topicsData.values().stream().anyMatch(Iterator::hasNext)) {
             for(String entity: entities) {
                 BaseTopic<BaseRecord, BaseRecord> topic = southpaw.topics.getInputTopic(entity);
-                String[] json = records.get(entity);
-                if(json.length >= i * 2 + 2) {
-                    topic.write(
-                            topic.getKeySerde().deserializer().deserialize(null, json[2 * i].getBytes()),
-                            topic.getValueSerde().deserializer().deserialize(null, json[2 * i + 1].getBytes())
-                    );
+                Iterator<Pair<BaseRecord, BaseRecord>> topicData = topicsData.get(entity);
+                if(topicData.hasNext()) {
+                    Pair<BaseRecord, BaseRecord> datum = topicData.next();
+                    topic.write(datum.getA(), datum.getB());
                 }
             }
             southpaw.run(1L);
-            for(String denormalizedName: denormalizedNames) {
-                BaseTopic<byte[], DenormalizedRecord> topic = southpaw.topics.getOutputTopic(denormalizedName);
-                if(!denormalizedRecords.containsKey(denormalizedName)) {
-                    denormalizedRecords.put(denormalizedName, new HashMap<>());
-                }
-                topic.resetCurrentOffsets();
-                Iterator<ConsumerRecord<byte[], DenormalizedRecord>> iter = topic.readNext();
-                while(iter.hasNext()) {
-                    ConsumerRecord<byte[], DenormalizedRecord> record = iter.next();
-                    denormalizedRecords.get(denormalizedName).put(new ByteArray(record.key()), record.value());
-                }
+        }
+    }
+
+    @Test
+    public void testRecord() throws Exception {
+        Map<String, Map<ByteArray, DenormalizedRecord>> expectedResults = getExpectedResults();
+        Map<String, Iterator<Pair<BaseRecord, BaseRecord>>> topicsData = getTopicsData();
+        runSouthpaw(topicsData);
+        Map<String, Map<ByteArray, DenormalizedRecord>> denormalizedRecords = readDenormalizedRecords();
+
+        for(String denormalizedName: denormalizedNames) {
+            Map<ByteArray, DenormalizedRecord> actualResults = denormalizedRecords.get(denormalizedName);
+            Map<ByteArray, DenormalizedRecord> expected = expectedResults.get(denormalizedName);
+            assertEquals(
+                    String.format("Denormalized Name: %s Expected: %s Actual: %s", denormalizedName, expected, actualResults),
+                    expected.size(), actualResults.size());
+            for(Map.Entry<ByteArray, DenormalizedRecord> actualResult: actualResults.entrySet()) {
+                assertEquals(
+                        String.format("Denormalized Name: %s Primary Key: %s", denormalizedName, actualResult.getKey()),
+                        expected.get(actualResult.getKey()), actualResult.getValue());
             }
         }
-
-        assertEquals(denormalizedRecords.entrySet().stream()
-                .flatMap(entry -> entry.getValue().entrySet().stream())
-                .peek(innerEntry ->
-                        assertEquals(
-                                expectedResults.get(innerEntry.getKey()),
-                                innerEntry.getValue()
-                        )).count(), expectedResults.size());
+        assertTrue(southpaw.indices.verifyIndices());
     }
 }

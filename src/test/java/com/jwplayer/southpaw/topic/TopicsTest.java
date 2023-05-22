@@ -1,6 +1,6 @@
 package com.jwplayer.southpaw.topic;
 
-import com.jwplayer.southpaw.MockState;
+import com.jwplayer.southpaw.state.InMemoryState;
 import com.jwplayer.southpaw.metric.Metrics;
 import com.jwplayer.southpaw.record.BaseRecord;
 import com.jwplayer.southpaw.util.FileHelper;
@@ -29,7 +29,7 @@ public class TopicsTest {
         topics = new Topics(
                 config,
                 new Metrics(),
-                new MockState(),
+                new InMemoryState(),
                 RelationHelper.loadRelations(Collections.singletonList(relationsUri)));
     }
 

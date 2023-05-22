@@ -15,9 +15,11 @@
  */
 package com.jwplayer.southpaw.util;
 
+import com.fasterxml.jackson.annotation.JsonValue;
 import com.google.common.base.Preconditions;
 import com.google.common.primitives.Ints;
 import com.google.common.primitives.Longs;
+import com.jwplayer.southpaw.record.BaseRecord;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.lang.ArrayUtils;
 import org.apache.kafka.common.utils.Bytes;
@@ -112,7 +114,7 @@ public class ByteArray implements Comparable<ByteArray>, Serializable {
      */
     @Override
     public boolean equals(Object object) {
-        return object != null && object instanceof ByteArray && Arrays.equals(bytes, ((ByteArray) object).getBytes());
+        return object instanceof ByteArray && Arrays.equals(bytes, ((ByteArray) object).getBytes());
     }
 
     /**
@@ -198,6 +200,8 @@ public class ByteArray implements Comparable<ByteArray>, Serializable {
             return new ByteArray((byte[]) object);
         } else if(object instanceof Boolean) {
             return new ByteArray((Boolean) object);
+        } else if(object instanceof BaseRecord) {
+            return ((BaseRecord) object).toByteArray();
         } else {
             throw new RuntimeException(String.format("Cannot convert type %s into a byte array", object.getClass()));
         }
@@ -228,6 +232,7 @@ public class ByteArray implements Comparable<ByteArray>, Serializable {
      * Gives a nice readable String version of the wrapped byte array. Useful for debugging.
      * @return - A pretty string representation
      */
+    @JsonValue
     public String toString() {
         return Hex.encodeHexString(bytes);
     }

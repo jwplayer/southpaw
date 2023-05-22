@@ -34,37 +34,79 @@ public final class InMemoryTopic<K, V> extends BaseTopic<K, V> {
      */
     private static class IMTIterator<K, V> implements Iterator<ConsumerRecord<K, V>> {
         int currentPartition = 0;
+        ConsumerRecord<K, V> stagedRecord = null;
         InMemoryTopic<K, V> topic;
 
         public IMTIterator(InMemoryTopic<K, V> topic) {
             this.topic = topic;
+            stageRecord();
         }
 
         @Override
         public boolean hasNext() {
-            return topic.getLag() > 0;
+            if(stagedRecord == null) {
+                stageRecord();
+                return stagedRecord != null;
+            } else {
+                return true;
+            }
         }
 
         @Override
         public ConsumerRecord<K, V> next() {
-            if(!hasNext()) {
+            if(stagedRecord == null) {
                 throw new NoSuchElementException();
+            } else {
+                ConsumerRecord<K, V> nextRecord = stagedRecord;
+                stageRecord();
+                return nextRecord;
             }
+        }
+
+        public void stageRecord() {
             for(int partitionsChecked = 0; partitionsChecked < NUM_PARTITIONS; partitionsChecked++) {
-                if(topic.getPartitionLag(currentPartition) > 0) {
+                while(topic.getPartitionLag(currentPartition) > 0) {
                     long currentOffset = topic.currentOffsets.get(currentPartition);
                     long firstOffset = topic.firstOffsets.get(currentPartition);
+                    topic.currentOffsets.put(currentPartition, currentOffset + 1);
                     ConsumerRecord<K, V> record
                         = topic.records.get(currentPartition).get((int) (currentOffset - firstOffset));
-                    topic.currentOffsets.put(currentPartition, currentOffset + 1);
-                    topic.recordsByPK.put(topic.getParsedKey(record.key()), record);
+                    ByteArray parsedKey = topic.getParsedKey(record.key());
+                    V oldValue = topic.readByPK(parsedKey);
+                    FilterMode filterMode = FilterMode.UPDATE;
+
+                    if (record.value() instanceof BaseRecord) {
+                        filterMode = topic.getFilter().filter(
+                                topic.getShortName(),
+                                (BaseRecord) record.value(),
+                                (BaseRecord) oldValue);
+                    }
+                    V parsedValue;
+
+                    switch (filterMode) {
+                        case DELETE:
+                            parsedValue = null;
+                            break;
+                        case UPDATE:
+                            parsedValue = record.value();
+                            break;
+                        case SKIP:
+                        default:
+                            continue;
+                    }
+                    stagedRecord = new ConsumerRecord<>(
+                            record.topic(),
+                            record.partition(),
+                            record.offset(),
+                            record.key(),
+                            parsedValue);
+                    topic.recordsByPK.put(topic.getParsedKey(record.key()), stagedRecord);
                     currentPartition = (currentPartition + 1) % NUM_PARTITIONS;
-                    return record;
+                    return;
                 }
                 currentPartition = (currentPartition + 1) % NUM_PARTITIONS;
             }
-            // We should never get here
-            throw new NoSuchElementException();
+            stagedRecord = null;
         }
     }
 
@@ -72,12 +114,12 @@ public final class InMemoryTopic<K, V> extends BaseTopic<K, V> {
     /**
      * The last read offsets by partition using the read next method.
      */
-    protected Map<Integer, Long> currentOffsets = new HashMap<>();
+    private final Map<Integer, Long> currentOffsets = new HashMap<>();
     /**
      * The first offsets by partition for this topic. Used so not all topics start at offset 0 to prevent subtle, hard
      * to debug errors in testing.
      */
-    protected final Map<Integer, Long> firstOffsets;
+    private final Map<Integer, Long> firstOffsets;
     /**
      * The internal records
      */
@@ -122,7 +164,7 @@ public final class InMemoryTopic<K, V> extends BaseTopic<K, V> {
         return lag;
     }
 
-    protected ByteArray getParsedKey(K key) {
+    private ByteArray getParsedKey(K key) {
         if(key instanceof BaseRecord) {
             return ((BaseRecord) key).toByteArray();
         } else {
@@ -130,7 +172,7 @@ public final class InMemoryTopic<K, V> extends BaseTopic<K, V> {
         }
     }
 
-    protected long getPartitionLag(int partition) {
+    private long getPartitionLag(int partition) {
         return records.get(partition).size() + firstOffsets.get(partition) - currentOffsets.get(partition);
     }
 
@@ -155,35 +197,15 @@ public final class InMemoryTopic<K, V> extends BaseTopic<K, V> {
 
     @Override
     public void resetCurrentOffsets() {
-        for(Map.Entry<Integer, Long> entry: firstOffsets.entrySet()) {
-            this.currentOffsets.put(entry.getKey(), entry.getValue());
-        }
+        this.currentOffsets.putAll(firstOffsets);
     }
 
     @Override
     public void write(K key, V value) {
         ConsumerRecord<K, V> record;
-        FilterMode filterMode = FilterMode.UPDATE;
-
-        if (value instanceof BaseRecord) {
-            filterMode = this.getFilter().filter(this.getShortName(), (BaseRecord) value, null);
-        }
-        V parsedValue;
-
-        switch (filterMode) {
-            case DELETE:
-                parsedValue = null;
-                break;
-            case UPDATE:
-                parsedValue = value;
-                break;
-            case SKIP:
-            default:
-                return;
-        }
         int partition = getParsedKey(key).hashCode() % NUM_PARTITIONS;
         long newOffset = records.get(partition).size() + firstOffsets.get(partition);
-        record = new ConsumerRecord<>(topicName, partition, newOffset, key, parsedValue);
+        record = new ConsumerRecord<>(topicName, partition, newOffset, key, value);
         records.get(partition).add(record);
     }
 }
