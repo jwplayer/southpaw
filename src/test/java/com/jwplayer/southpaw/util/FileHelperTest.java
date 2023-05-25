@@ -51,6 +51,6 @@ public class FileHelperTest {
     public void testGetFiles() throws URISyntaxException {
         Set<File> files = FileHelper.listFiles(new URI("test-resources"));
 
-        assertEquals(27, files.size());
+        assertEquals(32, files.size());
     }
 }

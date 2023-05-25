@@ -15,8 +15,12 @@
  */
 package com.jwplayer.southpaw;
 
+import com.codahale.metrics.Histogram;
+import com.codahale.metrics.Meter;
+import com.jwplayer.southpaw.index.Indices;
 import com.jwplayer.southpaw.json.DenormalizedRecord;
 import com.jwplayer.southpaw.json.Relation;
+import com.jwplayer.southpaw.metric.StaticGauge;
 import com.jwplayer.southpaw.record.BaseRecord;
 import com.jwplayer.southpaw.state.RocksDBState;
 import com.jwplayer.southpaw.topic.BaseTopic;
@@ -65,6 +69,8 @@ public class SouthpawEndToEndTest {
         Southpaw.deleteBackups(config);
         denormalizedNames = Arrays.stream(southpaw.relations)
                 .map(Relation::getDenormalizedName).collect(Collectors.toSet());
+        Map<String, Iterator<Pair<BaseRecord, BaseRecord>>> topicsData = getTopicsData();
+        runSouthpaw(topicsData);
     }
 
     @After
@@ -140,10 +146,8 @@ public class SouthpawEndToEndTest {
     }
 
     @Test
-    public void testRecord() throws Exception {
+    public void testDenormalizedRecords() throws Exception {
         Map<String, Map<ByteArray, DenormalizedRecord>> expectedResults = getExpectedResults();
-        Map<String, Iterator<Pair<BaseRecord, BaseRecord>>> topicsData = getTopicsData();
-        runSouthpaw(topicsData);
         Map<String, Map<ByteArray, DenormalizedRecord>> denormalizedRecords = readDenormalizedRecords();
 
         for(String denormalizedName: denormalizedNames) {
@@ -158,6 +162,107 @@ public class SouthpawEndToEndTest {
                         expected.get(actualResult.getKey()), actualResult.getValue());
             }
         }
+    }
+
+    public void testJoinIndex(Relation relation) throws Exception {
+        String indexName = Indices.createJoinIndexName(relation);
+        List<Pair<BaseRecord, BaseRecord>> data = TestHelper.readRecordData(TestHelper.getIndexDataPath(indexName));
+        for(Pair<BaseRecord, BaseRecord> datum: data) {
+            Set<ByteArray> expectedPKs = ((List<?>) datum.getB().get("pks")).stream()
+                    .map(TestHelper::convertPrimaryKey)
+                    .collect(Collectors.toSet());
+            assertEquals(
+                    String.format("Failed primary key check for Index: %s - Foreign Key: %s", indexName, datum.getA()),
+                    expectedPKs,
+                    southpaw.indices.getRelationPKs(relation, ByteArray.toByteArray(datum.getA())));
+        }
+    }
+
+    public void testParentIndex(Relation root, Relation parent, Relation child) throws Exception {
+        String indexName = Indices.createParentIndexName(root, parent, child);
+        List<Pair<BaseRecord, BaseRecord>> data = TestHelper.readRecordData(TestHelper.getIndexDataPath(indexName));
+        for(Pair<BaseRecord, BaseRecord> datum: data) {
+            Set<ByteArray> expectedPKs = ((List<?>) datum.getB().get("pks")).stream()
+                    .map(TestHelper::convertPrimaryKey)
+                    .collect(Collectors.toSet());
+            assertEquals(
+                    String.format("Failed primary key check for Index: %s - Foreign Key: %s", indexName, datum.getA()),
+                    expectedPKs,
+                    southpaw.indices.getRootPKs(root, parent, child, ByteArray.toByteArray(datum.getA())));
+        }
+    }
+
+    public void testIndicesByRelations(Relation root, Relation parent, Relation child) throws Exception {
+        if(parent != null) {
+            testJoinIndex(child);
+            testParentIndex(root, parent, child);
+        }
+        if(child.getChildren() != null) {
+            for(Relation grandchild: child.getChildren()) {
+                testIndicesByRelations(root, child, grandchild);
+            }
+        }
+    }
+
+    @Test
+    public void testIndices() throws Exception {
+        for(Relation root: southpaw.relations) {
+            testIndicesByRelations(root, null, root);
+        }
         assertTrue(southpaw.indices.verifyIndices());
+    }
+
+    @Test
+    public void testMetrics() {
+        southpaw.reportMetrics();
+
+        // Denormalized Records Created
+        long recordsCreated = southpaw.metrics.denormalizedRecordsCreated.getCount();
+        long recordsCreatedByTopic = southpaw.metrics.denormalizedRecordsCreatedByTopic.values().stream()
+                .map(Meter::getCount).reduce(0L, Long::sum);
+        long recordsCreatedByPriority = southpaw.metrics.denormalizedRecordsCreatedByTopicAndPriority.values().stream()
+                .map(Map::values).flatMap(Collection::stream).map(Meter::getCount).reduce(0L, Long::sum);
+        assertTrue(recordsCreated > 0L);
+        assertEquals(recordsCreated, recordsCreatedByTopic);
+        assertEquals(recordsCreated, recordsCreatedByPriority);
+
+        // Dropped Records
+        long droppedRecords = southpaw.metrics.denormalizedRecordsDropped.getCount();
+        long droppedRecordsByTopic = southpaw.metrics.denormalizedRecordsDroppedByTopic.values().stream()
+                .map(Meter::getCount).reduce(0L, Long::sum);
+        assertTrue(droppedRecords > 0L);
+        assertEquals(droppedRecords, droppedRecordsByTopic);
+
+        // Denormalized Records To Create
+        long recordsToCreate = southpaw.metrics.denormalizedRecordsToCreate.getValue();
+        long recordsToCreateByTopic = southpaw.metrics.denormalizedRecordsToCreateByTopic.values().stream()
+                .map(StaticGauge::getValue).reduce(0L, Long::sum);
+        long recordsToCreateByPriority = southpaw.metrics.denormalizedRecordsToCreateByTopicAndPriority.values().stream()
+                .map(Map::values).flatMap(Collection::stream).map(StaticGauge::getValue).reduce(0L, Long::sum);
+        assertEquals(0L, recordsToCreate);
+        assertEquals(0L, recordsToCreateByTopic);
+        assertEquals(0L, recordsToCreateByPriority);
+
+        // Index Entries
+        for(Histogram histogram :southpaw.metrics.indexEntriesSize.values()) {
+            assertTrue(histogram.getCount() > 0L);
+        }
+        for(Histogram histogram :southpaw.metrics.indexReverseEntriesSize.values()) {
+            assertTrue(histogram.getCount() > 0L);
+        }
+
+        // Records Consumed
+        long recordsConsumed = southpaw.metrics.recordsConsumed.getCount();
+        long recordsConsumedByTopic = southpaw.metrics.recordsConsumedByTopic.values().stream()
+                .map(Meter::getCount).reduce(0L, Long::sum);
+        assertTrue(recordsConsumed > 0L);
+        assertEquals(recordsConsumed, recordsConsumedByTopic);
+
+        // Topic Lag
+        long topicLag = southpaw.metrics.topicLag.getValue();
+        long topicLagByTopic = southpaw.metrics.topicLagByTopic.values().stream()
+                .map(StaticGauge::getValue).reduce(0L, Long::sum);
+        assertEquals(0L, topicLag);
+        assertEquals(0L, topicLagByTopic);
     }
 }

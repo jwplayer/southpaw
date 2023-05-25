@@ -16,7 +16,6 @@
 package com.jwplayer.southpaw;
 
 import com.codahale.metrics.Timer;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Preconditions;
 import com.jwplayer.southpaw.index.Indices;
 import com.jwplayer.southpaw.json.*;
@@ -73,19 +72,15 @@ public class Southpaw {
      * Le Logger
      */
     private static final Logger logger =  LoggerFactory.getLogger(Southpaw.class);
-    /**
-     * Used for doing object <-> JSON mappings
-     */
-    private static final ObjectMapper mapper = new ObjectMapper();
 
     /**
      * Timer used to track when to back up
      */
-    protected final StopWatch backupWatch = new StopWatch();
+    protected StopWatch backupWatch = new StopWatch();
     /**
      * Timer used to track when to commit
      */
-    protected final StopWatch commitWatch = new StopWatch();
+    protected StopWatch commitWatch = new StopWatch();
     /**
      * Parsed Southpaw config
      */
@@ -101,7 +96,7 @@ public class Southpaw {
     /**
      * Timer used to track when to calculate and report certain metrics
      */
-    protected final StopWatch metricsWatch = new StopWatch();
+    protected StopWatch metricsWatch = new StopWatch();
     /**
      * Tells the run() method to process records. If this is set to false, it will stop.
      */
@@ -379,16 +374,6 @@ public class Southpaw {
                 BaseTopic<byte[], DenormalizedRecord> outputTopic = topics.getOutputTopic(root.getDenormalizedName());
                 indices.scrubParentIndices(root, root, dePrimaryKey);
                 DenormalizedRecord newDeRecord = createDenormalizedRecord(root, root, dePrimaryKey, dePrimaryKey);
-                if (logger.isDebugEnabled()) {
-                    try {
-                        logger.debug(String.format(
-                                "Root Entity: %s / Primary Key: %s", root.getEntity(), dePrimaryKey));
-                        logger.debug(mapper.writeValueAsString(newDeRecord));
-                    } catch (Exception ex) {
-                        // noop
-                    }
-                }
-
                 outputTopic.write(dePrimaryKey.getBytes(), newDeRecord);
                 metrics.denormalizedRecordsCreated.mark(1);
                 metrics.denormalizedRecordsCreatedByTopic.get(root.getDenormalizedName()).mark(1);

@@ -16,7 +16,6 @@
 package com.jwplayer.southpaw.util;
 
 import org.apache.commons.lang.RandomStringUtils;
-import org.apache.commons.lang.time.StopWatch;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -63,7 +62,6 @@ public class ByteArraySetTest {
                 {ByteArraySet.MAX_FRONTING_SET_SIZE + 20 * PER_CHUNK_MAX_BYTE_ARRAY_COUNT},
             });
     }
-
 
     private long getDifferentRandomSeed() {
         long differentRandomSeed = RANDOM_SEED;

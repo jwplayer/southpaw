@@ -71,6 +71,11 @@ public final class InMemoryTopic<K, V> extends BaseTopic<K, V> {
                     topic.currentOffsets.put(currentPartition, currentOffset + 1);
                     ConsumerRecord<K, V> record
                         = topic.records.get(currentPartition).get((int) (currentOffset - firstOffset));
+                    if(this.topic.getMetrics() != null
+                            && this.topic.getMetrics().recordsConsumedByTopic.containsKey(this.topic.getShortName())) {
+                        this.topic.getMetrics().recordsConsumed.mark(1);
+                        this.topic.getMetrics().recordsConsumedByTopic.get(this.topic.getShortName()).mark(1);
+                    }
                     ByteArray parsedKey = topic.getParsedKey(record.key());
                     V oldValue = topic.readByPK(parsedKey);
                     FilterMode filterMode = FilterMode.UPDATE;

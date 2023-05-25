@@ -128,26 +128,26 @@ public class IndicesTest {
         Index playlistIndex = indices.parentIndices.get(TestHelper.PLAYLIST_PARENT_INDICES.PLAYLIST);
         assertNull(playlistIndex.getIndexEntry(rootPrimaryKey));
         assertNull(playlistIndex.getForeignKeys(rootPrimaryKey));
-        TestHelper.validateIndex(playlistIndex);
+        TestHelper.verifyIndexState(playlistIndex);
         // Check playlist <-> media index
         Index playlistMediaIndex = indices.parentIndices.get(TestHelper.PLAYLIST_PARENT_INDICES.PLAYLIST_MEDIA);
         assertNull(playlistMediaIndex.getIndexEntry(ByteArray.toByteArray(2234)));
         assertNull(playlistMediaIndex.getIndexEntry(ByteArray.toByteArray(2235)));
         assertNull(playlistMediaIndex.getIndexEntry(ByteArray.toByteArray(2236)));
         assertNull(playlistMediaIndex.getForeignKeys(rootPrimaryKey));
-        TestHelper.validateIndex(playlistMediaIndex);
+        TestHelper.verifyIndexState(playlistMediaIndex);
         // Check playlist <-> tag index
         Index playlistTagIndex = indices.parentIndices.get(TestHelper.PLAYLIST_PARENT_INDICES.PLAYLIST_TAG);
         assertNull(playlistTagIndex.getIndexEntry(ByteArray.toByteArray(7234)));
         assertEquals(TestHelper.toSet(4237), playlistTagIndex.getIndexEntry(ByteArray.toByteArray(7235)));
         assertEquals(TestHelper.toSet(4236), playlistTagIndex.getIndexEntry(ByteArray.toByteArray(7236)));
         assertNull(playlistTagIndex.getForeignKeys(rootPrimaryKey));
-        TestHelper.validateIndex(playlistTagIndex);
+        TestHelper.verifyIndexState(playlistTagIndex);
         // Check playlist <-> user index
         Index playlistUserIndex = indices.parentIndices.get(TestHelper.PLAYLIST_PARENT_INDICES.PLAYLIST_USER);
         assertEquals(TestHelper.toSet(4238), playlistUserIndex.getIndexEntry(ByteArray.toByteArray(1234)));
         assertNull(playlistUserIndex.getForeignKeys(rootPrimaryKey));
-        TestHelper.validateIndex(playlistUserIndex);
+        TestHelper.verifyIndexState(playlistUserIndex);
     }
 
     @Test
@@ -162,7 +162,7 @@ public class IndicesTest {
         assertEquals(TestHelper.toSet(6235, 6236), index.getIndexEntry(ByteArray.toByteArray(4235)));
         assertEquals(TestHelper.toSet(6234, 6237, 6238, 6239), index.getIndexEntry(ByteArray.toByteArray(4236)));
         assertEquals(TestHelper.toSet(4236), index.getForeignKeys(ByteArray.toByteArray(6234)));
-        TestHelper.validateIndex(index);
+        TestHelper.verifyIndexState(index);
     }
 
     @Test
@@ -177,7 +177,7 @@ public class IndicesTest {
         assertEquals(TestHelper.toSet(6234, 6235, 6236), index.getIndexEntry(ByteArray.toByteArray(4235)));
         assertEquals(TestHelper.toSet(6237, 6238, 6239), index.getIndexEntry(ByteArray.toByteArray(4236)));
         assertEquals(TestHelper.toSet(4235), index.getForeignKeys(ByteArray.toByteArray(6234)));
-        TestHelper.validateIndex(index);
+        TestHelper.verifyIndexState(index);
     }
 
     @Test
@@ -192,7 +192,7 @@ public class IndicesTest {
         assertEquals(TestHelper.toSet(6234, 6235, 6236), index.getIndexEntry(ByteArray.toByteArray(4235)));
         assertEquals(TestHelper.toSet(6237, 6238, 6239, 6270), index.getIndexEntry(ByteArray.toByteArray(4236)));
         assertEquals(TestHelper.toSet(4236), index.getForeignKeys(ByteArray.toByteArray(6270)));
-        TestHelper.validateIndex(index);
+        TestHelper.verifyIndexState(index);
     }
 
     @Test
@@ -207,7 +207,7 @@ public class IndicesTest {
         assertEquals(TestHelper.toSet(6235, 6236), index.getIndexEntry(ByteArray.toByteArray(4235)));
         assertEquals(TestHelper.toSet(6237, 6238, 6239), index.getIndexEntry(ByteArray.toByteArray(4236)));
         assertNull(index.getForeignKeys(ByteArray.toByteArray(6234)));
-        TestHelper.validateIndex(index);
+        TestHelper.verifyIndexState(index);
     }
 
     @Test
@@ -222,7 +222,7 @@ public class IndicesTest {
         indices.updateParentIndex(relations[0], playlistTag, userTag, rootPrimaryKey, newParentKey);
         assertEquals(TestHelper.toSet(4235, 4236), index.getIndexEntry(newParentKey));
         assertEquals(TestHelper.toSet(7234, 7235, 7236, 7237), index.getForeignKeys(rootPrimaryKey));
-        TestHelper.validateIndex(index);
+        TestHelper.verifyIndexState(index);
     }
 
     @Test
@@ -237,7 +237,7 @@ public class IndicesTest {
         indices.updateParentIndex(relations[0], playlistTag, userTag, rootPrimaryKey, newParentKey);
         assertEquals(TestHelper.toSet(4235, 4236, 4237), index.getIndexEntry(newParentKey));
         assertEquals(TestHelper.toSet(7235, 7236, 7237), index.getForeignKeys(rootPrimaryKey));
-        TestHelper.validateIndex(index);
+        TestHelper.verifyIndexState(index);
     }
 
     @Test
@@ -252,7 +252,7 @@ public class IndicesTest {
         indices.updateParentIndex(relations[0], playlistTag, userTag, rootPrimaryKey, newParentKey);
         assertEquals(TestHelper.toSet(4235, 4237), index.getIndexEntry(newParentKey));
         assertEquals(TestHelper.toSet(7234, 7235, 7236), index.getForeignKeys(rootPrimaryKey));
-        TestHelper.validateIndex(index);
+        TestHelper.verifyIndexState(index);
     }
 
     @Test
@@ -267,7 +267,7 @@ public class IndicesTest {
         indices.updateParentIndex(relations[0], playlistTag, userTag, rootPrimaryKey, newParentKey);
         assertEquals(TestHelper.toSet(4235, 4237), index.getIndexEntry(ByteArray.toByteArray(7235)));
         assertEquals(TestHelper.toSet(7234, 7235, 7236), index.getForeignKeys(rootPrimaryKey));
-        TestHelper.validateIndex(index);
+        TestHelper.verifyIndexState(index);
     }
 
     @Test

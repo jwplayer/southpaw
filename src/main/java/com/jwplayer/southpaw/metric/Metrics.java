@@ -194,12 +194,6 @@ public class Metrics {
         } else {
             denormalizedRecordsCreatedByTopic.put(shortName, (Meter) registry.getMetrics().get(meterName));
         }
-        meterName = String.join(".", DENORMALIZED_RECORDS_DROPPED, shortName);
-        if(!registry.getMetrics().containsKey(meterName)) {
-            denormalizedRecordsDroppedByTopic.put(shortName, registry.meter(meterName));
-        } else {
-            denormalizedRecordsDroppedByTopic.put(shortName, (Meter) registry.getMetrics().get(meterName));
-        }
         denormalizedRecordsCreatedByTopicAndPriority.put(shortName, new HashMap<>());
         for(QueueingStrategy.Priority priority: QueueingStrategy.Priority.values()) {
             if(priority == QueueingStrategy.Priority.NONE) continue;
@@ -209,6 +203,12 @@ public class Metrics {
             } else {
                 denormalizedRecordsCreatedByTopicAndPriority.get(shortName).put(priority, (Meter) registry.getMetrics().get(meterName));
             }
+        }
+        meterName = String.join(".", DENORMALIZED_RECORDS_DROPPED, shortName);
+        if(!registry.getMetrics().containsKey(meterName)) {
+            denormalizedRecordsDroppedByTopic.put(shortName, registry.meter(meterName));
+        } else {
+            denormalizedRecordsDroppedByTopic.put(shortName, (Meter) registry.getMetrics().get(meterName));
         }
         meterName = String.join(".", DENORMALIZED_RECORDS_TO_CREATE, shortName);
         if(!registry.getMetrics().containsKey(meterName)) {
@@ -221,7 +221,7 @@ public class Metrics {
             if(priority == QueueingStrategy.Priority.NONE) continue;
             meterName = String.join(".", DENORMALIZED_RECORDS_TO_CREATE, priority.name().toLowerCase(), shortName);
             if(!registry.getMetrics().containsKey(meterName)) {
-                denormalizedRecordsToCreateByTopicAndPriority.get(shortName).put(priority, new StaticGauge<>());
+                denormalizedRecordsToCreateByTopicAndPriority.get(shortName).put(priority, registry.register(meterName, new StaticGauge<>()));
             } else {
                 denormalizedRecordsToCreateByTopicAndPriority.get(shortName).put(priority, (StaticGauge<Long>) registry.getMetrics().get(meterName));
             }

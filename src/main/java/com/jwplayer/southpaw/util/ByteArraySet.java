@@ -292,32 +292,28 @@ public class ByteArraySet extends AbstractSet<ByteArray> {
          * Searches for and resets the min and max entries starting at index 0
          */
         public void resetMinAndMax() {
+            min = null;
             if(entries == 0) {
                 max = null;
-                min = null;
                 size = 0;
             } else {
                 int entrySize = 0;
                 int index = 0;
-                while (index < size) {
-                    entrySize = bytes[index];
-                    if (entrySize != 0) {
-                        min = new ByteArray(Arrays.copyOfRange(bytes, index + 1, index + entrySize + 1));
-                        break;
-                    }
-                    index++;
-                }
                 Integer maxIndex = null;
                 while (index < size) {
                     entrySize = bytes[index];
                     if (entrySize != 0) {
+                        if(min == null) {
+                            min = new ByteArray(Arrays.copyOfRange(bytes, index + 1, index + entrySize + 1));
+                        }
                         maxIndex = index;
                         index+= entrySize;
                     }
                     index++;
                 }
                 if (maxIndex != null) {
-                    max = new ByteArray(Arrays.copyOfRange(bytes, maxIndex + 1, maxIndex + bytes[maxIndex] + 1));
+                    size = maxIndex + bytes[maxIndex] + 1;
+                    max = new ByteArray(Arrays.copyOfRange(bytes, maxIndex + 1, size));
                 }
             }
         }

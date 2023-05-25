@@ -7,7 +7,6 @@ import com.jwplayer.southpaw.json.DenormalizedRecord;
 import com.jwplayer.southpaw.record.BaseRecord;
 import com.jwplayer.southpaw.record.MapRecord;
 import com.jwplayer.southpaw.serde.JsonSerde;
-import com.jwplayer.southpaw.topic.BaseTopic;
 import com.jwplayer.southpaw.util.ByteArray;
 import com.jwplayer.southpaw.util.ByteArraySet;
 import com.jwplayer.southpaw.util.FileHelper;
@@ -17,6 +16,7 @@ import org.slf4j.LoggerFactory;
 
 import java.net.URI;
 import java.util.*;
+import java.util.stream.Collectors;
 
 import static org.junit.Assert.assertEquals;
 
@@ -55,28 +55,31 @@ public class TestHelper {
         String PLAYLIST_CUSTOM_PARAMS = BASE_TOPIC_PATH + "playlist_custom_params.json";
         String PLAYLIST_MEDIA = BASE_TOPIC_PATH + "playlist_media.json";
         String PLAYLIST_TAG = BASE_TOPIC_PATH + "playlist_tag.json";
-        String SLIM_ENTITY = BASE_TOPIC_PATH + "slim_entity.json";
         String USER = BASE_TOPIC_PATH + "user.json";
         String USER_TAG = BASE_TOPIC_PATH + "user_tag.json";
     }
 
     @SuppressWarnings("unchecked")
+    public static ByteArray convertPrimaryKey(Object primaryKey) {
+        if(primaryKey instanceof Map) {
+            return ByteArray.toByteArray(new MapRecord((Map<String, ?>) primaryKey));
+        } else {
+            return ByteArray.toByteArray(primaryKey);
+        }
+    }
+
+    public static String getIndexDataPath(String indexName) {
+        return INDEX_BASE_PATH + indexName.replace(Indices.SEP, ".") + ".json";
+    }
+
     public static void populateIndex(Index index) throws Exception {
-        List<Pair<BaseRecord, BaseRecord>> data =
-                readRecordData(INDEX_BASE_PATH + index.getIndexName().replace(Indices.SEP, ".") + ".json");
+        List<Pair<BaseRecord, BaseRecord>> data = readRecordData(getIndexDataPath(index.getIndexName()));
         for(Pair<BaseRecord, BaseRecord> datum: data) {
-            ByteArray foreignKey = ByteArray.toByteArray(datum.getA());
             for(Object pk: (List<?>) datum.getB().get("pks")) {
-                ByteArray primaryKey;
-                if(pk instanceof Map) {
-                    primaryKey = ByteArray.toByteArray(new MapRecord((Map<String, ?>) pk));
-                } else {
-                    primaryKey = ByteArray.toByteArray(pk);
-                }
-                index.add(foreignKey, primaryKey);
+                index.add(ByteArray.toByteArray(datum.getA()), convertPrimaryKey(pk));
             }
         }
-        validateIndex(index);
+        verifyIndexState(index);
     }
 
     public static List<Pair<ByteArray, DenormalizedRecord>> readDenormalizedData(String dataPath) throws Exception {
@@ -109,7 +112,7 @@ public class TestHelper {
     }
 
     @SafeVarargs
-    public static <T> Set<ByteArray> toSet(T... items) {
+    public static <T> ByteArraySet toSet(T... items) {
         ByteArraySet set = new ByteArraySet();
         for(T item: items) {
             set.add(ByteArray.toByteArray(item));
@@ -117,7 +120,7 @@ public class TestHelper {
         return set;
     }
 
-    public static void validateIndex(Index index) {
+    public static void verifyIndexState(Index index) {
         assertEquals(Collections.emptySet(), index.verifyIndexState());
         assertEquals(Collections.emptySet(), index.verifyReverseIndexState());
     }
