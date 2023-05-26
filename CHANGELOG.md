@@ -1,5 +1,22 @@
 # Change log
 
+## 0.8.0
+May 26th, 2023
+
+### Upgrade Notes
+* The support for different record creation queues is not a breaking change. Existing states are still supported.
+* All changes are from [#116](https://github.com/jwplayer/southpaw/pull/116)
+
+### Bug Fixes
+* Fixes an issue where backups, commits, and metrics reporting would not happen when a very large amount of denormalized records to be created were queued and created  
+
+### New Features
+* Changes how new primary keys for denormalized records are queued. There are now 3 different priority queues: low, medium, high. By default, everything is queued as medium, but a custom QueueingStrategy class can be specified using the `queueing.strategy.class` config option. Additionally, there is a "none" priority that causes the keys to be dropped.
+  * The high queue is fully processed immediately
+  * The medium queue will only be fully processed once records have been consumed from all topics. If the queue exceeds the maximum configured size, records will be created in batches until the queue size is back under the max size. This is the same as the old queueing behavior.
+  * The low queue will only be created in a single batch with each pass through the topics. Similar to the medium queue, records are processed in batches until the queue size is under the max size.
+* Added additional metrics around index entry sizes and the different priority queues
+
 ## 0.7.3
 September 26th, 2022
 

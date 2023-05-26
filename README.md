@@ -149,9 +149,12 @@ The config is broken up into multiple sections:
 
 * backup.time.s - The amount of time in seconds between backups
 * commit.time.s - The amount of time in seconds between full state commits
+* create.records.time.s - The amount of time spent creating denormalized record before returning to the main loop
 * create.records.trigger - Number of denormalized record create actions to queue before creating denormalized records. Only queues creation of records when lagging. 
 * index.lru.cache.size - The number of index entries to cache in memory 
 * index.write.batch.size - The number of entries each index holds in memory before flushing to the state
+* metrics.report.time.s - The amount of time in seconds between calculating and reporting metrics
+* queueing.strategy.class - When specified, allows specifying a custom QueueingStrategy class that allows finer control over how denormalized record primary keys are queued and created. The default behavior is that everything is put in the medium priority queue. 
 * topic.lag.trigger - Southpaw will stick to a single topic until it falls below a certain lag threshold before switching to the next topic. This is for performance purposes. This option controls that threshold.
 
 ### RocksDB Config
@@ -193,6 +196,7 @@ Currently, Southpaw uses RocksDB for its state, though this could be made plugga
 
 Similar to the state, Southpaw is built around Kafka for the log store. The topic config is different from the normal config. All topic config is under the topics entry. Underneath that are one or more sections that should match the entity names of the different normalized entities from the relations file. In addition to those is a "default" section. Each topic created gets its config by taking the default section and then using the section corresponding to its entity as overrides for the default options. Most options come directly from the Kafka consumer/producer config, but there are a few added by Southpaw:
 
+* filter.class - When specified, allows filtering of incoming records. Records can be marked for deletion, skipping, or updating.
 * jackson.serde.class - The full class name of the deserialized object created by the JacksonSerde class
 * key.serde.class - The full name of the serde class for the record key
 * poll.timeout - The Kafka consumer poll() timeout in milliseconds
@@ -370,11 +374,17 @@ Southpaw exposes basic metrics about its operation and performance through JMX u
 * backups.restored (Timer) - The count and time taken for backup restoration
 * denormalized.records.created (Meter) - The count and rate for records created
 * denormalized.records.created.[RECORD_NAME] (Meter) - Similar to denormalized.records.created, but broken down by the specific type of denormalized record created
+* denormalized.records.created.[RECORD_NAME].[PRIORITY] (Meter) (Meter) - Similar to denormalized.records.created, but broken down by the specific type of denormalized record created, and which priority queue used to create it
+* denormalized.records.dropped (Meter) - The number of denormalized records dropped due to the configured Queueing strategy marking the priority of the records as NONE
+* denormalized.records.dropped.[RECORD_NAME] (Meter) - Similar to denormalized.records.dropped, but broken down by the specific type of denormalized record created
 * denormalized.records.to.create (Meter) - The count of denormalized records that are queued to be created 
 * denormalized.records.to.create.[RECORD_NAME] (Meter) - Similar to denormalized.records.to.create, but broken down by the specific type of denormalized record queued
+* denormalized.records.to.create.[RECORD_NAME].[PRIORITY] (Meter) - Similar to denormalized.records.to.create, but broken down by the specific type of denormalized record queued, and which priority queue used to create it
 * filter.deletes.[ENTITY_NAME] (Meter) - The count and rate of input records marked for deletion by the supplied or default filter
 * filter.skips.[ENTITY_NAME] (Meter) - The count and rate of input records marked for skipping by the supplied or default filter
 * filter.updates.[ENTITY_NAME] (Meter) - The count and rate of input records marked for updating by the supplied or default filter
+* index.entries.size.[INDEX_NAME] (Histogram) - A histogram of the sizes of the sets written to each index entry
+* index.reverse.entries.size.[INDEX_NAME] (Histogram) - A histogram of the sizes of the sets written to each reverse index entry
 * records.consumed (Meter) - The count and rate of records consumed from all normalized entity topics
 * records.consumed.[ENTITY_NAME] (Meter) - Similar to records.consumer, but broken down by the specific normalized entity
 * s3.downloads (Timer) - The count and time taken for state downloads from S3
