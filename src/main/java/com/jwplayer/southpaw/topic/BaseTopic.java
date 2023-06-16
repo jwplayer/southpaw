@@ -51,6 +51,8 @@ public abstract class BaseTopic<K, V> {
     public static final String TOPIC_CLASS_CONFIG = "topic.class";
     public static final String TOPIC_CLASS_DOC =
             "The topic class to use for Southpaw. The different topics can use different topic implementations.";
+    public static final String TOPIC_OFFSET_OVERRIDE_CONFIG = "topic.offset.override";
+    public static final String TOPIC_OFFSET_OVERRIDE_DOC = "Long value of a topic offset to explicitly start at";
     /**
      * Config option for specifying the name of the topic
      */
@@ -75,6 +77,10 @@ public abstract class BaseTopic<K, V> {
      * The full topic name (e.g. my.topic.user)
      */
     protected String topicName;
+    /**
+     * The offset to override from state when configuring
+     */
+    protected Long topicOffsetOverride;
 
     /**
      * Commits the current offsets and data to the state. Use after reading messages using the readNext method,
@@ -96,6 +102,7 @@ public abstract class BaseTopic<K, V> {
 
         // Initialize topic
         this.topicName = this.topicConfig.southpawConfig.getOrDefault(TOPIC_NAME_CONFIG, "").toString();
+        this.topicOffsetOverride = (Long) this.topicConfig.southpawConfig.getOrDefault(TOPIC_OFFSET_OVERRIDE_CONFIG, null);
         this.topicConfig.state.createKeySpace(dataKeyspaceName);
         this.topicConfig.state.createKeySpace(offsetKeyspaceName);
     }
