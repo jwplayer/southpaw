@@ -322,15 +322,23 @@ public class KafkaTopic<K, V> extends BaseTopic<K, V> {
         numPartitions = partitionsToAssign.size();
         consumer.assign(partitionsToAssign);
         for(TopicPartition partition: partitionsToAssign) {
-            byte[] bytes = this.getState().get(offsetKeyspaceName, Ints.toByteArray(partition.partition()));
-            if (bytes == null) {
-                consumer.seekToBeginning(Collections.singleton(partition));
-                logger.info(String.format("No offsets found for topic %s and partition %s, seeking to beginning.", this.getShortName(), partition.partition()));
-            } else {
-                Long offset = Longs.fromByteArray(bytes);
+            Long offset;
+            if (this.topicOffsetOverride != null) {
+                offset = this.topicOffsetOverride;
                 currentOffsets.put(partition.partition(), offset);
                 consumer.seek(new TopicPartition(topicName, partition.partition()), offset);
-                logger.info(String.format("Topic %s and partition %s starting with offset %s.", this.getShortName(), partition.partition(), offset));
+                logger.info(String.format("Topic %s and partition %s starting with offset %s from topic.offset.override.", this.getShortName(), partition.partition(), offset));
+            } else {
+                byte[] bytes = this.getState().get(offsetKeyspaceName, Ints.toByteArray(partition.partition()));
+                if (bytes == null) {
+                    consumer.seekToBeginning(Collections.singleton(partition));
+                    logger.info(String.format("No offsets found for topic %s and partition %s, seeking to beginning.", this.getShortName(), partition.partition()));
+                } else {
+                    offset = Longs.fromByteArray(bytes);
+                    currentOffsets.put(partition.partition(), offset);
+                    consumer.seek(new TopicPartition(topicName, partition.partition()), offset);
+                    logger.info(String.format("Topic %s and partition %s starting with offset %s from existing state.", this.getShortName(), partition.partition(), offset));
+                }
             }
         }
         endOffsetWatch = new StopWatch();
