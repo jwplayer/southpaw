@@ -29,13 +29,13 @@
         <!-- These Kafka dependencies need to be kept in sync -->
         <!-- As well as the TestContainer Kafka image version found in -->
         <!-- src/test/java/com/jwplayer/southpaw/topic/KafkaTopicTest.java -->
-        <version.confluent>7.1.1</version.confluent>
-        <version.kafka>3.1.1</version.kafka>
+        <version.confluent>7.6.0</version.confluent>
+        <version.kafka>3.7.0</version.kafka>
 
 
         <version.amazonaws>1.12.261</version.amazonaws>
         <version.apache.commons>4.1</version.apache.commons>
-        <version.avro>1.8.2</version.avro>
+        <version.avro>1.11.3</version.avro>
         <version.commons.io>2.7</version.commons.io>
         <version.commons.lang>2.6</version.commons.lang>
         <version.dropwizard>4.0.2</version.dropwizard>
@@ -53,7 +53,7 @@
         <version.junit>4.13.1</version.junit>
         <version.mockito>2.25.1</version.mockito>
         <version.s3mock>0.2.5</version.s3mock>
-        <version.testcontainers>1.17.3</version.testcontainers>
+        <version.testcontainers>1.19.8</version.testcontainers>
 
         <modules.argline />
 
