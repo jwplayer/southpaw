@@ -5,6 +5,7 @@ May 16th, 2024
 
 ### Bug Fixes
 * Upgrades Kafka dependencies and avro [#120](https://github.com/jwplayer/southpaw/pull/120)
+* Java 17 support added
 
 ## 0.8.0
 May 26th, 2023
