@@ -1,5 +1,11 @@
 # Change log
 
+## 0.8.2
+January 7th, 2025
+
+### Bug Fixes
+* Fixes an issue where a ConcurrentModificationException could be thrown when updated indices.
+
 ## 0.8.1
 May 16th, 2024
 

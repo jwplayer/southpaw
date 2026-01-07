@@ -236,6 +236,16 @@ public class ByteArraySetTest {
     }
 
     @Test
+    public void testIteratorConcurrentModification() {
+        if(!set.isEmpty()) {
+            for(ByteArray value: set) {
+                set.remove(value);
+            }
+        }
+        assertTrue(set.isEmpty());
+    }
+
+    @Test
     public void testOperationsWithRandomMerges() {
         if(size == 0) return;
         ByteArraySet set = new ByteArraySet();

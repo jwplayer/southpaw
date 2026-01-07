@@ -15,6 +15,8 @@
  */
 package com.jwplayer.southpaw.util;
 
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import org.apache.commons.lang.NotImplementedException;
 import com.google.common.base.Preconditions;
 import com.google.common.primitives.Ints;
@@ -343,7 +345,7 @@ public class ByteArraySet extends AbstractSet<ByteArray> {
         protected Iterator<Chunk> chunksIter;
 
         protected ChunksIterator() {
-            this.chunksIter = chunks.iterator();
+            this.chunksIter = ImmutableList.copyOf(chunks).iterator();
             currentChunk = getNextChunk();
             nextValue = getNextValue();
         }
@@ -394,7 +396,7 @@ public class ByteArraySet extends AbstractSet<ByteArray> {
 
         protected FullIterator() {
             this.chunksIterator = new ChunksIterator();
-            this.frontingSetIterator = frontingSet.iterator();
+            this.frontingSetIterator = ImmutableSet.copyOf(frontingSet).iterator();
         }
 
         @Override
