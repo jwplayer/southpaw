@@ -62,6 +62,10 @@ public class ByteArraySet extends AbstractSet<ByteArray> {
      */
     public static final byte[] EMPTY_SET_BYTES = { FORMAT.EMPTY.getValue() };
     /**
+     * The maximum size of an entry that can be added to the set
+     */
+    public static final int MAX_ENTRY_SIZE = 255;
+    /**
      * Force a max size on the fronting set to prevent uncontrolled growth and OOM errors
      */
     public static final int MAX_FRONTING_SET_SIZE = 1000;
@@ -69,7 +73,7 @@ public class ByteArraySet extends AbstractSet<ByteArray> {
     /**
      * A chunk contains a sorted set of ByteArrays within a single byte array. The set values are formatted such that
      * the first byte is the size of an individual ByteArray value, then the ByteArray after that. The chunk also
-     * contains information around it's min and max values, as well as the number of entries and the overall size
+     * contains information around its min and max values, as well as the number of entries and the overall size
      * of byte array chunk.
      */
     protected static class Chunk {
@@ -157,7 +161,7 @@ public class ByteArraySet extends AbstractSet<ByteArray> {
             int index = 0;
             byte[] baBytes = byteArray.getBytes();
             while(index < size) {
-                int baSize = bytes[index];
+                int baSize = Ints.fromBytes((byte) 0,(byte) 0,(byte) 0, bytes[index]);
                 int i;
                 index++;
                 if(baSize == baBytes.length) {
@@ -180,16 +184,16 @@ public class ByteArraySet extends AbstractSet<ByteArray> {
          */
         public static Chunk deserialize(byte[] bytes, int from, int to) {
             int size = Ints.fromBytes(bytes[to - 3], bytes[to - 2], bytes[to - 1], bytes[to]);
-            int maxSize = bytes[to - 4];
+            int maxSize = Ints.fromBytes((byte) 0,(byte) 0,(byte) 0, bytes[to - 4]);
             ByteArray max = new ByteArray(Arrays.copyOfRange(bytes, to - 4 - maxSize, to - 4));
-            int minSize = bytes[to - 5 - maxSize];
+            int minSize = Ints.fromBytes((byte) 0,(byte) 0,(byte) 0, bytes[to - 5 - maxSize]);
             ByteArray min = new ByteArray(Arrays.copyOfRange(bytes, to - 5 - maxSize - minSize, to - 5 - maxSize));
             size = size - 2 - minSize - maxSize - Integer.BYTES;
             int entries = 0;
             int index = 0;
             byte[] chunkBytes = Arrays.copyOfRange(bytes, from, from + size);
             while(index < size) {
-                int baSize = chunkBytes[index];
+                int baSize = Ints.fromBytes((byte) 0,(byte) 0,(byte) 0, chunkBytes[index]);
                 if(baSize != 0) entries++;
                 index += 1 + baSize;
             }
@@ -200,7 +204,7 @@ public class ByteArraySet extends AbstractSet<ByteArray> {
          * Deserializes a segment of a byte array into a Chunk, assuming it was serialized into a compact format
          * @param bytes - The bytes to deserialize a subsection of
          * @param from - The start of the serialized Chunk segment
-         * @param to - The end of the serialized Chunk segent
+         * @param to - The end of the serialized Chunk segment
          * @return - A deserialized Chunk instance
          */
         public static Chunk deserializeCompact(byte[] bytes, int from, int to) {
@@ -210,7 +214,7 @@ public class ByteArraySet extends AbstractSet<ByteArray> {
             ByteArray min = null;
             ByteArray max = null;
             while(index < chunkBytes.length) {
-                int baSize = chunkBytes[index];
+                int baSize = Ints.fromBytes((byte) 0,(byte) 0,(byte) 0, chunkBytes[index]);
                 index++;
                 if(baSize != 0) {
                     entries++;
@@ -232,7 +236,7 @@ public class ByteArraySet extends AbstractSet<ByteArray> {
             if(min.compareTo(valToRemove) > 0 || max.compareTo(valToRemove) < 0) return false;
             int index = 0;
             while(index < size) {
-                int entrySize = bytes[index];
+                int entrySize = Ints.fromBytes((byte) 0,(byte) 0,(byte) 0, bytes[index]);
                 if(entrySize == valToRemove.size() && valToRemove.compareTo(bytes, index + 1, entrySize) == 0) {
                     Arrays.fill(bytes, index, index + entrySize + 1, (byte) 0);
                     entries--;
@@ -260,7 +264,7 @@ public class ByteArraySet extends AbstractSet<ByteArray> {
                 if(valToRemove != null && valToRemove.size() > 0 &&
                         min.compareTo(valToRemove) <= 0 && max.compareTo(valToRemove) >= 0) {
                     while(index < size) {
-                        int entrySize = bytes[index];
+                        int entrySize = Ints.fromBytes((byte) 0,(byte) 0,(byte) 0, bytes[index]);
                         if(entrySize == 0) {
                             // This is a previously deleted value, so move the index forward
                             index++;
@@ -299,11 +303,11 @@ public class ByteArraySet extends AbstractSet<ByteArray> {
                 max = null;
                 size = 0;
             } else {
-                int entrySize = 0;
+                int entrySize;
                 int index = 0;
                 Integer maxIndex = null;
                 while (index < size) {
-                    entrySize = bytes[index];
+                    entrySize = Ints.fromBytes((byte) 0,(byte) 0,(byte) 0, bytes[index]);
                     if (entrySize != 0) {
                         if(min == null) {
                             min = new ByteArray(Arrays.copyOfRange(bytes, index + 1, index + entrySize + 1));
@@ -314,7 +318,8 @@ public class ByteArraySet extends AbstractSet<ByteArray> {
                     index++;
                 }
                 if (maxIndex != null) {
-                    size = maxIndex + bytes[maxIndex] + 1;
+                    int maxSize = Ints.fromBytes((byte) 0,(byte) 0,(byte) 0, bytes[maxIndex]);
+                    size = maxIndex + maxSize + 1;
                     max = new ByteArray(Arrays.copyOfRange(bytes, maxIndex + 1, size));
                 }
             }
@@ -361,7 +366,7 @@ public class ByteArraySet extends AbstractSet<ByteArray> {
         protected ByteArray getNextValue() {
             while(currentChunk != null) {
                 while(currentOffset < currentChunk.size) {
-                    int size = currentChunk.bytes[currentOffset];
+                    int size = Ints.fromBytes((byte) 0,(byte) 0,(byte) 0, currentChunk.bytes[currentOffset]);
                     if (size == 0) {
                         currentOffset += 1;
                     } else {
@@ -420,6 +425,9 @@ public class ByteArraySet extends AbstractSet<ByteArray> {
     @Override
     public boolean add(ByteArray byteArray) {
         if(byteArray == null || byteArray.size() == 0) return false;
+        if(byteArray.size() > MAX_ENTRY_SIZE) {
+            throw new IllegalArgumentException(String.format("%s exceeds the maximum entry size of %s", byteArray.size(), MAX_ENTRY_SIZE));
+        }
         boolean retVal = false;
         if(!contains(byteArray)) {
             frontingSet.add(byteArray);
@@ -519,7 +527,7 @@ public class ByteArraySet extends AbstractSet<ByteArray> {
      * splitting them apart.
      */
     protected void merge() {
-        if(frontingSet.size() == 0) return;
+        if(frontingSet.isEmpty()) return;
         List<Chunk> newChunks = new ArrayList<>();
         Chunk chunk = new Chunk(Chunk.MAX_CHUNK_SIZE);
         Iterator<ByteArray> frontIter = frontingSet.iterator();
@@ -596,7 +604,7 @@ public class ByteArraySet extends AbstractSet<ByteArray> {
                 valsToRemove.add((ByteArray) val);
             }
         }
-        if(valsToRemove.chunks.size() > 0) {
+        if(!valsToRemove.chunks.isEmpty()) {
             valsToRemove.merge();
         }
 

@@ -1,5 +1,11 @@
 # Change log
 
+## 0.8.3
+April 9th, 2026
+
+### Bug Fixes
+* Fixes an issue where serialized entry sizes in ByteArraySet were not properly converted back to an int from a byte, limiting the size to 127 instead of 255.
+
 ## 0.8.2
 January 7th, 2025
 
