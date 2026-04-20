@@ -77,6 +77,7 @@ public class RocksDBState extends BaseState {
      * Amount of memory used for memtables
      */
     public static final String MEMTABLE_SIZE = "rocks.db.memtable.size";
+    public static final int NUM_LEVELS = 4;
     /**
      * Used for # of threads for RocksDB parallelism
      */
@@ -152,7 +153,7 @@ public class RocksDBState extends BaseState {
      * Log level for RocksDB native layer
      */
     protected InfoLogLevel infoLogLevel;
-    private List<Iterator> iterators = new ArrayList<>();
+    private final List<Iterator> iterators = new ArrayList<>();
     /**
      * Max # of background compactions
      */
@@ -332,7 +333,7 @@ public class RocksDBState extends BaseState {
             this.uri = new URI(Preconditions.checkNotNull(config.get(URI_CONFIG).toString()));
 
             // TODO: We need to split S3 persistence out of RocksDBState. It doesn't belong here
-            if(backupURI.getScheme().toLowerCase().equals(S3Helper.SCHEME)) {
+            if(backupURI.getScheme().equalsIgnoreCase(S3Helper.SCHEME)) {
                 s3Helper = new S3Helper(config);
                 backupPath = getLocalBackupPath(uri);
             } else {
@@ -342,7 +343,7 @@ public class RocksDBState extends BaseState {
             File file = new File(backupPath);
             if (!file.exists()) {
                 boolean created = file.mkdir();
-                logger.info("Created RocksDB backup directory: " + created);
+                logger.info("Created RocksDB backup directory: {}", created);
             }
             backupPath = file.getPath();
 
@@ -373,11 +374,7 @@ public class RocksDBState extends BaseState {
                     .setSstFileManager(sstFileManager)
                     .setWalSizeLimitMB(0L);
             dbOptions.setMaxSubcompactions(maxSubcompactions);
-            ColumnFamilyOptions cfOptions = new ColumnFamilyOptions()
-                    .setCompactionStyle(CompactionStyle.LEVEL)
-                    .setMaxWriteBufferNumber(maxWriteBufferNumber)
-                    .setNumLevels(4)
-                    .setTargetFileSizeMultiplier(2);
+            ColumnFamilyOptions cfOptions = createColumnFamilyOptions();
             rocksDBOptions = new Options(dbOptions, cfOptions)
                     .optimizeLevelStyleCompaction(memtableSize)
                     .setCompactionReadaheadSize(compactionReadAheadSize)
@@ -389,7 +386,7 @@ public class RocksDBState extends BaseState {
                     .setMaxBackgroundCompactions(maxBackgroundCompactions)
                     .setMaxBackgroundFlushes(maxBackgroundFlushes)
                     .setMaxWriteBufferNumber(maxWriteBufferNumber)
-                    .setNumLevels(4)
+                    .setNumLevels(NUM_LEVELS)
                     .setSstFileManager(sstFileManager)
                     .setStatistics(statistics)
                     .setTargetFileSizeMultiplier(2)
@@ -413,7 +410,7 @@ public class RocksDBState extends BaseState {
             for (byte[] family : families) {
                 descriptors.add(new ColumnFamilyDescriptor(family, cfOptions));
             }
-            if (descriptors.size() == 0) {
+            if (descriptors.isEmpty()) {
                 descriptors.add(new ColumnFamilyDescriptor(RocksDB.DEFAULT_COLUMN_FAMILY, cfOptions));
             }
 
@@ -435,7 +432,7 @@ public class RocksDBState extends BaseState {
                     for (byte[] family : families) {
                         descriptors.add(new ColumnFamilyDescriptor(family, cfOptions));
                     }
-                    if (descriptors.size() == 0) {
+                    if (descriptors.isEmpty()) {
                         descriptors.add(new ColumnFamilyDescriptor(RocksDB.DEFAULT_COLUMN_FAMILY, cfOptions));
                     }
                 }
@@ -470,6 +467,14 @@ public class RocksDBState extends BaseState {
         }
     }
 
+    protected ColumnFamilyOptions createColumnFamilyOptions() {
+        return new ColumnFamilyOptions()
+            .setCompactionStyle(CompactionStyle.LEVEL)
+            .setMaxWriteBufferNumber(maxWriteBufferNumber)
+            .setNumLevels(NUM_LEVELS)
+            .setTargetFileSizeMultiplier(2);
+    }
+
     @Override
     public void createKeySpace(String keySpace) {
         ByteArray handleName = new ByteArray(keySpace);
@@ -479,9 +484,10 @@ public class RocksDBState extends BaseState {
     }
 
     protected void createKeySpace(ByteArray handleName) {
-        ColumnFamilyDescriptor cfDescriptor = new ColumnFamilyDescriptor(handleName.getBytes());
         ColumnFamilyHandle cfHandle;
         try {
+            ColumnFamilyOptions cfOptions = createColumnFamilyOptions();
+            ColumnFamilyDescriptor cfDescriptor = new ColumnFamilyDescriptor(handleName.getBytes(), cfOptions);
             cfHandle = this.rocksDB.createColumnFamily(cfDescriptor);
         } catch (RocksDBException ex) {
             throw new RuntimeException(ex);
