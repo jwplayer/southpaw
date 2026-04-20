@@ -1,5 +1,11 @@
 # Change log
 
+## 0.8.4
+April 20th, 2026
+
+### Bug Fixes
+* Use the same column family config when loading the DB and when creating a new column family.
+
 ## 0.8.3
 April 9th, 2026
 
