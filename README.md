@@ -131,11 +131,11 @@ As specified above, the best way to think about this is as a series of LEFT OUTE
         LEFT OUTER JOIN user ON playlist.user_id = user.user_id
         LEFT OUTER JOIN playlist_tag ON playlist.id = playlist_tag.playlist_id
         LEFT OUTER JOIN user_tag ON playlist_tag.user_tag_id = user_tag.id
-        LEFT OUTER JOIN playlist_custom_params ON playlist.id = playlist_custom_params.playlist.id
+        LEFT OUTER JOIN playlist_custom_params ON playlist.id = playlist_custom_params.playlist_id
         LEFT OUTER JOIN playlist_media ON playlist.id = playlist_media.playlist_id
         LEFT OUTER JOIN media ON playlist_media.media_id = media.id
 
-The root node in this relationship tree (playilst in the example) is special. It must have a DenormalizedName in addition to an Entity, but it has no ParentKey or JoinKey. Each child node also has an Entity in addition to a ParentKey and JoinKey. Each node (root or child) may or may not have children.  
+The root node in this relationship tree (playlist in the example) is special. It must have a DenormalizedName in addition to an Entity, but it has no ParentKey or JoinKey. Each child node also has an Entity in addition to a ParentKey and JoinKey. Each node (root or child) may or may not have children.
 
 The Entity and DenormalizedName fields should match corresponding entries under topics in the configuration. This allows different input and output topics to have different configuration. You could even specify different servers for each topic.
 
@@ -203,6 +203,8 @@ Similar to the state, Southpaw is built around Kafka for the log store. The topi
 * topic.class - The full class name of the class used by the topic
 * topic.name - The name of the topic (not the entity name for this topic!)
 * value.serde.class - The full name of the serde class for the record value
+
+Furthermore, multiple normalized entities can leverage the same topic as long as they use different consumer groups.
 
 ### Example
 
